@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
 import { buildMemoryPromptSection } from "../plugins/memory-state.js";
-import { resolveSuperhumanStateDir } from "./super-state-store.js";
+import type {
+  FrozenMemoryReductionReason,
+  StateFrozenMemoryBlockedLine,
+} from "./super-runtime-seams.js";
+import { createSuperhumanStateStore, resolveSuperhumanStateDir } from "./super-state-store.js";
 
 type FrozenMemoryPromptSnapshot = {
   sessionKey: string;
@@ -41,16 +45,54 @@ const INVISIBLE_CHARS = [
   "\u202e",
 ];
 
-function sanitizeSnapshotLines(lines: string[]): string[] {
-  return lines.filter((line) => {
-    if (line.includes(ENTRY_DELIMITER)) {
-      return false;
+function classifyBlockedLine(line: string): StateFrozenMemoryBlockedLine | null {
+  if (line.includes(ENTRY_DELIMITER)) {
+    return {
+      line,
+      reason: "delimiter_abuse",
+      pattern: ENTRY_DELIMITER,
+    };
+  }
+  if (INVISIBLE_CHARS.some((char) => line.includes(char))) {
+    return {
+      line,
+      reason: "invisible_char",
+    };
+  }
+  for (const pattern of SUSPICIOUS_MEMORY_PATTERNS) {
+    if (!pattern.test(line)) {
+      continue;
     }
-    if (INVISIBLE_CHARS.some((char) => line.includes(char))) {
-      return false;
+    const reason: FrozenMemoryReductionReason =
+      /curl|wget|cat|authorized_keys|\.ssh|\.env|credentials|token|secret|password/i.test(
+        pattern.source,
+      )
+        ? "exfiltration_pattern"
+        : "prompt_injection";
+    return {
+      line,
+      reason,
+      pattern: pattern.source,
+    };
+  }
+  return null;
+}
+
+function reduceSnapshotLines(lines: string[]): {
+  safeLines: string[];
+  blockedLines: StateFrozenMemoryBlockedLine[];
+} {
+  const safeLines: string[] = [];
+  const blockedLines: StateFrozenMemoryBlockedLine[] = [];
+  for (const line of lines) {
+    const blocked = classifyBlockedLine(line);
+    if (blocked) {
+      blockedLines.push(blocked);
+      continue;
     }
-    return !SUSPICIOUS_MEMORY_PATTERNS.some((pattern) => pattern.test(line));
-  });
+    safeLines.push(line);
+  }
+  return { safeLines, blockedLines };
 }
 
 function resolveSnapshotPath(workspaceDir: string, sessionKey: string): string {
@@ -104,17 +146,55 @@ export function buildSuperFrozenMemoryPromptSection(params: {
     return existing.lines;
   }
 
-  const lines = sanitizeSnapshotLines(
-    buildMemoryPromptSection({
-      availableTools: params.availableTools,
-      citationsMode: params.citationsMode,
-      sessionKey,
-    }),
-  );
+  const builtLines = buildMemoryPromptSection({
+    availableTools: params.availableTools,
+    citationsMode: params.citationsMode,
+    sessionKey,
+  });
+  const { safeLines, blockedLines } = reduceSnapshotLines(builtLines);
   persistSnapshot(snapshotPath, {
     sessionKey,
     createdAt: Date.now(),
-    lines,
+    lines: safeLines,
   });
-  return lines;
+  const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+  try {
+    const now = Date.now();
+    store.upsertFrozenMemorySnapshot({
+      sessionKey,
+      snapshotPath,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      safeLineCount: safeLines.length,
+      removedLineCount: blockedLines.length,
+      blocked: blockedLines.length > 0,
+      blockedLines,
+    });
+    store.appendAction({
+      actionId: `frozen-memory:${sessionKey}:${Buffer.from(snapshotPath).toString("base64url")}`,
+      sessionKey,
+      actionType: "super.memory.frozen_snapshot",
+      actionKind: "automation",
+      summary:
+        blockedLines.length > 0
+          ? "Reduced frozen-memory snapshot for safety"
+          : "Captured frozen-memory snapshot",
+      status: blockedLines.length > 0 ? "blocked" : "completed",
+      createdAt: now,
+      completedAt: now,
+      details: {
+        snapshotPath,
+        safeLineCount: safeLines.length,
+        removedLineCount: blockedLines.length,
+        blockedReasons: blockedLines.map((line) => ({
+          reason: line.reason,
+          pattern: line.pattern,
+        })),
+      },
+    });
+  } finally {
+    store.close();
+  }
+
+  return safeLines;
 }

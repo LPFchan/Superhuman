@@ -213,6 +213,71 @@ export type TeamMemorySyncDirection = "pull" | "push";
 
 export type TeamMemorySyncStatus = "success" | "blocked" | "failed" | "skipped";
 
+export type StateMemoryEvidenceRef = {
+  sessionKey?: string;
+  messageId?: string;
+  role: string;
+  excerpt: string;
+  timestamp?: number;
+  source: StateEvidenceSource;
+};
+
+export type StateMemoryWriteAuditEntry = {
+  entry: string;
+  supportingEvidence: StateMemoryEvidenceRef[];
+  sourceSessionKeys: string[];
+  evidenceSources: StateEvidenceSource[];
+};
+
+export type StateMemoryWriteAuditStatus = "completed" | "failed" | "skipped" | "unchanged";
+
+export type StateMemoryWriteAuditRecord = {
+  auditId: string;
+  sessionKey?: string;
+  runId?: string;
+  operationKind: "extraction" | "consolidation";
+  memoryPath: string;
+  status: StateMemoryWriteAuditStatus;
+  beforeHash?: string;
+  afterHash?: string;
+  beforeLineCount: number;
+  afterLineCount: number;
+  sourceSessionKeys: string[];
+  evidenceCounts: Record<StateEvidenceSource, number>;
+  evidenceRefs: StateMemoryEvidenceRef[];
+  addedEntries: StateMemoryWriteAuditEntry[];
+  removedEntries: string[];
+  changedAt: number;
+  operatorSummary?: string;
+};
+
+export type StateMemoryWriteAuditAppend = StateMemoryWriteAuditRecord;
+
+export type FrozenMemoryReductionReason =
+  | "delimiter_abuse"
+  | "exfiltration_pattern"
+  | "invisible_char"
+  | "prompt_injection";
+
+export type StateFrozenMemoryBlockedLine = {
+  line: string;
+  reason: FrozenMemoryReductionReason;
+  pattern?: string;
+};
+
+export type StateFrozenMemorySnapshotRecord = {
+  sessionKey: string;
+  snapshotPath: string;
+  createdAt: number;
+  updatedAt: number;
+  safeLineCount: number;
+  removedLineCount: number;
+  blocked: boolean;
+  blockedLines: StateFrozenMemoryBlockedLine[];
+};
+
+export type StateFrozenMemorySnapshotUpsert = StateFrozenMemorySnapshotRecord;
+
 export type StateTeamMemorySyncEventAppend = {
   eventId: string;
   repoRoot: string;
@@ -237,6 +302,9 @@ export type StateTeamMemorySyncStateRecord = {
   lastRetryAt?: number;
   conflictRetryCount: number;
   blockedFiles: string[];
+  blockedFileReasons?: Record<string, string>;
+  uploadedFiles: string[];
+  withheldFiles: string[];
   checksumState?: Record<string, string>;
   lastStatus?: TeamMemorySyncStatus;
   lastDecision?: string;
@@ -540,6 +608,13 @@ export interface StateStore {
   }): ContextPressureSnapshot[];
   upsertContextCollapseLedger(ledger: StateContextCollapseLedgerUpsert): void;
   getContextCollapseLedger(sessionKey: string): StateContextCollapseLedgerRecord | null;
+  appendMemoryWriteAudit(audit: StateMemoryWriteAuditAppend): void;
+  listMemoryWriteAudits(params?: {
+    sessionKey?: string;
+    limit?: number;
+  }): StateMemoryWriteAuditRecord[];
+  upsertFrozenMemorySnapshot(snapshot: StateFrozenMemorySnapshotUpsert): void;
+  getFrozenMemorySnapshot(sessionKey: string): StateFrozenMemorySnapshotRecord | null;
   appendTeamMemorySyncEvent(event: StateTeamMemorySyncEventAppend): void;
   listTeamMemorySyncEvents(params?: {
     repoRoot?: string;
@@ -676,7 +751,7 @@ export function createSuperPluginCapabilityRegistry(
         services: [...entry.services],
         toolNames: [...entry.toolNames],
         bundleCapabilities: [...(entry.bundleCapabilities ?? [])],
-        hasConfigSchema: entry.configSchema,
+        hasConfigSchema: Boolean(entry.configSchema),
       })),
   };
 }

@@ -106,6 +106,11 @@ const pendingTeamSyncs = new Map<string, Promise<void>>();
 
 type VisibleContextState = "original_content" | "collapsed_content" | "restored_files" | "mixed";
 
+type MemoryAuditSnapshot = {
+  hash?: string;
+  lines: string[];
+};
+
 function normalizeTextContent(content: unknown): string {
   if (typeof content === "string") {
     return content.trim();
@@ -560,6 +565,88 @@ function hashMemorySnapshot(contents: Array<{ path: string; hash: string }>): st
   return crypto.createHash("sha256").update(JSON.stringify(contents)).digest("hex");
 }
 
+function normalizeMemoryLines(content: string): string[] {
+  return content
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+async function readMemoryAuditSnapshot(
+  workspaceDir: string,
+  relativePath: string,
+): Promise<MemoryAuditSnapshot> {
+  const targetPath = path.join(workspaceDir, relativePath);
+  try {
+    const content = await fsp.readFile(targetPath, "utf8");
+    return {
+      hash: crypto.createHash("sha256").update(content).digest("hex"),
+      lines: normalizeMemoryLines(content),
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { lines: [] };
+    }
+    throw error;
+  }
+}
+
+function buildMemoryEvidenceRefs(params: {
+  messages: AgentMessage[];
+  fallbackSessionKey?: string;
+  limit?: number;
+}) {
+  const refs = params.messages.flatMap((message) => {
+    const text = extractMessageText(message);
+    if (!text) {
+      return [];
+    }
+    const meta = extractOpenClawMeta(message);
+    return [
+      {
+        sessionKey:
+          typeof meta?.sourceSessionKey === "string"
+            ? meta.sourceSessionKey
+            : params.fallbackSessionKey,
+        messageId: typeof meta?.sourceMessageId === "string" ? meta.sourceMessageId : undefined,
+        role: message.role,
+        excerpt: text.slice(0, 280),
+        timestamp: typeof message.timestamp === "number" ? message.timestamp : undefined,
+        source: classifyEvidenceSource(message),
+      },
+    ];
+  });
+  const evidenceRefs = refs.slice(0, params.limit ?? 12);
+  return {
+    evidenceRefs,
+    sourceSessionKeys: [
+      ...new Set(evidenceRefs.flatMap((ref) => (ref.sessionKey ? [ref.sessionKey] : []))),
+    ],
+    evidenceSources: [...new Set(evidenceRefs.map((ref) => ref.source))],
+  };
+}
+
+function buildMemoryDelta(params: {
+  beforeLines: string[];
+  afterLines: string[];
+  evidenceRefs: ReturnType<typeof buildMemoryEvidenceRefs>["evidenceRefs"];
+  sourceSessionKeys: string[];
+  evidenceSources: StateEvidenceSource[];
+}) {
+  const beforeSet = new Set(params.beforeLines);
+  const afterSet = new Set(params.afterLines);
+  const addedEntries = params.afterLines
+    .filter((line) => !beforeSet.has(line))
+    .map((entry) => ({
+      entry,
+      supportingEvidence: params.evidenceRefs,
+      sourceSessionKeys: params.sourceSessionKeys,
+      evidenceSources: params.evidenceSources,
+    }));
+  const removedEntries = params.beforeLines.filter((line) => !afterSet.has(line));
+  return { addedEntries, removedEntries };
+}
+
 async function runMemoryExtraction(params: {
   sessionKey?: string;
   sessionId: string;
@@ -583,6 +670,15 @@ async function runMemoryExtraction(params: {
 
   const evidence = summarizeEvidenceSources(params.recentMessages);
   const extractionActionId = `memory-extract:${params.sessionKey ?? params.sessionId}:${fingerprintFromMessages(params.recentMessages)}`;
+  const auditId = `memory-audit:${extractionActionId}`;
+  const memoryTargetSnapshot = await readMemoryAuditSnapshot(
+    params.workspaceDir,
+    memoryPlan.relativePath,
+  );
+  const evidenceBundle = buildMemoryEvidenceRefs({
+    messages: params.recentMessages,
+    fallbackSessionKey: params.sessionKey,
+  });
   const stateStore = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
   try {
     if (!evidence.allowDurableWrite) {
@@ -601,6 +697,25 @@ async function runMemoryExtraction(params: {
           sourceCounts: evidence.counts,
           memoryTarget: memoryPlan.relativePath,
         },
+      });
+      stateStore.appendMemoryWriteAudit({
+        auditId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        operationKind: "extraction",
+        memoryPath: memoryPlan.relativePath,
+        status: "skipped",
+        beforeHash: memoryTargetSnapshot.hash,
+        afterHash: memoryTargetSnapshot.hash,
+        beforeLineCount: memoryTargetSnapshot.lines.length,
+        afterLineCount: memoryTargetSnapshot.lines.length,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceCounts: evidence.counts,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        addedEntries: [],
+        removedEntries: [],
+        changedAt: Date.now(),
+        operatorSummary: "Skipped extraction because provisional evidence was present.",
       });
       return;
     }
@@ -634,7 +749,7 @@ async function runMemoryExtraction(params: {
       },
     });
     try {
-      const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.js");
+      const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.runtime.js");
       const tempSessionFile = path.join(
         resolveSuperhumanStateDir(params.workspaceDir),
         ENGINE_STATE_DIR,
@@ -670,6 +785,17 @@ async function runMemoryExtraction(params: {
       params.state.extraction.lastFingerprint = fingerprint;
       params.state.extraction.lastRunAt = Date.now();
       await saveState(params.statePath, params.state);
+      const afterSnapshot = await readMemoryAuditSnapshot(
+        params.workspaceDir,
+        memoryPlan.relativePath,
+      );
+      const delta = buildMemoryDelta({
+        beforeLines: memoryTargetSnapshot.lines,
+        afterLines: afterSnapshot.lines,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceSources: evidenceBundle.evidenceSources,
+      });
       store.appendAction({
         actionId: extractionActionId,
         sessionKey: params.sessionKey,
@@ -684,9 +810,37 @@ async function runMemoryExtraction(params: {
           sourceCounts: evidence.counts,
           memoryTarget: memoryPlan.relativePath,
           extractionFingerprint: fingerprint,
+          addedEntries: delta.addedEntries.map((entry) => entry.entry),
+          removedEntries: delta.removedEntries,
         },
       });
+      store.appendMemoryWriteAudit({
+        auditId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        operationKind: "extraction",
+        memoryPath: memoryPlan.relativePath,
+        status: afterSnapshot.hash === memoryTargetSnapshot.hash ? "unchanged" : "completed",
+        beforeHash: memoryTargetSnapshot.hash,
+        afterHash: afterSnapshot.hash,
+        beforeLineCount: memoryTargetSnapshot.lines.length,
+        afterLineCount: afterSnapshot.lines.length,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceCounts: evidence.counts,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        addedEntries: delta.addedEntries,
+        removedEntries: delta.removedEntries,
+        changedAt: Date.now(),
+        operatorSummary:
+          afterSnapshot.hash === memoryTargetSnapshot.hash
+            ? "Extraction completed without changing durable memory."
+            : `Extraction updated durable memory with ${delta.addedEntries.length} added entr${delta.addedEntries.length === 1 ? "y" : "ies"}.`,
+      });
     } catch (error) {
+      const afterSnapshot = await readMemoryAuditSnapshot(
+        params.workspaceDir,
+        memoryPlan.relativePath,
+      );
       store.appendAction({
         actionId: extractionActionId,
         sessionKey: params.sessionKey,
@@ -702,6 +856,25 @@ async function runMemoryExtraction(params: {
           memoryTarget: memoryPlan.relativePath,
           error: String(error),
         },
+      });
+      store.appendMemoryWriteAudit({
+        auditId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        operationKind: "extraction",
+        memoryPath: memoryPlan.relativePath,
+        status: "failed",
+        beforeHash: memoryTargetSnapshot.hash,
+        afterHash: afterSnapshot.hash,
+        beforeLineCount: memoryTargetSnapshot.lines.length,
+        afterLineCount: afterSnapshot.lines.length,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceCounts: evidence.counts,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        addedEntries: [],
+        removedEntries: [],
+        changedAt: Date.now(),
+        operatorSummary: String(error),
       });
       log.warn(`super-context memory extraction failed: ${String(error)}`);
     } finally {
@@ -755,21 +928,35 @@ async function runMemoryConsolidation(params: {
   }
   const evidenceMessages = touchedSessions.flatMap(
     ([sessionKey]) =>
-      store.getConversationWindow({ sessionKey, limit: 200 }).messages.map((message) => ({
-        role: message.role as AgentMessage["role"],
-        content: [{ type: "text", text: message.contentText }],
-        timestamp: message.createdAt,
-        __openclaw: {
+      store.getConversationWindow({ sessionKey, limit: 200 }).messages.map((message) => {
+        const meta: Record<string, unknown> = {
           importedFrom: message.provenance?.importedFrom,
           partialRead: message.provenance?.partialRead,
           persistedPreview: message.provenance?.persistedPreview,
           collapsed: message.provenance?.collapsed,
           restored: message.provenance?.restored,
-        },
-      })) as AgentMessage[],
+          sourceSessionKey: sessionKey,
+          sourceMessageId: message.messageId,
+        };
+        return {
+          role: message.role as AgentMessage["role"],
+          content: [{ type: "text", text: message.contentText }],
+          timestamp: message.createdAt,
+          __openclaw: meta,
+        };
+      }) as AgentMessage[],
   );
   const evidence = summarizeEvidenceSources(evidenceMessages);
   const actionId = `memory-consolidate:${params.sessionKey ?? "workspace"}:${touchedSessions.map(([key]) => key).join(",")}`;
+  const auditId = `memory-audit:${actionId}`;
+  const memoryTargetSnapshot = await readMemoryAuditSnapshot(
+    params.workspaceDir,
+    memoryPlan.relativePath,
+  );
+  const evidenceBundle = buildMemoryEvidenceRefs({
+    messages: evidenceMessages,
+    fallbackSessionKey: params.sessionKey,
+  });
   if (!evidence.allowDurableWrite) {
     store.appendAction({
       actionId,
@@ -787,6 +974,25 @@ async function runMemoryConsolidation(params: {
         touchedSessions: touchedSessions.map(([sessionKey]) => sessionKey),
         memoryTarget: memoryPlan.relativePath,
       },
+    });
+    store.appendMemoryWriteAudit({
+      auditId,
+      sessionKey: params.sessionKey,
+      runId: params.sessionKey,
+      operationKind: "consolidation",
+      memoryPath: memoryPlan.relativePath,
+      status: "skipped",
+      beforeHash: memoryTargetSnapshot.hash,
+      afterHash: memoryTargetSnapshot.hash,
+      beforeLineCount: memoryTargetSnapshot.lines.length,
+      afterLineCount: memoryTargetSnapshot.lines.length,
+      sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+      evidenceCounts: evidence.counts,
+      evidenceRefs: evidenceBundle.evidenceRefs,
+      addedEntries: [],
+      removedEntries: [],
+      changedAt: Date.now(),
+      operatorSummary: "Skipped consolidation because provisional evidence was present.",
     });
     store.close();
     return;
@@ -808,7 +1014,7 @@ async function runMemoryConsolidation(params: {
           memoryTarget: memoryPlan.relativePath,
         },
       });
-      const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.js");
+      const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.runtime.js");
       const { appendInjectedAssistantMessageToTranscript } =
         await import("../gateway/server-methods/chat-transcript-inject.js");
       const tempSessionFile = path.join(
@@ -843,6 +1049,17 @@ async function runMemoryConsolidation(params: {
       params.state.consolidation.lastRunAt = Date.now();
       params.state.consolidation.touchedSessions = {};
       await saveState(params.statePath, params.state);
+      const afterSnapshot = await readMemoryAuditSnapshot(
+        params.workspaceDir,
+        memoryPlan.relativePath,
+      );
+      const delta = buildMemoryDelta({
+        beforeLines: memoryTargetSnapshot.lines,
+        afterLines: afterSnapshot.lines,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceSources: evidenceBundle.evidenceSources,
+      });
       appendInjectedAssistantMessageToTranscript({
         transcriptPath: params.sessionFile,
         label: "memory consolidation",
@@ -862,13 +1079,41 @@ async function runMemoryConsolidation(params: {
           sourceCounts: evidence.counts,
           touchedSessions: touchedSessions.map(([sessionKey]) => sessionKey),
           memoryTarget: memoryPlan.relativePath,
+          addedEntries: delta.addedEntries.map((entry) => entry.entry),
+          removedEntries: delta.removedEntries,
         },
+      });
+      store.appendMemoryWriteAudit({
+        auditId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionKey,
+        operationKind: "consolidation",
+        memoryPath: memoryPlan.relativePath,
+        status: afterSnapshot.hash === memoryTargetSnapshot.hash ? "unchanged" : "completed",
+        beforeHash: memoryTargetSnapshot.hash,
+        afterHash: afterSnapshot.hash,
+        beforeLineCount: memoryTargetSnapshot.lines.length,
+        afterLineCount: afterSnapshot.lines.length,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceCounts: evidence.counts,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        addedEntries: delta.addedEntries,
+        removedEntries: delta.removedEntries,
+        changedAt: Date.now(),
+        operatorSummary:
+          afterSnapshot.hash === memoryTargetSnapshot.hash
+            ? "Consolidation completed without changing durable memory."
+            : `Consolidation updated durable memory with ${delta.addedEntries.length} added entr${delta.addedEntries.length === 1 ? "y" : "ies"}.`,
       });
       await runTeamMemorySyncIfEnabled({
         workspaceDir: params.workspaceDir,
         config: params.config,
       });
     } catch (error) {
+      const afterSnapshot = await readMemoryAuditSnapshot(
+        params.workspaceDir,
+        memoryPlan.relativePath,
+      );
       store.appendAction({
         actionId,
         sessionKey: params.sessionKey,
@@ -885,6 +1130,25 @@ async function runMemoryConsolidation(params: {
           memoryTarget: memoryPlan.relativePath,
           error: String(error),
         },
+      });
+      store.appendMemoryWriteAudit({
+        auditId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionKey,
+        operationKind: "consolidation",
+        memoryPath: memoryPlan.relativePath,
+        status: "failed",
+        beforeHash: memoryTargetSnapshot.hash,
+        afterHash: afterSnapshot.hash,
+        beforeLineCount: memoryTargetSnapshot.lines.length,
+        afterLineCount: afterSnapshot.lines.length,
+        sourceSessionKeys: evidenceBundle.sourceSessionKeys,
+        evidenceCounts: evidence.counts,
+        evidenceRefs: evidenceBundle.evidenceRefs,
+        addedEntries: [],
+        removedEntries: [],
+        changedAt: Date.now(),
+        operatorSummary: String(error),
       });
       log.warn(`super-context memory consolidation failed: ${String(error)}`);
     } finally {
@@ -903,6 +1167,11 @@ async function copyFileEnsuringDir(source: string, target: string): Promise<void
 
 function hasSecretLikeContent(content: string): boolean {
   return /(?:api[_-]?key|secret|token|password|authorization)\s*[:=]/i.test(content);
+}
+
+function buildSecretLikeReason(content: string): string {
+  const match = content.match(/(?:api[_-]?key|secret|token|password|authorization)\s*[:=]/i);
+  return match ? `matched ${match[0].trim()}` : "matched secret-like content";
 }
 
 async function runTeamMemorySyncIfEnabled(params: {
@@ -944,9 +1213,6 @@ async function runTeamMemorySyncIfEnabled(params: {
             content,
           };
         }),
-      );
-      const localManifestHash = hashMemorySnapshot(
-        localEntries.map((entry) => ({ path: entry.path, hash: entry.hash })),
       );
       const remoteManifestPath = path.join(remoteRoot, "manifest.json");
       let remoteManifest: { baseHash?: string; files?: Record<string, string> } = {};
@@ -991,6 +1257,9 @@ async function runTeamMemorySyncIfEnabled(params: {
           lastRetryAt: Date.now(),
           conflictRetryCount,
           blockedFiles: [],
+          blockedFileReasons: undefined,
+          uploadedFiles: [],
+          withheldFiles: [],
           checksumState: remoteManifest.files ?? {},
           lastStatus: "success",
           lastDecision: "pull-before-push-retry",
@@ -999,46 +1268,41 @@ async function runTeamMemorySyncIfEnabled(params: {
       }
 
       const blockedFiles = localEntries.filter((entry) => hasSecretLikeContent(entry.content));
-      if (blockedFiles.length > 0) {
-        store.appendTeamMemorySyncEvent({
-          eventId: crypto.randomUUID(),
-          repoRoot,
-          direction: "push",
-          status: "blocked",
-          fileCount: blockedFiles.length,
-          transferHash: localManifestHash,
-          details: `Blocked secret-bearing files: ${blockedFiles.map((entry) => entry.path).join(", ")}`,
-          createdAt: Date.now(),
-        });
-        store.upsertTeamMemorySyncState({
-          repoRoot,
-          remoteRoot,
-          lastPulledHash: syncState.lastPulledHash,
-          lastPushedHash: syncState.lastPushedHash,
-          lastSyncAt: syncState.lastSyncAt,
-          conflictRetryCount,
-          blockedFiles: blockedFiles.map((entry) => entry.path),
-          checksumState: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
-          lastStatus: "blocked",
-          lastDecision: "secret-scan-blocked-push",
-          updatedAt: Date.now(),
-        });
-        return;
-      }
-
-      const changed = localEntries.filter(
+      const blockedFileReasons = Object.fromEntries(
+        blockedFiles.map((entry) => [entry.path, buildSecretLikeReason(entry.content)]),
+      );
+      const safeEntries = localEntries.filter(
+        (entry) => !blockedFiles.some((blocked) => blocked.path === entry.path),
+      );
+      const changed = safeEntries.filter(
         (entry) => remoteManifest.files?.[entry.path] !== entry.hash,
       );
       for (const entry of changed) {
         await copyFileEnsuringDir(entry.absPath, path.join(remoteRoot, entry.path));
       }
+      const nextRemoteFiles: Record<string, string> = {
+        ...remoteManifest.files,
+      };
+      for (const entry of changed) {
+        nextRemoteFiles[entry.path] = entry.hash;
+      }
+      for (const blocked of blockedFiles) {
+        if (!remoteManifest.files?.[blocked.path]) {
+          delete nextRemoteFiles[blocked.path];
+        }
+      }
+      const pushedManifestHash = hashMemorySnapshot(
+        Object.entries(nextRemoteFiles)
+          .map(([entryPath, hash]) => ({ path: entryPath, hash }))
+          .toSorted((a, b) => a.path.localeCompare(b.path)),
+      );
       await fsp.mkdir(remoteRoot, { recursive: true });
       await fsp.writeFile(
         remoteManifestPath,
         JSON.stringify(
           {
-            baseHash: localManifestHash,
-            files: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
+            baseHash: pushedManifestHash,
+            files: nextRemoteFiles,
             updatedAt: Date.now(),
           },
           null,
@@ -1046,9 +1310,21 @@ async function runTeamMemorySyncIfEnabled(params: {
         ),
         "utf8",
       );
-      syncState.lastPushedHash = localManifestHash;
-      syncState.lastPulledHash = localManifestHash;
+      syncState.lastPushedHash = pushedManifestHash;
+      syncState.lastPulledHash = pushedManifestHash;
       syncState.lastSyncAt = Date.now();
+      const uploadedFiles = changed.map((entry) => entry.path);
+      const withheldFiles = blockedFiles.map((entry) => entry.path);
+      const syncStatus =
+        uploadedFiles.length > 0 ? "success" : withheldFiles.length > 0 ? "blocked" : "skipped";
+      const lastDecision =
+        uploadedFiles.length > 0 && withheldFiles.length > 0
+          ? "uploaded-safe-delta-withheld-secret-bearing-files"
+          : uploadedFiles.length > 0
+            ? "uploaded-delta"
+            : withheldFiles.length > 0
+              ? "withheld-secret-bearing-files"
+              : "no-op";
       store.upsertTeamMemorySyncState({
         repoRoot,
         remoteRoot,
@@ -1057,22 +1333,35 @@ async function runTeamMemorySyncIfEnabled(params: {
         lastSyncAt: syncState.lastSyncAt,
         lastPushAt: Date.now(),
         conflictRetryCount,
-        blockedFiles: [],
-        checksumState: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
-        lastStatus: changed.length > 0 ? "success" : "skipped",
-        lastDecision: changed.length > 0 ? "uploaded-delta" : "no-op",
+        blockedFiles: withheldFiles,
+        blockedFileReasons:
+          Object.keys(blockedFileReasons).length > 0 ? blockedFileReasons : undefined,
+        uploadedFiles,
+        withheldFiles,
+        checksumState: nextRemoteFiles,
+        lastStatus: syncStatus,
+        lastDecision,
         updatedAt: Date.now(),
       });
       store.appendTeamMemorySyncEvent({
         eventId: crypto.randomUUID(),
         repoRoot,
         direction: "push",
-        status: changed.length > 0 ? "success" : "skipped",
-        fileCount: changed.length,
-        transferHash: localManifestHash,
+        status: syncStatus,
+        fileCount: uploadedFiles.length,
+        transferHash: pushedManifestHash,
         details:
-          changed.length > 0
-            ? `Uploaded changed files: ${changed.map((entry) => entry.path).join(", ")}`
+          uploadedFiles.length > 0 || withheldFiles.length > 0
+            ? [
+                uploadedFiles.length > 0
+                  ? `Uploaded safe files: ${uploadedFiles.join(", ")}`
+                  : "No safe local memory changes to upload.",
+                withheldFiles.length > 0
+                  ? `Withheld files: ${withheldFiles.map((filePath) => `${filePath} (${blockedFileReasons[filePath]})`).join(", ")}`
+                  : undefined,
+              ]
+                .filter((value): value is string => Boolean(value))
+                .join(" ")
             : "No local memory changes to upload.",
         createdAt: Date.now(),
       });
@@ -1092,6 +1381,9 @@ async function runTeamMemorySyncIfEnabled(params: {
         remoteRoot,
         conflictRetryCount: store.getTeamMemorySyncState(repoRoot)?.conflictRetryCount ?? 0,
         blockedFiles: [],
+        blockedFileReasons: undefined,
+        uploadedFiles: [],
+        withheldFiles: [],
         lastStatus: "failed",
         lastDecision: String(error),
         updatedAt: Date.now(),

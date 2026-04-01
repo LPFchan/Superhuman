@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { registerMemoryPromptSection, clearMemoryPluginState } from "../plugins/memory-state.js";
 import { buildSuperFrozenMemoryPromptSection } from "./super-frozen-memory-prompt.js";
+import { createSuperhumanStateStore } from "./super-state-store.js";
 
 const cleanupPaths = new Set<string>();
 
@@ -56,5 +57,30 @@ describe("buildSuperFrozenMemoryPromptSection", () => {
     });
 
     expect(lines).toEqual(["safe memory line"]);
+    const store = createSuperhumanStateStore({ workspaceDir });
+    try {
+      expect(store.getFrozenMemorySnapshot("main")).toEqual(
+        expect.objectContaining({
+          blocked: true,
+          safeLineCount: 1,
+          removedLineCount: 3,
+          blockedLines: [
+            expect.objectContaining({ reason: "prompt_injection" }),
+            expect.objectContaining({ reason: "exfiltration_pattern" }),
+            expect.objectContaining({ reason: "invisible_char" }),
+          ],
+        }),
+      );
+      expect(
+        store
+          .getActions({ sessionKey: "main" })
+          .some(
+            (action) =>
+              action.actionType === "super.memory.frozen_snapshot" && action.status === "blocked",
+          ),
+      ).toBe(true);
+    } finally {
+      store.close();
+    }
   });
 });
