@@ -5,6 +5,7 @@ import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js
 import { stopGmailWatcher } from "../hooks/gmail-watcher.js";
 import type { HeartbeatRunner } from "../infra/heartbeat-runner.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
+import type { SuperhumanGatewayRuntime } from "../superhuman/gateway-runtime.js";
 
 export function createGatewayCloseHandler(params: {
   bonjourStop: (() => Promise<void>) | null;
@@ -14,6 +15,7 @@ export function createGatewayCloseHandler(params: {
   releasePluginRouteRegistry?: (() => void) | null;
   stopChannel: (name: ChannelId, accountId?: string) => Promise<void>;
   pluginServices: PluginServicesHandle | null;
+  superhumanRuntime: SuperhumanGatewayRuntime | null;
   cron: { stop: () => void };
   heartbeatRunner: HeartbeatRunner;
   updateCheckStop?: (() => void) | null;
@@ -71,6 +73,11 @@ export function createGatewayCloseHandler(params: {
       }
       if (params.pluginServices) {
         await params.pluginServices.stop().catch(() => {});
+      }
+      try {
+        params.superhumanRuntime?.stop();
+      } catch {
+        /* ignore */
       }
       await stopGmailWatcher();
       params.cron.stop();

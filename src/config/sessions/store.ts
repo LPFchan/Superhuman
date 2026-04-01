@@ -7,6 +7,7 @@ import {
 import type { MsgContext } from "../../auto-reply/templating.js";
 import { writeTextAtomic } from "../../infra/json-files.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { emitSessionStoreMutation } from "../../sessions/session-store-events.js";
 import {
   deliveryContextFromSession,
   mergeDeliveryContext,
@@ -422,6 +423,48 @@ function preserveExistingAcpMetadata(params: {
   }
 }
 
+function emitSessionStoreMutations(params: {
+  storePath: string;
+  previousStore: Record<string, SessionEntry>;
+  nextStore: Record<string, SessionEntry>;
+}): void {
+  const allKeys = new Set<string>([
+    ...Object.keys(params.previousStore),
+    ...Object.keys(params.nextStore),
+  ]);
+  for (const sessionKey of allKeys) {
+    const previousEntry = params.previousStore[sessionKey];
+    const nextEntry = params.nextStore[sessionKey];
+    if (!previousEntry && !nextEntry) {
+      continue;
+    }
+    if (!nextEntry && previousEntry) {
+      emitSessionStoreMutation({
+        kind: "delete",
+        storePath: params.storePath,
+        sessionKey,
+        previousEntry,
+      });
+      continue;
+    }
+    if (!nextEntry) {
+      continue;
+    }
+    const previousJson = previousEntry ? JSON.stringify(previousEntry) : null;
+    const nextJson = JSON.stringify(nextEntry);
+    if (previousJson === nextJson) {
+      continue;
+    }
+    emitSessionStoreMutation({
+      kind: "upsert",
+      storePath: params.storePath,
+      sessionKey,
+      entry: nextEntry,
+      previousEntry,
+    });
+  }
+}
+
 async function saveSessionStoreUnlocked(
   storePath: string,
   store: Record<string, SessionEntry>,
@@ -612,6 +655,7 @@ export async function updateSessionStore<T>(
   return await withSessionStoreLock(storePath, async () => {
     // Always re-read inside the lock to avoid clobbering concurrent writers.
     const store = loadSessionStore(storePath, { skipCache: true });
+    const previousStore = structuredClone(store);
     const previousAcpByKey = collectAcpMetadataSnapshot(store);
     const result = await mutator(store);
     preserveExistingAcpMetadata({
@@ -620,6 +664,11 @@ export async function updateSessionStore<T>(
       allowDropSessionKeys: opts?.allowDropAcpMetaSessionKeys,
     });
     await saveSessionStoreUnlocked(storePath, store, opts);
+    emitSessionStoreMutations({
+      storePath,
+      previousStore,
+      nextStore: structuredClone(store),
+    });
     return result;
   });
 }
@@ -711,12 +760,18 @@ async function persistResolvedSessionEntry(params: {
   resolved: ReturnType<typeof resolveSessionStoreEntry>;
   next: SessionEntry;
 }): Promise<SessionEntry> {
+  const previousStore = structuredClone(params.store);
   params.store[params.resolved.normalizedKey] = params.next;
   for (const legacyKey of params.resolved.legacyKeys) {
     delete params.store[legacyKey];
   }
   await saveSessionStoreUnlocked(params.storePath, params.store, {
     activeSessionKey: params.resolved.normalizedKey,
+  });
+  emitSessionStoreMutations({
+    storePath: params.storePath,
+    previousStore,
+    nextStore: structuredClone(params.store),
   });
   return params.next;
 }

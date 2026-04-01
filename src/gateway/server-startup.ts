@@ -27,6 +27,10 @@ import { isTruthyEnvValue } from "../infra/env.js";
 import type { loadOpenClawPlugins } from "../plugins/loader.js";
 import { type PluginServicesHandle, startPluginServices } from "../plugins/services.js";
 import {
+  startSuperhumanGatewayRuntime,
+  type SuperhumanGatewayRuntime,
+} from "../superhuman/gateway-runtime.js";
+import {
   scheduleRestartSentinelWake,
   shouldWakeFromRestartSentinel,
 } from "./server-restart-sentinel.js";
@@ -77,7 +81,10 @@ export async function startGatewaySidecars(params: {
     error: (msg: string) => void;
   };
   logChannels: { info: (msg: string) => void; error: (msg: string) => void };
-}) {
+}): Promise<{
+  pluginServices: PluginServicesHandle | null;
+  superhumanRuntime: SuperhumanGatewayRuntime | null;
+}> {
   try {
     const stateDir = resolveStateDir(process.env);
     const sessionDirs = await resolveAgentSessionDirs(stateDir);
@@ -209,13 +216,25 @@ export async function startGatewaySidecars(params: {
     params.log.warn(`qmd memory startup initialization failed: ${String(err)}`);
   });
 
+  let superhumanRuntime: SuperhumanGatewayRuntime | null = null;
+  try {
+    superhumanRuntime = startSuperhumanGatewayRuntime({
+      cfg: params.cfg,
+      deps: params.deps,
+      workspaceDir: params.defaultWorkspaceDir,
+      pluginRegistry: params.pluginRegistry,
+    });
+  } catch (err) {
+    params.log.warn(`superhuman startup initialization failed: ${String(err)}`);
+  }
+
   if (shouldWakeFromRestartSentinel()) {
     setTimeout(() => {
       void scheduleRestartSentinelWake({ deps: params.deps });
     }, 750);
   }
 
-  return { pluginServices };
+  return { pluginServices, superhumanRuntime };
 }
 
 export const __testing = {

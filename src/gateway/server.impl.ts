@@ -78,6 +78,7 @@ import {
 } from "../secrets/runtime.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
+import type { SuperhumanGatewayRuntime } from "../superhuman/gateway-runtime.js";
 import {
   getInspectableTaskRegistrySummary,
   startTaskRegistryMaintenance,
@@ -782,6 +783,7 @@ export async function startGatewayServer(
   };
   let stopGatewayUpdateCheck = () => {};
   let tailscaleCleanup: (() => Promise<void>) | null = null;
+  let superhumanRuntime: SuperhumanGatewayRuntime | null = null;
   let skillsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   const skillsRefreshDelayMs = 30_000;
   let skillsChangeUnsub = () => {};
@@ -810,6 +812,7 @@ export async function startGatewayServer(
       releasePluginRouteRegistry,
       stopChannel,
       pluginServices,
+      superhumanRuntime,
       cron,
       heartbeatRunner,
       updateCheckStop: stopGatewayUpdateCheck,
@@ -1367,7 +1370,7 @@ export async function startGatewayServer(
           logDiagnostics: false,
         }));
       }
-      ({ pluginServices } = await startGatewaySidecars({
+      ({ pluginServices, superhumanRuntime } = await startGatewaySidecars({
         cfg: gatewayPluginConfigAtStart,
         pluginRegistry,
         defaultWorkspaceDir,
@@ -1483,6 +1486,7 @@ export async function startGatewayServer(
     releasePluginRouteRegistry,
     stopChannel,
     pluginServices,
+    superhumanRuntime,
     cron,
     heartbeatRunner,
     updateCheckStop: stopGatewayUpdateCheck,
