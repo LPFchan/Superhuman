@@ -66,6 +66,8 @@ Implementation notes:
 - Boot and routing behavior must remain source-compatible with the existing shell.
 - Session identity drift is a blocker for closing this phase.
 - This phase is where hidden runtime facts become visible state. If a later phase depends on verification status, worker lineage, preview/full artifact relationships, or partial-read provenance, the storage seam must already exist here.
+- Compatibility caveat: missing behavior should be added as a typed capability or documented core seam, not via private reach-ins around plugin runtime, registry ownership, or channel/provider internals.
+- Slot policy caveat: keep `plugins.slots.contextEngine` defaulting to `super-context`, while retaining `legacy` as an explicit compatibility option until shared ecosystem dependencies are gone.
 
 Source extraction map:
 

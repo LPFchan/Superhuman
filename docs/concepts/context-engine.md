@@ -13,7 +13,7 @@ A **context engine** controls how OpenClaw builds model context for each run.
 It decides which messages to include, how to summarize older history, and how
 to manage context across subagent boundaries.
 
-OpenClaw ships with built-in `managed-context` and `legacy` engines. Plugins can
+OpenClaw ships with built-in `super-context` and `legacy` engines. Plugins can
 register alternative engines that replace the active context-engine lifecycle.
 
 ## Quick start
@@ -61,7 +61,7 @@ Then enable the plugin and select it as the active engine in your config:
 Restart the gateway after installing and configuring.
 
 To switch back to the legacy built-in engine, set `contextEngine` to `"legacy"`.
-Removing the key uses the default built-in `"managed-context"` engine.
+Removing the key uses the default built-in `"super-context"` engine.
 
 ## How it works
 
@@ -226,9 +226,9 @@ engine slot.
 {
   plugins: {
     slots: {
-      // Select the active context engine. Default: "managed-context".
+      // Select the active context engine. Default: "super-context".
       // Set to a plugin id to use a plugin engine.
-      contextEngine: "managed-context",
+      contextEngine: "super-context",
     },
   },
 }

@@ -195,10 +195,10 @@ describe("applyExclusiveSlotSelection", () => {
   it("applies slot selection for each kind in a multi-kind array", () => {
     const config: OpenClawConfig = {
       plugins: {
-        slots: { memory: "memory-core", contextEngine: "managed-context" },
+        slots: { memory: "memory-core", contextEngine: "super-context" },
         entries: {
           "memory-core": { enabled: true },
-          "managed-context": { enabled: true },
+          "super-context": { enabled: true },
         },
       },
     };
@@ -244,12 +244,12 @@ describe("applyExclusiveSlotSelection", () => {
   });
 
   it("does not disable a dual-kind plugin that owns another slot via default", () => {
-    // contextEngine is NOT explicitly set — defaults to "managed-context"
+    // contextEngine is NOT explicitly set — defaults to "super-context"
     const config: OpenClawConfig = {
       plugins: {
-        slots: { memory: "managed-context" },
+        slots: { memory: "super-context" },
         entries: {
-          "managed-context": { enabled: true },
+          "super-context": { enabled: true },
         },
       },
     };
@@ -258,14 +258,14 @@ describe("applyExclusiveSlotSelection", () => {
       selectedId: "new-memory",
       selectedKind: "memory",
       registry: buildSelectionRegistry([
-        { id: "managed-context", kind: ["memory", "context-engine"] },
+        { id: "super-context", kind: ["memory", "context-engine"] },
         { id: "new-memory", kind: "memory" },
       ]),
     });
     expect(result.changed).toBe(true);
     expect(result.config.plugins?.slots?.memory).toBe("new-memory");
-    // managed-context still owns contextEngine via default — must NOT be disabled
-    expect(result.config.plugins?.entries?.["managed-context"]?.enabled).not.toBe(false);
+    // super-context still owns contextEngine via default — must NOT be disabled
+    expect(result.config.plugins?.entries?.["super-context"]?.enabled).not.toBe(false);
   });
 });
 

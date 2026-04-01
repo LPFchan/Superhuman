@@ -8,7 +8,6 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 // ---------------------------------------------------------------------------
 import { delegateCompactionToRuntime } from "./delegate.js";
 import { LegacyContextEngine, registerLegacyContextEngine } from "./legacy.js";
-import { registerManagedContextEngine } from "./managed-context-engine.js";
 import {
   registerContextEngine,
   registerContextEngineForOwner,
@@ -17,6 +16,7 @@ import {
   resolveContextEngine,
 } from "./registry.js";
 import type { ContextEngineFactory, ContextEngineRegistrationResult } from "./registry.js";
+import { registerSuperContextEngine } from "./super-context-engine.js";
 import type {
   ContextEngine,
   ContextEngineInfo,
@@ -613,7 +613,7 @@ describe("Default engine selection", () => {
   beforeEach(() => {
     // Registration is idempotent (Map.set), so calling again is safe.
     registerLegacyContextEngine();
-    registerManagedContextEngine();
+    registerSuperContextEngine();
     // Register a lightweight custom stub so we don't need external resources.
     registerContextEngine("test-engine", () => {
       const engine: ContextEngine = {
@@ -632,9 +632,9 @@ describe("Default engine selection", () => {
     });
   });
 
-  it("resolveContextEngine() with no config returns the default ('managed-context') engine", async () => {
+  it("resolveContextEngine() with no config returns the default ('super-context') engine", async () => {
     const engine = await resolveContextEngine();
-    expect(engine.info.id).toBe("managed-context");
+    expect(engine.info.id).toBe("super-context");
   });
 
   it("resolveContextEngine() with config contextEngine='legacy' returns legacy engine", async () => {

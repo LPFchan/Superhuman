@@ -1,11 +1,11 @@
 import { registerLegacyContextEngine } from "./legacy.js";
-import { registerManagedContextEngine } from "./managed-context-engine.js";
+import { registerSuperContextEngine } from "./super-context-engine.js";
 
 /**
  * Ensures all built-in context engines are registered exactly once.
  *
  * The legacy engine is always registered as a safe fallback so that
- * `resolveContextEngine()` can resolve the default "legacy" slot without
+ * `resolveContextEngine()` can resolve the built-in slot targets without
  * callers needing to remember manual registration.
  *
  * Additional engines are registered by their own plugins via
@@ -21,5 +21,5 @@ export function ensureContextEnginesInitialized(): void {
 
   // Always available – safe fallback for the "legacy" slot default.
   registerLegacyContextEngine();
-  registerManagedContextEngine();
+  registerSuperContextEngine();
 }

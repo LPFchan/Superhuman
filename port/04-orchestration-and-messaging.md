@@ -65,6 +65,8 @@ Implementation notes:
 - In-process and out-of-process workers must converge on the same lifecycle API.
 - Permission relay must be inspectable from the operator perspective before proactive automation can depend on it.
 - Worker fan-out must be bounded by persisted policy. Unbounded swarm behavior is explicitly out of scope.
+- Compatibility caveat: orchestration should extend OpenClaw through typed runtime and task capabilities, not by privately bypassing plugin runtime, registry ownership, or channel/provider seams.
+- Tool contract caveat: if orchestration changes user-facing tool results such as `sessions_spawn`, preserve compatibility aliases during the transition rather than forcing immediate consumers onto a new shape.
 
 Source extraction map:
 

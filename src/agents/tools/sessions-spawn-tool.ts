@@ -203,6 +203,9 @@ export function createSessionsSpawnTool(
           status: "accepted",
           workerId: worker.workerId,
           queueState: worker.state,
+          childSessionKey: worker.childSessionKey,
+          runId: worker.runId,
+          mode: worker.launchRequest.mode === "session" ? "session" : "run",
           requesterSessionKey: requesterDisplayKey,
           note:
             worker.state === "queued"

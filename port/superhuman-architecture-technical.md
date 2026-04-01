@@ -34,6 +34,18 @@ When proactive, remote, or high-autonomy features fail, the system should degrad
 
 The local operating model should remain valuable on its own. Remote and cloud execution should extend the system, not define it.
 
+## Compatibility And Breakaway Risk Assessment
+
+Superhuman is intentionally a Claude-code-enriched OpenClaw core, not a fork that drifts onto private integration rules.
+
+That means:
+
+- Additive internal state, orchestration, and observability changes are usually low risk when they stay behind documented core seams.
+- Changes that alter user-visible tool payloads, gateway event payloads, or slot semantics are medium risk and should carry compatibility aliases or explicit migrations.
+- Changes that bypass plugin runtime, registry ownership, or channel/provider boundaries with private reach-ins are high risk and would create genuine ecosystem-compatibility problems.
+- Missing behavior should be added as a typed capability or documented runtime seam, not as an ad hoc shortcut around the OpenClaw architecture.
+- `plugins.slots.contextEngine` should default to `super-context`, while `legacy` remains an explicit compatibility option until shared callers and plugins no longer depend on it.
+
 ## Source-of-Truth Mapping
 
 ### Base platform from OpenClaw

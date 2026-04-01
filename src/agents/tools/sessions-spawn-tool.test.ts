@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const hoisted = vi.hoisted(() => {
   const spawnSubagentDirectMock = vi.fn();
   const spawnAcpDirectMock = vi.fn();
+  const getActiveOrchestrationRuntimeMock = vi.fn();
   return {
     spawnSubagentDirectMock,
     spawnAcpDirectMock,
+    getActiveOrchestrationRuntimeMock,
   };
 });
 
@@ -18,6 +20,10 @@ vi.mock("../acp-spawn.js", () => ({
   ACP_SPAWN_MODES: ["run", "session"],
   ACP_SPAWN_STREAM_TARGETS: ["parent"],
   spawnAcpDirect: (...args: unknown[]) => hoisted.spawnAcpDirectMock(...args),
+}));
+
+vi.mock("../../superhuman/orchestration-runtime.js", () => ({
+  getActiveOrchestrationRuntime: () => hoisted.getActiveOrchestrationRuntimeMock(),
 }));
 
 let createSessionsSpawnTool: typeof import("./sessions-spawn-tool.js").createSessionsSpawnTool;
@@ -33,11 +39,15 @@ async function loadFreshSessionsSpawnToolModuleForTest() {
     ACP_SPAWN_STREAM_TARGETS: ["parent"],
     spawnAcpDirect: (...args: unknown[]) => hoisted.spawnAcpDirectMock(...args),
   }));
+  vi.doMock("../../superhuman/orchestration-runtime.js", () => ({
+    getActiveOrchestrationRuntime: () => hoisted.getActiveOrchestrationRuntimeMock(),
+  }));
   ({ createSessionsSpawnTool } = await import("./sessions-spawn-tool.js"));
 }
 
 describe("sessions_spawn tool", () => {
   beforeEach(async () => {
+    hoisted.getActiveOrchestrationRuntimeMock.mockReset().mockReturnValue(null);
     hoisted.spawnSubagentDirectMock.mockReset().mockResolvedValue({
       status: "accepted",
       childSessionKey: "agent:main:subagent:1",
@@ -151,6 +161,42 @@ describe("sessions_spawn tool", () => {
       }),
     );
     expect(hoisted.spawnSubagentDirectMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves legacy accepted fields when orchestration is active", async () => {
+    const launchWorker = vi.fn().mockResolvedValue({
+      workerId: "worker-1",
+      state: "queued",
+      childSessionKey: "agent:main:subagent:queued-1",
+      runId: "run-queued-1",
+      launchRequest: {
+        mode: "session",
+      },
+    });
+    hoisted.getActiveOrchestrationRuntimeMock.mockReturnValue({
+      launchWorker,
+    });
+
+    const tool = createSessionsSpawnTool({
+      agentSessionKey: "agent:main:main",
+    });
+
+    const result = await tool.execute("call-orch", {
+      task: "delegate queued work",
+      mode: "session",
+    });
+
+    expect(result.details).toMatchObject({
+      status: "accepted",
+      workerId: "worker-1",
+      queueState: "queued",
+      childSessionKey: "agent:main:subagent:queued-1",
+      runId: "run-queued-1",
+      mode: "session",
+      requesterSessionKey: "agent:main:main",
+    });
+    expect(hoisted.spawnSubagentDirectMock).not.toHaveBeenCalled();
+    expect(hoisted.spawnAcpDirectMock).not.toHaveBeenCalled();
   });
 
   it("forwards ACP sandbox options and requester sandbox context", async () => {

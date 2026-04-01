@@ -26,7 +26,7 @@ import type {
   IngestResult,
 } from "./types.js";
 
-const log = createSubsystemLogger("context-engine/managed-context-engine");
+const log = createSubsystemLogger("context-engine/super-context-engine");
 
 const ENGINE_STATE_DIR = "context-engine";
 const KEEP_RECENT_MESSAGES = 12;
@@ -429,7 +429,7 @@ async function runMemoryExtraction(params: {
       params.state.extraction.lastRunAt = Date.now();
       await saveState(params.statePath, params.state);
     } catch (error) {
-      log.warn(`managed-context memory extraction failed: ${String(error)}`);
+      log.warn(`super-context memory extraction failed: ${String(error)}`);
     } finally {
       pendingExtractions.delete(extractionKey);
     }
@@ -520,7 +520,7 @@ async function runMemoryConsolidation(params: {
         config: params.config,
       });
     } catch (error) {
-      log.warn(`managed-context memory consolidation failed: ${String(error)}`);
+      log.warn(`super-context memory consolidation failed: ${String(error)}`);
     } finally {
       pendingConsolidations.delete(consolidationKey);
     }
@@ -702,16 +702,16 @@ async function runTeamMemorySyncIfEnabled(params: {
     } finally {
       store.close();
     }
-    log.warn(`managed-context team memory sync failed: ${String(error)}`);
+    log.warn(`super-context team memory sync failed: ${String(error)}`);
   } finally {
     pendingTeamSyncs.delete(syncKey);
   }
 }
 
-export class ManagedContextEngine implements ContextEngine {
+export class SuperContextEngine implements ContextEngine {
   readonly info: ContextEngineInfo = {
-    id: "managed-context",
-    name: "Managed Context Engine",
+    id: "super-context",
+    name: "Super Context Engine",
     version: "1.0.0",
     ownsCompaction: true,
   };
@@ -904,7 +904,7 @@ export class ManagedContextEngine implements ContextEngine {
         latestFirstKeptEntryId,
         tokensBefore,
         {
-          kind: "managed-context-collapse",
+          kind: "super-context-collapse",
           committedCollapseIds: committedNow.map((entry) => entry.id),
           committedCount: compactedCount,
         },
@@ -987,8 +987,8 @@ export class ManagedContextEngine implements ContextEngine {
   async dispose(): Promise<void> {}
 }
 
-export function registerManagedContextEngine(): void {
-  registerContextEngineForOwner("managed-context", () => new ManagedContextEngine(), "core", {
+export function registerSuperContextEngine(): void {
+  registerContextEngineForOwner("super-context", () => new SuperContextEngine(), "core", {
     allowSameOwnerRefresh: true,
   });
 }

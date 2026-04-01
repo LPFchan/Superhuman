@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
-import { ManagedContextEngine } from "./managed-context-engine.js";
+import { SuperContextEngine } from "./super-context-engine.js";
 
 const cleanupPaths = new Set<string>();
 
@@ -14,9 +14,9 @@ afterEach(() => {
   cleanupPaths.clear();
 });
 
-describe("ManagedContextEngine", () => {
+describe("SuperContextEngine", () => {
   it("projects committed collapse summaries at read time", async () => {
-    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "managed-context-engine-"));
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "super-context-engine-"));
     cleanupPaths.add(workspaceDir);
     const sessionFile = path.join(workspaceDir, "session.jsonl");
     const sessionManager = SessionManager.open(sessionFile);
@@ -55,7 +55,7 @@ describe("ManagedContextEngine", () => {
       }
     }
 
-    const engine = new ManagedContextEngine();
+    const engine = new SuperContextEngine();
     const branchMessages = sessionManager
       .getBranch()
       .filter((entry) => entry.type === "message")
