@@ -325,6 +325,8 @@ export async function runAgentTurnWithFallback(params: {
                     ],
                   images: params.opts?.images,
                   imageOrder: params.opts?.imageOrder,
+                  trigger: params.isHeartbeat ? "heartbeat" : "user",
+                  abortSignal: params.opts?.abortSignal,
                 });
                 bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                   result.meta?.systemPromptReport,

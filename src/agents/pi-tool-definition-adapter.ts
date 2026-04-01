@@ -6,6 +6,11 @@ import type {
 import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { logDebug, logError } from "../logger.js";
 import { redactToolDetail } from "../logging/redact.js";
+import {
+  createToolExecutionScheduler,
+  getRuntimeToolExecutionContext,
+  getRuntimeToolSafetyMeta,
+} from "../superhuman/tool-runtime-policy.js";
 import { isPlainObject } from "../utils.js";
 import { sanitizeForConsole } from "./console-sanitize.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";
@@ -170,10 +175,13 @@ function splitToolExecuteArgs(args: ToolExecuteArgsAny): {
 }
 
 export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
+  const scheduler = createToolExecutionScheduler();
   return tools.map((tool) => {
     const name = tool.name || "tool";
     const normalizedName = normalizeToolName(name);
     const beforeHookWrapped = isToolWrappedWithBeforeToolCallHook(tool);
+    const runtimeSafety = getRuntimeToolSafetyMeta(tool);
+    const runtimeExecutionContext = getRuntimeToolExecutionContext(tool);
     return {
       name,
       label: tool.label ?? name,
@@ -182,6 +190,15 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
       execute: async (...args: ToolExecuteArgs): Promise<AgentToolResult<unknown>> => {
         const { toolCallId, params, onUpdate, signal } = splitToolExecuteArgs(args);
         let executeParams = params;
+        const toolAbortScope = runtimeExecutionContext?.runtimeTurn.createAbortScope({
+          kind: "tool",
+          label: `${normalizedName}:${toolCallId}`,
+          parentSignal: signal,
+        });
+        const toolBudgetId = runtimeExecutionContext?.runtimeTurn.createChildBudget({
+          label: `${normalizedName}:${toolCallId}`,
+          maxIterations: 1,
+        });
         try {
           if (!beforeHookWrapped) {
             const hookOutcome = await runBeforeToolCallHook({
@@ -194,7 +211,24 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
             }
             executeParams = hookOutcome.params;
           }
-          const rawResult = await tool.execute(toolCallId, executeParams, signal, onUpdate);
+          const rawResult = await scheduler.schedule({
+            toolName: normalizedName,
+            params: executeParams,
+            safety: runtimeSafety,
+            run: async () =>
+              await tool.execute(
+                toolCallId,
+                executeParams,
+                toolAbortScope?.signal ?? signal,
+                onUpdate,
+              ),
+          });
+          if (toolBudgetId) {
+            runtimeExecutionContext?.runtimeTurn.updateChildBudget(toolBudgetId, {
+              usedIterations: 1,
+              ...(toolAbortScope?.signal.aborted ? { exhaustedReason: "aborted" as const } : {}),
+            });
+          }
           const result = normalizeToolExecutionResult({
             toolName: normalizedName,
             result: rawResult,
@@ -225,6 +259,14 @@ export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
             toolName: normalizedName,
             message: described.message,
           });
+        } finally {
+          if (toolBudgetId) {
+            runtimeExecutionContext?.runtimeTurn.updateChildBudget(toolBudgetId, {
+              usedIterations: 1,
+              ...(toolAbortScope?.signal.aborted ? { exhaustedReason: "aborted" as const } : {}),
+            });
+          }
+          toolAbortScope?.dispose();
         }
       },
     } satisfies ToolDefinition;

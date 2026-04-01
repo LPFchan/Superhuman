@@ -1,11 +1,28 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { SuperhumanAgentRuntimeTurn } from "../superhuman/agent-runtime.js";
+import { createSuperhumanStateStore } from "../superhuman/state-store.js";
+import {
+  setRuntimeToolExecutionContext,
+  setRuntimeToolSafetyMeta,
+} from "../superhuman/tool-runtime-policy.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";
 import { toClientToolDefinitions, toToolDefinitions } from "./pi-tool-definition-adapter.js";
 
 type ToolExecute = ReturnType<typeof toToolDefinitions>[number]["execute"];
 const extensionContext = {} as Parameters<ToolExecute>[4];
+const cleanupPaths = new Set<string>();
+
+afterEach(() => {
+  for (const target of cleanupPaths) {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+  cleanupPaths.clear();
+});
 
 async function executeThrowingTool(name: string, callId: string) {
   const tool = {
@@ -97,6 +114,123 @@ describe("pi tool definition adapter", () => {
     });
     expect(result.content[0]).toMatchObject({ type: "text" });
     expect((result.content[0] as { text?: string }).text).toContain('"count"');
+  });
+
+  it("serializes non-parallel tool executions", async () => {
+    let active = 0;
+    let maxActive = 0;
+    const tool = {
+      name: "exec",
+      label: "Exec",
+      description: "serial",
+      parameters: Type.Object({ command: Type.String() }),
+      execute: (async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        active -= 1;
+        return { content: [], details: { ok: true } };
+      }) as AgentTool["execute"],
+    } satisfies AgentTool;
+    setRuntimeToolSafetyMeta(tool, { neverParallel: true });
+
+    const [def] = toToolDefinitions([tool]);
+    if (!def) {
+      throw new Error("missing tool definition");
+    }
+
+    await Promise.all([
+      def.execute("serial-1", { command: "echo one" }, undefined, undefined, extensionContext),
+      def.execute("serial-2", { command: "echo two" }, undefined, undefined, extensionContext),
+    ]);
+
+    expect(maxActive).toBe(1);
+  });
+
+  it("runs explicitly parallel-safe tool executions concurrently", async () => {
+    let active = 0;
+    let maxActive = 0;
+    const makeTool = (name: string) => {
+      const tool = {
+        name,
+        label: name,
+        description: "parallel",
+        parameters: Type.Object({ path: Type.String() }),
+        execute: (async () => {
+          active += 1;
+          maxActive = Math.max(maxActive, active);
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          active -= 1;
+          return { content: [], details: { ok: true } };
+        }) as AgentTool["execute"],
+      } satisfies AgentTool;
+      setRuntimeToolSafetyMeta(tool, { parallelSafe: true, pathScoped: true });
+      return tool;
+    };
+
+    const defs = toToolDefinitions([makeTool("read_a"), makeTool("read_b")]);
+    const [first, second] = defs;
+    if (!first || !second) {
+      throw new Error("missing tool definitions");
+    }
+
+    await Promise.all([
+      first.execute("parallel-1", { path: "src/a.ts" }, undefined, undefined, extensionContext),
+      second.execute("parallel-2", { path: "src/b.ts" }, undefined, undefined, extensionContext),
+    ]);
+
+    expect(maxActive).toBeGreaterThan(1);
+  });
+
+  it("records child tool budgets and abort nodes from runtime context", async () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-tool-runtime-"));
+    cleanupPaths.add(workspaceDir);
+    const stateStore = createSuperhumanStateStore({ workspaceDir });
+    const runtimeTurn = new SuperhumanAgentRuntimeTurn({
+      workspaceDir,
+      runId: "tool-run-1",
+      sessionId: "session-1",
+      sessionKey: "main",
+      mode: "interactive",
+      maxIterations: 2,
+      stateStore,
+    });
+    const tool = {
+      name: "read",
+      label: "Read",
+      description: "runtime-aware",
+      parameters: Type.Object({ path: Type.String() }),
+      execute: (async () => ({ content: [], details: { ok: true } })) as AgentTool["execute"],
+    } satisfies AgentTool;
+    setRuntimeToolSafetyMeta(tool, { pathScoped: true, parallelSafe: true });
+    setRuntimeToolExecutionContext(tool, { runtimeTurn });
+
+    const [def] = toToolDefinitions([tool]);
+    if (!def) {
+      throw new Error("missing tool definition");
+    }
+
+    await def.execute(
+      "tool-call-1",
+      { path: "src/index.ts" },
+      undefined,
+      undefined,
+      extensionContext,
+    );
+    runtimeTurn.finish("completed");
+
+    expect(stateStore.getIterationBudgets("tool-run-1")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "read:tool-call-1", usedIterations: 1 }),
+      ]),
+    );
+    expect(stateStore.getAbortNodes("tool-run-1")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "read:tool-call-1", status: "completed" }),
+      ]),
+    );
+
+    stateStore.close();
   });
 });
 

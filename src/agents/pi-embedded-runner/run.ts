@@ -8,6 +8,10 @@ import {
 import { sleepWithAbort } from "../../infra/backoff.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { enqueueCommandInLane } from "../../process/command-queue.js";
+import {
+  resolveRuntimeInvocationMode,
+  SuperhumanAgentRuntimeTurn,
+} from "../../superhuman/agent-runtime.js";
 import { sanitizeForLog } from "../../terminal/ansi.js";
 import { isMarkdownCapableMessageChannel } from "../../utils/message-channel.js";
 import { resolveOpenClawAgentDir } from "../agent-paths.js";
@@ -118,6 +122,8 @@ export async function runEmbeddedPiAgent(
   return enqueueSession(() =>
     enqueueGlobal(async () => {
       const started = Date.now();
+      let runtimeStatus: "completed" | "failed" | "aborted" = "completed";
+      let runtimeError: string | undefined;
       const workspaceResolution = resolveRunWorkspaceDir({
         workspaceDir: params.workspaceDir,
         sessionKey: params.sessionKey,
@@ -133,6 +139,20 @@ export async function runEmbeddedPiAgent(
           `[workspace-fallback] caller=runEmbeddedPiAgent reason=${workspaceResolution.fallbackReason} run=${params.runId} session=${redactedSessionId} sessionKey=${redactedSessionKey} agent=${workspaceResolution.agentId} workspace=${redactedWorkspace}`,
         );
       }
+      const runtimeTurn = new SuperhumanAgentRuntimeTurn({
+        workspaceDir: resolvedWorkspace,
+        runId: params.runId,
+        sessionId: params.sessionId,
+        sessionKey: params.sessionKey,
+        mode: resolveRuntimeInvocationMode({
+          trigger: params.trigger,
+          lane: params.lane,
+        }),
+        trigger: params.trigger,
+        maxIterations: 8,
+      });
+      const detachRuntimeAbort = runtimeTurn.attachAbortSignal(params.abortSignal, "run");
+      runtimeTurn.enterStage("prompt_assembly", "initial setup");
       ensureRuntimePluginsLoaded({
         config: params.config,
         workspaceDir: resolvedWorkspace,
@@ -308,6 +328,7 @@ export async function runEmbeddedPiAgent(
       const MAX_TIMEOUT_COMPACTION_ATTEMPTS = 2;
       const MAX_OVERFLOW_COMPACTION_ATTEMPTS = 3;
       const MAX_RUN_LOOP_ITERATIONS = resolveMaxRunRetryIterations(profileCandidates.length);
+      runtimeTurn.markStage("prompt_assembly", `max iterations ${String(MAX_RUN_LOOP_ITERATIONS)}`);
       let overflowCompactionAttempts = 0;
       let toolResultTruncationAttempted = false;
       let bootstrapPromptWarningSignaturesSeen =
@@ -457,6 +478,17 @@ export async function runEmbeddedPiAgent(
             };
           }
           runLoopIterations += 1;
+          runtimeTurn.consumeIteration(`attempt ${String(runLoopIterations)}`);
+          const attemptLabel = `attempt-${String(runLoopIterations)}`;
+          const attemptBudgetId = runtimeTurn.createChildBudget({
+            label: attemptLabel,
+            maxIterations: 1,
+          });
+          const attemptAbortScope = runtimeTurn.createAbortScope({
+            kind: "attempt",
+            label: attemptLabel,
+            parentSignal: params.abortSignal,
+          });
           const nextSelection = shouldTrackPersistedLiveSelection
             ? resolvePersistedLiveSelection()
             : null;
@@ -473,85 +505,111 @@ export async function runEmbeddedPiAgent(
 
           const prompt =
             provider === "anthropic" ? scrubAnthropicRefusalMagic(params.prompt) : params.prompt;
+          runtimeTurn.enterStage("model_call", `attempt ${String(runLoopIterations)}`);
+          const onAgentEvent = (evt: { stream: string; data: Record<string, unknown> }) => {
+            runtimeTurn.handleAgentEvent({
+              runId: params.runId,
+              seq: -1,
+              ts: Date.now(),
+              stream: evt.stream,
+              data: evt.data,
+              sessionKey: params.sessionKey,
+            });
+            params.onAgentEvent?.(evt);
+          };
 
-          const attempt = await runEmbeddedAttempt({
-            sessionId: params.sessionId,
-            sessionKey: params.sessionKey,
-            trigger: params.trigger,
-            memoryFlushWritePath: params.memoryFlushWritePath,
-            messageChannel: params.messageChannel,
-            messageProvider: params.messageProvider,
-            agentAccountId: params.agentAccountId,
-            messageTo: params.messageTo,
-            messageThreadId: params.messageThreadId,
-            groupId: params.groupId,
-            groupChannel: params.groupChannel,
-            groupSpace: params.groupSpace,
-            spawnedBy: params.spawnedBy,
-            senderId: params.senderId,
-            senderName: params.senderName,
-            senderUsername: params.senderUsername,
-            senderE164: params.senderE164,
-            senderIsOwner: params.senderIsOwner,
-            currentChannelId: params.currentChannelId,
-            currentThreadTs: params.currentThreadTs,
-            currentMessageId: params.currentMessageId,
-            replyToMode: params.replyToMode,
-            hasRepliedRef: params.hasRepliedRef,
-            sessionFile: params.sessionFile,
-            workspaceDir: resolvedWorkspace,
-            agentDir,
-            config: params.config,
-            allowGatewaySubagentBinding: params.allowGatewaySubagentBinding,
-            contextEngine,
-            contextTokenBudget: ctxInfo.tokens,
-            skillsSnapshot: params.skillsSnapshot,
-            prompt,
-            images: params.images,
-            imageOrder: params.imageOrder,
-            clientTools: params.clientTools,
-            disableTools: params.disableTools,
-            provider,
-            modelId,
-            model: applyLocalNoAuthHeaderOverride(effectiveModel, apiKeyInfo),
-            authProfileId: lastProfileId,
-            authProfileIdSource: lockedProfileId ? "user" : "auto",
-            authStorage,
-            modelRegistry,
-            agentId: workspaceResolution.agentId,
-            legacyBeforeAgentStartResult,
-            thinkLevel,
-            fastMode: params.fastMode,
-            verboseLevel: params.verboseLevel,
-            reasoningLevel: params.reasoningLevel,
-            toolResultFormat: resolvedToolResultFormat,
-            execOverrides: params.execOverrides,
-            bashElevated: params.bashElevated,
-            timeoutMs: params.timeoutMs,
-            runId: params.runId,
-            abortSignal: params.abortSignal,
-            shouldEmitToolResult: params.shouldEmitToolResult,
-            shouldEmitToolOutput: params.shouldEmitToolOutput,
-            onPartialReply: params.onPartialReply,
-            onAssistantMessageStart: params.onAssistantMessageStart,
-            onBlockReply: params.onBlockReply,
-            onBlockReplyFlush: params.onBlockReplyFlush,
-            blockReplyBreak: params.blockReplyBreak,
-            blockReplyChunking: params.blockReplyChunking,
-            onReasoningStream: params.onReasoningStream,
-            onReasoningEnd: params.onReasoningEnd,
-            onToolResult: params.onToolResult,
-            onAgentEvent: params.onAgentEvent,
-            extraSystemPrompt: params.extraSystemPrompt,
-            inputProvenance: params.inputProvenance,
-            streamParams: params.streamParams,
-            ownerNumbers: params.ownerNumbers,
-            enforceFinalTag: params.enforceFinalTag,
-            silentExpected: params.silentExpected,
-            bootstrapPromptWarningSignaturesSeen,
-            bootstrapPromptWarningSignature:
-              bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
-          });
+          let attempt;
+          try {
+            attempt = await runEmbeddedAttempt({
+              sessionId: params.sessionId,
+              sessionKey: params.sessionKey,
+              trigger: params.trigger,
+              memoryFlushWritePath: params.memoryFlushWritePath,
+              messageChannel: params.messageChannel,
+              messageProvider: params.messageProvider,
+              agentAccountId: params.agentAccountId,
+              messageTo: params.messageTo,
+              messageThreadId: params.messageThreadId,
+              groupId: params.groupId,
+              groupChannel: params.groupChannel,
+              groupSpace: params.groupSpace,
+              spawnedBy: params.spawnedBy,
+              senderId: params.senderId,
+              senderName: params.senderName,
+              senderUsername: params.senderUsername,
+              senderE164: params.senderE164,
+              senderIsOwner: params.senderIsOwner,
+              currentChannelId: params.currentChannelId,
+              currentThreadTs: params.currentThreadTs,
+              currentMessageId: params.currentMessageId,
+              replyToMode: params.replyToMode,
+              hasRepliedRef: params.hasRepliedRef,
+              sessionFile: params.sessionFile,
+              workspaceDir: resolvedWorkspace,
+              agentDir,
+              config: params.config,
+              allowGatewaySubagentBinding: params.allowGatewaySubagentBinding,
+              contextEngine,
+              contextTokenBudget: ctxInfo.tokens,
+              skillsSnapshot: params.skillsSnapshot,
+              prompt,
+              images: params.images,
+              imageOrder: params.imageOrder,
+              clientTools: params.clientTools,
+              disableTools: params.disableTools,
+              provider,
+              modelId,
+              model: applyLocalNoAuthHeaderOverride(effectiveModel, apiKeyInfo),
+              authProfileId: lastProfileId,
+              authProfileIdSource: lockedProfileId ? "user" : "auto",
+              authStorage,
+              modelRegistry,
+              agentId: workspaceResolution.agentId,
+              legacyBeforeAgentStartResult,
+              thinkLevel,
+              fastMode: params.fastMode,
+              verboseLevel: params.verboseLevel,
+              reasoningLevel: params.reasoningLevel,
+              toolResultFormat: resolvedToolResultFormat,
+              execOverrides: params.execOverrides,
+              bashElevated: params.bashElevated,
+              timeoutMs: params.timeoutMs,
+              runId: params.runId,
+              abortSignal: attemptAbortScope.signal,
+              runtimeTurn,
+              shouldEmitToolResult: params.shouldEmitToolResult,
+              shouldEmitToolOutput: params.shouldEmitToolOutput,
+              onPartialReply: params.onPartialReply,
+              onAssistantMessageStart: params.onAssistantMessageStart,
+              onBlockReply: params.onBlockReply,
+              onBlockReplyFlush: params.onBlockReplyFlush,
+              blockReplyBreak: params.blockReplyBreak,
+              blockReplyChunking: params.blockReplyChunking,
+              onReasoningStream: params.onReasoningStream,
+              onReasoningEnd: params.onReasoningEnd,
+              onToolResult: params.onToolResult,
+              onAgentEvent,
+              extraSystemPrompt: params.extraSystemPrompt,
+              inputProvenance: params.inputProvenance,
+              streamParams: params.streamParams,
+              ownerNumbers: params.ownerNumbers,
+              enforceFinalTag: params.enforceFinalTag,
+              silentExpected: params.silentExpected,
+              bootstrapPromptWarningSignaturesSeen,
+              bootstrapPromptWarningSignature:
+                bootstrapPromptWarningSignaturesSeen[
+                  bootstrapPromptWarningSignaturesSeen.length - 1
+                ],
+            });
+          } catch (error) {
+            attemptAbortScope.dispose();
+            throw error;
+          }
+          runtimeTurn.updateChildBudget(attemptBudgetId, { usedIterations: 1 });
+          if (attempt.aborted) {
+            attemptAbortScope.abort("attempt aborted");
+          }
+          attemptAbortScope.dispose();
 
           const {
             aborted,
@@ -1305,11 +1363,14 @@ export async function runEmbeddedPiAgent(
             didSendViaMessagingTool: attempt.didSendViaMessagingTool,
             didSendDeterministicApprovalPrompt: attempt.didSendDeterministicApprovalPrompt,
           });
+          runtimeTurn.enterStage("terminal_response", `payload count ${String(payloads.length)}`);
 
           // Timeout aborts can leave the run without any assistant payloads.
           // Emit an explicit timeout error instead of silently completing, so
           // callers do not lose the turn as an orphaned user message.
           if (timedOut && !timedOutDuringCompaction && payloads.length === 0) {
+            runtimeStatus = "failed";
+            runtimeError = "Request timed out before a response was generated.";
             return {
               payloads: [
                 {
@@ -1426,6 +1487,8 @@ export async function runEmbeddedPiAgent(
               agentDir: params.agentDir,
             });
           }
+          runtimeStatus = aborted ? "aborted" : "completed";
+          runtimeError = aborted ? "run aborted" : undefined;
           return {
             payloads: payloads.length ? payloads : undefined,
             meta: {
@@ -1459,7 +1522,16 @@ export async function runEmbeddedPiAgent(
             successfulCronAdds: attempt.successfulCronAdds,
           };
         }
+      } catch (error) {
+        runtimeStatus = params.abortSignal?.aborted ? "aborted" : "failed";
+        runtimeError = error instanceof Error ? error.message : String(error);
+        throw error;
       } finally {
+        detachRuntimeAbort();
+        if (runLoopIterations >= MAX_RUN_LOOP_ITERATIONS) {
+          runtimeTurn.markBudgetExhausted("retry_limit", "runner retry limit reached");
+        }
+        runtimeTurn.finish(runtimeStatus, runtimeError);
         await contextEngine.dispose?.();
         stopRuntimeAuthRefreshTimer();
         if (params.cleanupBundleMcpOnRunEnd === true) {

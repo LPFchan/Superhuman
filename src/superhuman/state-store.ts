@@ -4,12 +4,24 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { loadGatewaySessionRow } from "../gateway/session-utils.js";
 import { requireNodeSqlite } from "../infra/node-sqlite.js";
 import type {
+  AbortNodeStatus,
+  AgentRuntimeStage,
   ContextPressureSnapshot,
   ConversationWindow,
   ConversationWindowMessage,
+  RuntimeBudgetExhaustionReason,
+  RuntimeInvocationMode,
+  RuntimeInvocationStatus,
   StateActionAppend,
+  StateAbortNodeRecord,
+  StateAbortNodeUpsert,
   StateArtifactAppend,
+  StateIterationBudgetRecord,
+  StateIterationBudgetUpsert,
   StateMessageAppend,
+  StateRuntimeInvocationRecord,
+  StateRuntimeInvocationUpsert,
+  StateRuntimeStageEventAppend,
   StateSessionRecord,
   StateSessionUpsert,
   StateStore,
@@ -27,8 +39,16 @@ type StateStoreStatements = {
   touchSessionAfterMessage: StatementSync;
   upsertAction: StatementSync;
   upsertArtifact: StatementSync;
+  upsertRuntimeInvocation: StatementSync;
+  insertRuntimeStageEvent: StatementSync;
+  upsertIterationBudget: StatementSync;
+  upsertAbortNode: StatementSync;
   selectSession: StatementSync;
   selectArtifacts: StatementSync;
+  selectRuntimeInvocation: StatementSync;
+  selectRuntimeStageEvents: StatementSync;
+  selectIterationBudgets: StatementSync;
+  selectAbortNodes: StatementSync;
   selectConversationWindow: StatementSync;
   selectApproxTokens: StatementSync;
 };
@@ -75,6 +95,61 @@ type ArtifactRow = {
   label: string | null;
   location: string | null;
   created_at: number;
+};
+
+type RuntimeInvocationRow = {
+  run_id: string;
+  session_key: string | null;
+  session_id: string;
+  workspace_dir: string;
+  mode: RuntimeInvocationMode;
+  trigger: string | null;
+  status: RuntimeInvocationStatus;
+  current_stage: AgentRuntimeStage | null;
+  started_at: number;
+  updated_at: number;
+  ended_at: number | null;
+  parent_run_id: string | null;
+  root_budget_id: string;
+  root_abort_node_id: string;
+  latest_error: string | null;
+};
+
+type RuntimeStageEventRow = {
+  event_id: string;
+  run_id: string;
+  session_key: string | null;
+  stage: AgentRuntimeStage;
+  boundary: "enter" | "exit" | "mark";
+  detail: string | null;
+  created_at: number;
+};
+
+type IterationBudgetRow = {
+  budget_id: string;
+  run_id: string;
+  parent_budget_id: string | null;
+  label: string;
+  max_iterations: number;
+  used_iterations: number;
+  refunded_iterations: number;
+  exhausted_reason: RuntimeBudgetExhaustionReason | null;
+  created_at: number;
+  updated_at: number;
+};
+
+type AbortNodeRow = {
+  abort_node_id: string;
+  run_id: string;
+  parent_abort_node_id: string | null;
+  kind: string;
+  label: string;
+  status: AbortNodeStatus;
+  created_at: number;
+  updated_at: number;
+  aborted_at: number | null;
+  completed_at: number | null;
+  reason: string | null;
 };
 
 const openDatabases = new Map<string, StateDatabase>();
@@ -165,6 +240,64 @@ function ensureSchema(db: DatabaseSync): void {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS runtime_invocations (
+      run_id TEXT PRIMARY KEY,
+      session_key TEXT,
+      session_id TEXT NOT NULL,
+      workspace_dir TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      trigger TEXT,
+      status TEXT NOT NULL,
+      current_stage TEXT,
+      started_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      parent_run_id TEXT,
+      root_budget_id TEXT NOT NULL,
+      root_abort_node_id TEXT NOT NULL,
+      latest_error TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS runtime_stage_events (
+      event_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      session_key TEXT,
+      stage TEXT NOT NULL,
+      boundary TEXT NOT NULL,
+      detail TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY(run_id) REFERENCES runtime_invocations(run_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS iteration_budgets (
+      budget_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      parent_budget_id TEXT,
+      label TEXT NOT NULL,
+      max_iterations INTEGER NOT NULL,
+      used_iterations INTEGER NOT NULL,
+      refunded_iterations INTEGER NOT NULL,
+      exhausted_reason TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY(run_id) REFERENCES runtime_invocations(run_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS abort_nodes (
+      abort_node_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      parent_abort_node_id TEXT,
+      kind TEXT NOT NULL,
+      label TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      aborted_at INTEGER,
+      completed_at INTEGER,
+      reason TEXT,
+      FOREIGN KEY(run_id) REFERENCES runtime_invocations(run_id)
+    );
+
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       content_text,
       content='messages',
@@ -192,6 +325,12 @@ function ensureSchema(db: DatabaseSync): void {
       ON actions(session_key, created_at);
     CREATE INDEX IF NOT EXISTS idx_artifacts_session_created
       ON artifacts(session_key, created_at);
+    CREATE INDEX IF NOT EXISTS idx_runtime_stage_events_run_created
+      ON runtime_stage_events(run_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_iteration_budgets_run_updated
+      ON iteration_budgets(run_id, updated_at);
+    CREATE INDEX IF NOT EXISTS idx_abort_nodes_run_updated
+      ON abort_nodes(run_id, updated_at);
   `);
 }
 
@@ -310,6 +449,101 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         location = COALESCE(excluded.location, artifacts.location),
         created_at = excluded.created_at
     `),
+    upsertRuntimeInvocation: db.prepare(`
+      INSERT INTO runtime_invocations (
+        run_id,
+        session_key,
+        session_id,
+        workspace_dir,
+        mode,
+        trigger,
+        status,
+        current_stage,
+        started_at,
+        updated_at,
+        ended_at,
+        parent_run_id,
+        root_budget_id,
+        root_abort_node_id,
+        latest_error
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id) DO UPDATE SET
+        session_key = COALESCE(excluded.session_key, runtime_invocations.session_key),
+        session_id = excluded.session_id,
+        workspace_dir = excluded.workspace_dir,
+        mode = excluded.mode,
+        trigger = COALESCE(excluded.trigger, runtime_invocations.trigger),
+        status = excluded.status,
+        current_stage = COALESCE(excluded.current_stage, runtime_invocations.current_stage),
+        started_at = runtime_invocations.started_at,
+        updated_at = excluded.updated_at,
+        ended_at = COALESCE(excluded.ended_at, runtime_invocations.ended_at),
+        parent_run_id = COALESCE(excluded.parent_run_id, runtime_invocations.parent_run_id),
+        root_budget_id = excluded.root_budget_id,
+        root_abort_node_id = excluded.root_abort_node_id,
+        latest_error = COALESCE(excluded.latest_error, runtime_invocations.latest_error)
+    `),
+    insertRuntimeStageEvent: db.prepare(`
+      INSERT OR IGNORE INTO runtime_stage_events (
+        event_id,
+        run_id,
+        session_key,
+        stage,
+        boundary,
+        detail,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `),
+    upsertIterationBudget: db.prepare(`
+      INSERT INTO iteration_budgets (
+        budget_id,
+        run_id,
+        parent_budget_id,
+        label,
+        max_iterations,
+        used_iterations,
+        refunded_iterations,
+        exhausted_reason,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(budget_id) DO UPDATE SET
+        run_id = excluded.run_id,
+        parent_budget_id = COALESCE(excluded.parent_budget_id, iteration_budgets.parent_budget_id),
+        label = excluded.label,
+        max_iterations = excluded.max_iterations,
+        used_iterations = excluded.used_iterations,
+        refunded_iterations = excluded.refunded_iterations,
+        exhausted_reason = COALESCE(excluded.exhausted_reason, iteration_budgets.exhausted_reason),
+        created_at = iteration_budgets.created_at,
+        updated_at = excluded.updated_at
+    `),
+    upsertAbortNode: db.prepare(`
+      INSERT INTO abort_nodes (
+        abort_node_id,
+        run_id,
+        parent_abort_node_id,
+        kind,
+        label,
+        status,
+        created_at,
+        updated_at,
+        aborted_at,
+        completed_at,
+        reason
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(abort_node_id) DO UPDATE SET
+        run_id = excluded.run_id,
+        parent_abort_node_id = COALESCE(excluded.parent_abort_node_id, abort_nodes.parent_abort_node_id),
+        kind = excluded.kind,
+        label = excluded.label,
+        status = excluded.status,
+        created_at = abort_nodes.created_at,
+        updated_at = excluded.updated_at,
+        aborted_at = COALESCE(excluded.aborted_at, abort_nodes.aborted_at),
+        completed_at = COALESCE(excluded.completed_at, abort_nodes.completed_at),
+        reason = COALESCE(excluded.reason, abort_nodes.reason)
+    `),
     selectSession: db.prepare(`
       SELECT
         session_key,
@@ -335,6 +569,65 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
       FROM artifacts
       WHERE (? IS NULL OR session_key = ?)
       ORDER BY created_at ASC, artifact_id ASC
+    `),
+    selectRuntimeInvocation: db.prepare(`
+      SELECT
+        run_id,
+        session_key,
+        session_id,
+        workspace_dir,
+        mode,
+        trigger,
+        status,
+        current_stage,
+        started_at,
+        updated_at,
+        ended_at,
+        parent_run_id,
+        root_budget_id,
+        root_abort_node_id,
+        latest_error
+      FROM runtime_invocations
+      WHERE run_id = ?
+    `),
+    selectRuntimeStageEvents: db.prepare(`
+      SELECT event_id, run_id, session_key, stage, boundary, detail, created_at
+      FROM runtime_stage_events
+      WHERE run_id = ?
+      ORDER BY created_at ASC, event_id ASC
+    `),
+    selectIterationBudgets: db.prepare(`
+      SELECT
+        budget_id,
+        run_id,
+        parent_budget_id,
+        label,
+        max_iterations,
+        used_iterations,
+        refunded_iterations,
+        exhausted_reason,
+        created_at,
+        updated_at
+      FROM iteration_budgets
+      WHERE run_id = ?
+      ORDER BY created_at ASC, budget_id ASC
+    `),
+    selectAbortNodes: db.prepare(`
+      SELECT
+        abort_node_id,
+        run_id,
+        parent_abort_node_id,
+        kind,
+        label,
+        status,
+        created_at,
+        updated_at,
+        aborted_at,
+        completed_at,
+        reason
+      FROM abort_nodes
+      WHERE run_id = ?
+      ORDER BY created_at ASC, abort_node_id ASC
     `),
     selectConversationWindow: db.prepare(`
       SELECT message_id, role, content_text, created_at, approx_tokens, transcript_message_id, sequence
@@ -428,6 +721,69 @@ function mapArtifactRow(row: ArtifactRow): StateArtifactAppend {
     label: row.label ?? undefined,
     location: row.location ?? undefined,
     createdAt: row.created_at,
+  };
+}
+
+function mapRuntimeInvocationRow(row: RuntimeInvocationRow): StateRuntimeInvocationRecord {
+  return {
+    runId: row.run_id,
+    sessionKey: row.session_key ?? undefined,
+    sessionId: row.session_id,
+    workspaceDir: row.workspace_dir,
+    mode: row.mode,
+    trigger: row.trigger ?? undefined,
+    status: row.status,
+    currentStage: row.current_stage ?? undefined,
+    startedAt: row.started_at,
+    updatedAt: row.updated_at,
+    endedAt: row.ended_at ?? undefined,
+    parentRunId: row.parent_run_id ?? undefined,
+    rootBudgetId: row.root_budget_id,
+    rootAbortNodeId: row.root_abort_node_id,
+    latestError: row.latest_error ?? undefined,
+  };
+}
+
+function mapRuntimeStageEventRow(row: RuntimeStageEventRow): StateRuntimeStageEventAppend {
+  return {
+    eventId: row.event_id,
+    runId: row.run_id,
+    sessionKey: row.session_key ?? undefined,
+    stage: row.stage,
+    boundary: row.boundary,
+    detail: row.detail ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+function mapIterationBudgetRow(row: IterationBudgetRow): StateIterationBudgetRecord {
+  return {
+    budgetId: row.budget_id,
+    runId: row.run_id,
+    parentBudgetId: row.parent_budget_id ?? undefined,
+    label: row.label,
+    maxIterations: row.max_iterations,
+    usedIterations: row.used_iterations,
+    refundedIterations: row.refunded_iterations,
+    exhaustedReason: row.exhausted_reason ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAbortNodeRow(row: AbortNodeRow): StateAbortNodeRecord {
+  return {
+    abortNodeId: row.abort_node_id,
+    runId: row.run_id,
+    parentAbortNodeId: row.parent_abort_node_id ?? undefined,
+    kind: row.kind,
+    label: row.label,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    abortedAt: row.aborted_at ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    reason: row.reason ?? undefined,
   };
 }
 
@@ -529,6 +885,69 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       );
     },
 
+    upsertRuntimeInvocation(invocation: StateRuntimeInvocationUpsert): void {
+      opened.statements.upsertRuntimeInvocation.run(
+        invocation.runId,
+        invocation.sessionKey ?? null,
+        invocation.sessionId,
+        invocation.workspaceDir,
+        invocation.mode,
+        invocation.trigger ?? null,
+        invocation.status,
+        invocation.currentStage ?? null,
+        invocation.startedAt,
+        invocation.updatedAt,
+        invocation.endedAt ?? null,
+        invocation.parentRunId ?? null,
+        invocation.rootBudgetId,
+        invocation.rootAbortNodeId,
+        invocation.latestError ?? null,
+      );
+    },
+
+    appendRuntimeStageEvent(event: StateRuntimeStageEventAppend): void {
+      opened.statements.insertRuntimeStageEvent.run(
+        event.eventId,
+        event.runId,
+        event.sessionKey ?? null,
+        event.stage,
+        event.boundary,
+        event.detail ?? null,
+        event.createdAt,
+      );
+    },
+
+    upsertIterationBudget(budget: StateIterationBudgetUpsert): void {
+      opened.statements.upsertIterationBudget.run(
+        budget.budgetId,
+        budget.runId,
+        budget.parentBudgetId ?? null,
+        budget.label,
+        budget.maxIterations,
+        budget.usedIterations,
+        budget.refundedIterations,
+        budget.exhaustedReason ?? null,
+        budget.createdAt,
+        budget.updatedAt,
+      );
+    },
+
+    upsertAbortNode(node: StateAbortNodeUpsert): void {
+      opened.statements.upsertAbortNode.run(
+        node.abortNodeId,
+        node.runId,
+        node.parentAbortNodeId ?? null,
+        node.kind,
+        node.label,
+        node.status,
+        node.createdAt,
+        node.updatedAt,
+        node.abortedAt ?? null,
+        node.completedAt ?? null,
+        node.reason ?? null,
+      );
+    },
+
     getSessionSnapshot(sessionKey: string): StateSessionRecord | null {
       const row = opened.statements.selectSession.get(sessionKey) as SessionRow | undefined;
       return row ? mapSessionRow(row) : null;
@@ -538,6 +957,28 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       const sessionKey = paramsIn?.sessionKey ?? null;
       const rows = opened.statements.selectArtifacts.all(sessionKey, sessionKey) as ArtifactRow[];
       return rows.map((row) => mapArtifactRow(row));
+    },
+
+    getRuntimeInvocation(runId: string): StateRuntimeInvocationRecord | null {
+      const row = opened.statements.selectRuntimeInvocation.get(runId) as
+        | RuntimeInvocationRow
+        | undefined;
+      return row ? mapRuntimeInvocationRow(row) : null;
+    },
+
+    getRuntimeStageEvents(runId: string): StateRuntimeStageEventAppend[] {
+      const rows = opened.statements.selectRuntimeStageEvents.all(runId) as RuntimeStageEventRow[];
+      return rows.map((row) => mapRuntimeStageEventRow(row));
+    },
+
+    getIterationBudgets(runId: string): StateIterationBudgetRecord[] {
+      const rows = opened.statements.selectIterationBudgets.all(runId) as IterationBudgetRow[];
+      return rows.map((row) => mapIterationBudgetRow(row));
+    },
+
+    getAbortNodes(runId: string): StateAbortNodeRecord[] {
+      const rows = opened.statements.selectAbortNodes.all(runId) as AbortNodeRow[];
+      return rows.map((row) => mapAbortNodeRow(row));
     },
 
     getConversationWindow(paramsIn: { sessionKey: string; limit?: number }): ConversationWindow {

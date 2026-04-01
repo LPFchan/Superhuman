@@ -30,6 +30,9 @@ export type RunCliAgentParams = {
   bootstrapPromptWarningSignature?: string;
   images?: ImageContent[];
   imageOrder?: PromptImageOrderEntry[];
+  trigger?: string;
+  lane?: string;
+  abortSignal?: AbortSignal;
 };
 
 export type CliPreparedBackend = {

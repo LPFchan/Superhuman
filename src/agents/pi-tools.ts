@@ -6,6 +6,11 @@ import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runt
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
+import type { SuperhumanAgentRuntimeTurn } from "../superhuman/agent-runtime.js";
+import {
+  applyDefaultRuntimeToolSafety,
+  applyRuntimeToolExecutionContext,
+} from "../superhuman/tool-runtime-policy.js";
 import { resolveGatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 import { createApplyPatchTool } from "./apply-patch.js";
@@ -245,6 +250,7 @@ export function createOpenClawCodingTools(options?: {
   spawnWorkspaceDir?: string;
   config?: OpenClawConfig;
   abortSignal?: AbortSignal;
+  runtimeTurn?: SuperhumanAgentRuntimeTurn;
   /**
    * Provider of the currently selected model (used for provider-specific tool quirks).
    * Example: "anthropic", "openai", "google", "openai-codex".
@@ -641,6 +647,16 @@ export function createOpenClawCodingTools(options?: {
       modelCompat: options?.modelCompat,
     }),
   );
+  applyDefaultRuntimeToolSafety({
+    tools: normalized,
+    scopeKey,
+  });
+  if (options?.runtimeTurn) {
+    applyRuntimeToolExecutionContext({
+      tools: normalized,
+      context: { runtimeTurn: options.runtimeTurn },
+    });
+  }
   const withHooks = normalized.map((tool) =>
     wrapToolWithBeforeToolCallHook(tool, {
       agentId,

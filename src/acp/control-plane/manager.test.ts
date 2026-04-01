@@ -3,6 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { AcpSessionRuntimeOptions, SessionAcpMeta } from "../../config/sessions/types.js";
+import { createSuperhumanStateStore } from "../../superhuman/state-store.js";
 import { withTempDir } from "../../test-helpers/temp-dir.js";
 import type { AcpRuntime, AcpRuntimeCapabilities } from "../runtime/types.js";
 
@@ -1369,6 +1370,54 @@ describe("AcpSessionManager", () => {
     expect(states).toContain("running");
     expect(states).toContain("idle");
     expect(states).not.toContain("error");
+  });
+
+  it("records runtime stages for ACP turns in the state store", async () => {
+    await withAcpManagerTaskStateDir(async (root) => {
+      const runtimeState = createRuntime();
+      hoisted.requireAcpRuntimeBackendMock.mockReturnValue({
+        id: "acpx",
+        runtime: runtimeState.runtime,
+      });
+      hoisted.readAcpSessionEntryMock.mockReturnValue({
+        sessionKey: "agent:codex:acp:session-1",
+        storeSessionKey: "agent:codex:acp:session-1",
+        acp: readySessionMeta(),
+      });
+      runtimeState.runTurn.mockImplementation(async function* () {
+        yield { type: "tool_call" as const, text: "Read workspace", title: "read" };
+        yield { type: "text_delta" as const, text: "done" };
+        yield { type: "done" as const, stopReason: "end_turn" };
+      });
+
+      const manager = new AcpSessionManager();
+      await manager.runTurn({
+        cfg: baseCfg,
+        sessionKey: "agent:codex:acp:session-1",
+        text: "inspect repo",
+        mode: "prompt",
+        requestId: "acp-run-1",
+      });
+
+      const store = createSuperhumanStateStore({ workspaceDir: root });
+      try {
+        expect(store.getRuntimeInvocation("acp-run-1")).toMatchObject({
+          mode: "remote",
+          status: "completed",
+          sessionKey: "agent:codex:acp:session-1",
+        });
+        expect(store.getRuntimeStageEvents("acp-run-1")).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ stage: "prompt_assembly", boundary: "enter" }),
+            expect.objectContaining({ stage: "model_call", boundary: "enter" }),
+            expect.objectContaining({ stage: "tool_execution", boundary: "enter" }),
+            expect.objectContaining({ stage: "terminal_response", boundary: "enter" }),
+          ]),
+        );
+      } finally {
+        store.close();
+      }
+    });
   });
 
   it("cleans actor-tail bookkeeping after session turns complete", async () => {

@@ -145,6 +145,25 @@ describe("before_tool_call hook integration", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("blocks clearly destructive exec commands before execution", async () => {
+    beforeToolCallHook = installBeforeToolCallHook({ enabled: false });
+    const execute = vi.fn().mockResolvedValue({ content: [], details: { ok: true } });
+    // oxlint-disable-next-line typescript/no-explicit-any
+    const tool = wrapToolWithBeforeToolCallHook({ name: "exec", execute } as any);
+    const extensionContext = {} as Parameters<typeof tool.execute>[3];
+
+    await expect(
+      tool.execute(
+        "call-risk-block",
+        { command: "git reset --hard HEAD" },
+        undefined,
+        extensionContext,
+      ),
+    ).rejects.toThrow("Blocked exec command: destructive shell pattern");
+    expect(execute).not.toHaveBeenCalled();
+    expect(beforeToolCallHook).not.toHaveBeenCalled();
+  });
+
   it("does not execute lower-priority hooks after block=true", async () => {
     const high = vi.fn().mockResolvedValue({ block: true, blockReason: "blocked-high" });
     const low = vi.fn().mockResolvedValue({ params: { shouldNotApply: true } });

@@ -72,4 +72,79 @@ describe("createSuperhumanStateStore", () => {
 
     store.close();
   });
+
+  it("stores runtime invocations, stage events, budgets, and abort nodes", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-state-"));
+    cleanupPaths.add(workspaceDir);
+    const store = createSuperhumanStateStore({ workspaceDir });
+
+    store.upsertRuntimeInvocation({
+      runId: "run-1",
+      sessionId: "session-1",
+      sessionKey: "main",
+      workspaceDir,
+      mode: "interactive",
+      status: "running",
+      currentStage: "model_call",
+      startedAt: 10,
+      updatedAt: 15,
+      rootBudgetId: "budget:root",
+      rootAbortNodeId: "abort:root",
+    });
+    store.appendRuntimeStageEvent({
+      eventId: "evt-1",
+      runId: "run-1",
+      sessionKey: "main",
+      stage: "model_call",
+      boundary: "enter",
+      detail: "attempt 1",
+      createdAt: 11,
+    });
+    store.upsertIterationBudget({
+      budgetId: "budget:root",
+      runId: "run-1",
+      label: "root",
+      maxIterations: 4,
+      usedIterations: 1,
+      refundedIterations: 0,
+      createdAt: 10,
+      updatedAt: 11,
+    });
+    store.upsertAbortNode({
+      abortNodeId: "abort:root",
+      runId: "run-1",
+      kind: "runtime",
+      label: "root",
+      status: "active",
+      createdAt: 10,
+      updatedAt: 11,
+    });
+
+    expect(store.getRuntimeInvocation("run-1")).toMatchObject({
+      sessionKey: "main",
+      currentStage: "model_call",
+      rootBudgetId: "budget:root",
+    });
+    expect(store.getRuntimeStageEvents("run-1")).toEqual([
+      expect.objectContaining({
+        stage: "model_call",
+        boundary: "enter",
+        detail: "attempt 1",
+      }),
+    ]);
+    expect(store.getIterationBudgets("run-1")).toEqual([
+      expect.objectContaining({
+        budgetId: "budget:root",
+        usedIterations: 1,
+      }),
+    ]);
+    expect(store.getAbortNodes("run-1")).toEqual([
+      expect.objectContaining({
+        abortNodeId: "abort:root",
+        status: "active",
+      }),
+    ]);
+
+    store.close();
+  });
 });

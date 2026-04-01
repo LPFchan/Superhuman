@@ -519,6 +519,9 @@ export async function runCronIsolatedAgentTurn(params: {
               cliSessionId,
               bootstrapPromptWarningSignaturesSeen,
               bootstrapPromptWarningSignature,
+              trigger: "cron",
+              lane: resolveNestedAgentLane(params.lane),
+              abortSignal,
             });
             bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
               result.meta?.systemPromptReport,

@@ -5,6 +5,11 @@ import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { copyPluginToolMeta } from "../plugins/tools.js";
 import { PluginApprovalResolutions, type PluginApprovalResolution } from "../plugins/types.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
+import { classifyCommandRisk } from "../superhuman/command-risk-classifier.js";
+import {
+  copyRuntimeToolExecutionContext,
+  copyRuntimeToolSafetyMeta,
+} from "../superhuman/tool-runtime-policy.js";
 import { isPlainObject } from "../utils.js";
 import { copyChannelAgentToolMeta } from "./channel-tools.js";
 import { normalizeToolName } from "./tool-policy.js";
@@ -67,6 +72,30 @@ function isAbortSignalCancellation(err: unknown, signal?: AbortSignal): boolean 
   return false;
 }
 
+function shouldBlockCommandRisk(reason: string): boolean {
+  return (
+    reason === "destructive shell pattern" ||
+    reason === "host secret path access" ||
+    reason === "dangerous env override blocked" ||
+    reason === "unsafe executable token"
+  );
+}
+
+function resolveCommandRiskBlockReason(args: { toolName: string; params: unknown }): string | null {
+  const classification = classifyCommandRisk({
+    toolName: args.toolName,
+    args: args.params,
+  });
+  if (classification.risk === "low") {
+    return null;
+  }
+  const blockingReasons = classification.reasons.filter((reason) => shouldBlockCommandRisk(reason));
+  if (blockingReasons.length === 0) {
+    return null;
+  }
+  return `Blocked ${args.toolName} command: ${blockingReasons.join(", ")}`;
+}
+
 function shouldEmitLoopWarning(state: SessionState, warningKey: string, count: number): boolean {
   if (!state.toolLoopWarningBuckets) {
     state.toolLoopWarningBuckets = new Map();
@@ -125,6 +154,22 @@ export async function runBeforeToolCallHook(args: {
 }): Promise<HookOutcome> {
   const toolName = normalizeToolName(args.toolName || "tool");
   const params = args.params;
+  const allowWithRiskCheck = (allowedParams: unknown): HookOutcome => {
+    const riskBlockReason = resolveCommandRiskBlockReason({
+      toolName,
+      params: allowedParams,
+    });
+    if (riskBlockReason) {
+      return {
+        blocked: true,
+        reason: riskBlockReason,
+      };
+    }
+    return {
+      blocked: false,
+      params: allowedParams,
+    };
+  };
 
   if (args.ctx?.sessionKey) {
     const { getDiagnosticSessionState, logToolLoopAction, detectToolCallLoop, recordToolCall } =
@@ -178,7 +223,7 @@ export async function runBeforeToolCallHook(args: {
 
   const hookRunner = getGlobalHookRunner();
   if (!hookRunner?.hasHooks("before_tool_call")) {
-    return { blocked: false, params: args.params };
+    return allowWithRiskCheck(args.params);
   }
 
   try {
@@ -316,20 +361,14 @@ export async function runBeforeToolCallHook(args: {
           decision === PluginApprovalResolutions.ALLOW_ONCE ||
           decision === PluginApprovalResolutions.ALLOW_ALWAYS
         ) {
-          return {
-            blocked: false,
-            params: mergeParamsWithApprovalOverrides(params, hookResult.params),
-          };
+          return allowWithRiskCheck(mergeParamsWithApprovalOverrides(params, hookResult.params));
         }
         if (decision === PluginApprovalResolutions.DENY) {
           return { blocked: true, reason: "Denied by user" };
         }
         const timeoutBehavior = approval.timeoutBehavior ?? "deny";
         if (timeoutBehavior === "allow") {
-          return {
-            blocked: false,
-            params: mergeParamsWithApprovalOverrides(params, hookResult.params),
-          };
+          return allowWithRiskCheck(mergeParamsWithApprovalOverrides(params, hookResult.params));
         }
         return { blocked: true, reason: "Approval timed out" };
       } catch (err) {
@@ -350,17 +389,14 @@ export async function runBeforeToolCallHook(args: {
     }
 
     if (hookResult?.params) {
-      return {
-        blocked: false,
-        params: mergeParamsWithApprovalOverrides(params, hookResult.params),
-      };
+      return allowWithRiskCheck(mergeParamsWithApprovalOverrides(params, hookResult.params));
     }
   } catch (err) {
     const toolCallId = args.toolCallId ? ` toolCallId=${args.toolCallId}` : "";
     log.warn(`before_tool_call hook failed: tool=${toolName}${toolCallId} error=${String(err)}`);
   }
 
-  return { blocked: false, params };
+  return allowWithRiskCheck(params);
 }
 
 export function wrapToolWithBeforeToolCallHook(
@@ -420,6 +456,8 @@ export function wrapToolWithBeforeToolCallHook(
   };
   copyPluginToolMeta(tool, wrappedTool);
   copyChannelAgentToolMeta(tool as never, wrappedTool as never);
+  copyRuntimeToolSafetyMeta(tool, wrappedTool);
+  copyRuntimeToolExecutionContext(tool, wrappedTool);
   Object.defineProperty(wrappedTool, BEFORE_TOOL_CALL_WRAPPED, {
     value: true,
     enumerable: true,

@@ -82,13 +82,103 @@ export type StateArtifactAppend = {
   createdAt: number;
 };
 
+export type AgentRuntimeStage =
+  | "prompt_assembly"
+  | "model_call"
+  | "tool_planning"
+  | "tool_execution"
+  | "post_tool_continuation"
+  | "terminal_response";
+
+export type RuntimeInvocationMode = "interactive" | "background" | "scheduled" | "remote";
+
+export type RuntimeInvocationStatus = "running" | "completed" | "failed" | "aborted";
+
+export type RuntimeBudgetExhaustionReason =
+  | "retry_limit"
+  | "tool_loop"
+  | "timeout"
+  | "aborted"
+  | "unknown";
+
+export type AbortNodeStatus = "active" | "completed" | "aborted";
+
+export type StateRuntimeInvocationRecord = {
+  runId: string;
+  sessionKey?: string;
+  sessionId: string;
+  workspaceDir: string;
+  mode: RuntimeInvocationMode;
+  trigger?: string;
+  status: RuntimeInvocationStatus;
+  currentStage?: AgentRuntimeStage;
+  startedAt: number;
+  updatedAt: number;
+  endedAt?: number;
+  parentRunId?: string;
+  rootBudgetId: string;
+  rootAbortNodeId: string;
+  latestError?: string;
+};
+
+export type StateRuntimeInvocationUpsert = StateRuntimeInvocationRecord;
+
+export type StateRuntimeStageEventAppend = {
+  eventId: string;
+  runId: string;
+  sessionKey?: string;
+  stage: AgentRuntimeStage;
+  boundary: "enter" | "exit" | "mark";
+  detail?: string;
+  createdAt: number;
+};
+
+export type StateIterationBudgetRecord = {
+  budgetId: string;
+  runId: string;
+  parentBudgetId?: string;
+  label: string;
+  maxIterations: number;
+  usedIterations: number;
+  refundedIterations: number;
+  exhaustedReason?: RuntimeBudgetExhaustionReason;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type StateIterationBudgetUpsert = StateIterationBudgetRecord;
+
+export type StateAbortNodeRecord = {
+  abortNodeId: string;
+  runId: string;
+  parentAbortNodeId?: string;
+  kind: string;
+  label: string;
+  status: AbortNodeStatus;
+  createdAt: number;
+  updatedAt: number;
+  abortedAt?: number;
+  completedAt?: number;
+  reason?: string;
+};
+
+export type StateAbortNodeUpsert = StateAbortNodeRecord;
+
 export interface StateStore {
   upsertSession(session: StateSessionUpsert): void;
   appendMessage(message: StateMessageAppend): void;
   appendAction(action: StateActionAppend): void;
   appendArtifact(artifact: StateArtifactAppend): void;
+  upsertRuntimeInvocation(invocation: StateRuntimeInvocationUpsert): void;
+  appendRuntimeStageEvent(event: StateRuntimeStageEventAppend): void;
+  upsertIterationBudget(budget: StateIterationBudgetUpsert): void;
+  upsertAbortNode(node: StateAbortNodeUpsert): void;
   getSessionSnapshot(sessionKey: string): StateSessionRecord | null;
   getArtifacts(params?: { sessionKey?: string }): StateArtifactAppend[];
+  getRuntimeInvocation(runId: string): StateRuntimeInvocationRecord | null;
+  getRuntimeStageEvents(runId: string): StateRuntimeStageEventAppend[];
+  getIterationBudgets(runId: string): StateIterationBudgetRecord[];
+  getAbortNodes(runId: string): StateAbortNodeRecord[];
   getConversationWindow(params: { sessionKey: string; limit?: number }): ConversationWindow;
   getContextPressureSnapshot(params: {
     sessionKey: string;

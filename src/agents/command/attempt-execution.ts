@@ -370,6 +370,7 @@ export function runAgentAttempt(params: {
         images: params.isFallbackRetry ? undefined : params.opts.images,
         imageOrder: params.isFallbackRetry ? undefined : params.opts.imageOrder,
         streamParams: params.opts.streamParams,
+        trigger: "user",
       });
     return runCliWithSession(cliSessionBinding?.sessionId).catch(async (err) => {
       if (

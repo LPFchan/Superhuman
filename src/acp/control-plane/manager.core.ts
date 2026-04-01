@@ -1,8 +1,9 @@
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
-import type { OpenClawConfig } from "../../config/config.js";
+import { resolveStateDir, type OpenClawConfig } from "../../config/config.js";
 import { logVerbose } from "../../globals.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
 import { isAcpSessionKey } from "../../sessions/session-key-utils.js";
+import { SuperhumanAgentRuntimeTurn } from "../../superhuman/agent-runtime.js";
 import {
   createRunningTaskRun,
   completeTaskRunByRunId,
@@ -712,6 +713,13 @@ export class AcpSessionManager {
           let activeTurn: ActiveTurnState | undefined;
           let internalAbortController: AbortController | undefined;
           let onCallerAbort: (() => void) | undefined;
+          let runtimeTurn: SuperhumanAgentRuntimeTurn | undefined;
+          let turnAbortScope:
+            | ReturnType<SuperhumanAgentRuntimeTurn["createAbortScope"]>
+            | undefined;
+          let toolStageActive = false;
+          let runtimeStatus: "completed" | "failed" | "aborted" = "completed";
+          let runtimeError: string | undefined;
           let activeTurnStarted = false;
           let sawTurnOutput = false;
           let retryFreshHandle = false;
@@ -739,12 +747,27 @@ export class AcpSessionManager {
               clearLastError: true,
             });
 
-            internalAbortController = new AbortController();
+            runtimeTurn = new SuperhumanAgentRuntimeTurn({
+              workspaceDir: handle.cwd ?? resolveStateDir(process.env),
+              runId: input.requestId,
+              sessionId: sessionKey,
+              sessionKey,
+              mode: "remote",
+              trigger: input.mode,
+              maxIterations: 1,
+            });
+            runtimeTurn.enterStage("prompt_assembly", "acp runtime prepared");
+            turnAbortScope = runtimeTurn.createAbortScope({
+              kind: "acp-turn",
+              label: input.mode,
+              parentSignal: input.signal,
+            });
+            internalAbortController = turnAbortScope.controller;
             onCallerAbort = () => {
-              internalAbortController?.abort();
+              turnAbortScope?.abort(input.signal?.reason);
             };
             if (input.signal?.aborted) {
-              internalAbortController.abort();
+              turnAbortScope.abort(input.signal.reason);
             } else if (input.signal) {
               input.signal.addEventListener("abort", onCallerAbort, { once: true });
             }
@@ -758,11 +781,10 @@ export class AcpSessionManager {
             activeTurnStarted = true;
 
             let streamError: AcpRuntimeError | null = null;
-            const combinedSignal =
-              input.signal && typeof AbortSignal.any === "function"
-                ? AbortSignal.any([input.signal, internalAbortController.signal])
-                : internalAbortController.signal;
+            const combinedSignal = turnAbortScope.signal;
             const eventGate = { open: true };
+            runtimeTurn.enterStage("model_call", "acp turn start");
+            runtimeTurn.consumeIteration("acp turn");
             const turnPromise = (async () => {
               for await (const event of runtime.runTurn({
                 handle,
@@ -774,6 +796,26 @@ export class AcpSessionManager {
               })) {
                 if (!eventGate.open) {
                   continue;
+                }
+                if (event.type === "tool_call") {
+                  const detail = event.title?.trim() || event.text?.trim() || "acp tool";
+                  runtimeTurn.enterStage("tool_planning", detail);
+                  runtimeTurn.enterStage("tool_execution", detail);
+                  toolStageActive = true;
+                } else if (toolStageActive && event.type === "text_delta") {
+                  runtimeTurn.exitStage("tool_execution", "acp tool complete");
+                  runtimeTurn.enterStage("post_tool_continuation", "acp assistant continuation");
+                  runtimeTurn.enterStage("model_call", "acp assistant continuation");
+                  toolStageActive = false;
+                } else if (event.type === "done") {
+                  if (toolStageActive) {
+                    runtimeTurn.exitStage("tool_execution", "acp tool complete");
+                    toolStageActive = false;
+                  }
+                  runtimeTurn.enterStage(
+                    "terminal_response",
+                    event.stopReason ? `acp done: ${event.stopReason}` : "acp done",
+                  );
                 }
                 if (event.type === "error") {
                   streamError = new AcpRuntimeError(
@@ -830,6 +872,11 @@ export class AcpSessionManager {
             if (streamError) {
               throw streamError;
             }
+            runtimeStatus = internalAbortController.signal.aborted ? "aborted" : "completed";
+            runtimeError =
+              runtimeStatus === "aborted"
+                ? String(internalAbortController.signal.reason ?? "acp turn aborted")
+                : undefined;
             this.recordTurnCompletion({
               startedAt: turnStartedAt,
             });
@@ -861,6 +908,8 @@ export class AcpSessionManager {
                 ? "ACP turn failed before completion."
                 : "Could not initialize ACP session runtime.",
             });
+            runtimeStatus = internalAbortController?.signal.aborted ? "aborted" : "failed";
+            runtimeError = acpError.message;
             retryFreshHandle = this.shouldRetryTurnWithFreshHandle({
               attempt,
               sessionKey,
@@ -896,6 +945,8 @@ export class AcpSessionManager {
             if (input.signal && onCallerAbort) {
               input.signal.removeEventListener("abort", onCallerAbort);
             }
+            turnAbortScope?.dispose();
+            runtimeTurn?.finish(runtimeStatus, runtimeError);
             if (activeTurn && this.activeTurnBySession.get(actorKey) === activeTurn) {
               this.activeTurnBySession.delete(actorKey);
             }

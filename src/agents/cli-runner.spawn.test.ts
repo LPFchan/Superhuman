@@ -1,8 +1,10 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
+import { createSuperhumanStateStore } from "../superhuman/state-store.js";
 import {
   createManagedRun,
   mockSuccessfulCliRun,
@@ -140,6 +142,58 @@ describe("runCliAgent spawn path", () => {
     expect(input.noOutputTimeoutMs).toBeGreaterThanOrEqual(1_000);
     expect(input.replaceExistingScope).toBe(true);
     expect(input.scopeKey).toContain("thread-123");
+  });
+
+  it("records CLI runtime stages in the state store", async () => {
+    const runCliAgent = await setupCliRunnerTestModule();
+    supervisorSpawnMock.mockResolvedValueOnce(
+      createManagedRun({
+        reason: "exit",
+        exitCode: 0,
+        exitSignal: null,
+        durationMs: 50,
+        stdout: "ok",
+        stderr: "",
+        timedOut: false,
+        noOutputTimedOut: false,
+      }),
+    );
+
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cli-runtime-"));
+    try {
+      await runCliAgent({
+        sessionId: "s-runtime",
+        sessionKey: "agent:main:main",
+        sessionFile: path.join(workspaceDir, "session.jsonl"),
+        workspaceDir,
+        prompt: "hi",
+        provider: "codex-cli",
+        model: "gpt-5.2-codex",
+        timeoutMs: 1_000,
+        runId: "run-cli-runtime",
+        cliSessionId: "thread-123",
+        trigger: "heartbeat",
+      });
+
+      const store = createSuperhumanStateStore({ workspaceDir });
+      try {
+        expect(store.getRuntimeInvocation("run-cli-runtime")).toMatchObject({
+          mode: "background",
+          status: "completed",
+        });
+        expect(store.getRuntimeStageEvents("run-cli-runtime")).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ stage: "prompt_assembly", boundary: "enter" }),
+            expect.objectContaining({ stage: "model_call", boundary: "enter" }),
+            expect.objectContaining({ stage: "terminal_response", boundary: "enter" }),
+          ]),
+        );
+      } finally {
+        store.close();
+      }
+    } finally {
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+    }
   });
 
   it("sanitizes dangerous backend env overrides before spawn", async () => {
