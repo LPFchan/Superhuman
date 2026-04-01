@@ -1,4 +1,5 @@
 import { stripInboundMetadata } from "../auto-reply/reply/strip-inbound-meta.js";
+import { extractSuperReplayAnnotations } from "../superhuman/super-replay-annotations.js";
 
 const DEDUPE_TIMESTAMP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -123,6 +124,7 @@ function withHistoryProvenance(message: unknown): unknown {
     __openclaw: {
       ...meta,
       historyProvenance: resolveHistoryProvenance(message),
+      replayAnnotations: extractSuperReplayAnnotations(meta),
     },
   };
 }

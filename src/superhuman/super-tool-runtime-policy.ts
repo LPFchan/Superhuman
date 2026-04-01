@@ -199,18 +199,10 @@ export function applyDefaultSuperRuntimeToolSafety(params: {
   for (const tool of params.tools) {
     const toolName = tool.name.trim().toLowerCase();
     const capabilityClass = resolveCapabilityClass(toolName);
-    if (toolName === "bash" || toolName === "exec") {
+    if (toolName === "bash" || toolName === "exec" || toolName === "process") {
       setSuperRuntimeToolSafetyMeta(tool, {
         neverParallel: true,
         destructivePossible: true,
-        capabilityClass,
-        scopeKey: params.scopeKey,
-      });
-      continue;
-    }
-    if (toolName === "process") {
-      setSuperRuntimeToolSafetyMeta(tool, {
-        neverParallel: true,
         capabilityClass,
         scopeKey: params.scopeKey,
       });

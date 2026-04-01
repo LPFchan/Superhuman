@@ -25,9 +25,55 @@ export type StateEvidenceProvenance = {
   previewArtifactId?: string;
   fullArtifactId?: string;
   partialReadArtifactId?: string;
+  replayAnnotations?: StateReplayAnnotation[];
 };
 
 export type StateStructuredDetails = Record<string, unknown>;
+
+export type StateReplayAnnotation =
+  | {
+      kind: "verification";
+      outcome?: VerificationOutcome;
+      stage?: SuperVerificationStage;
+      verifierKind?: SuperVerifierKind;
+      summary?: string;
+      command?: string;
+      exitCode?: number;
+    }
+  | {
+      kind: "partial_read";
+      sourceTool?: string;
+      descriptor?: string;
+      requestedRange?: {
+        startLine?: number;
+        endLine?: number;
+      };
+      returnedRange?: {
+        startLine?: number;
+        endLine?: number;
+      };
+      totalKnownLines?: number;
+      limitKind?: string;
+      continuationHint?: string;
+      artifactId?: string;
+      fullArtifactId?: string;
+    }
+  | {
+      kind: "persisted_preview";
+      descriptor?: string;
+      previewArtifactId?: string;
+      fullArtifactId?: string;
+      storagePath?: string;
+      previewBytes?: number;
+      fullBytes?: number;
+    }
+  | {
+      kind: "imported_history";
+      importedFrom?: string;
+      externalId?: string;
+      sourceSessionKey?: string;
+      descriptor?: string;
+    };
 
 export type ConversationWindowMessage = {
   messageId: string;
@@ -105,6 +151,51 @@ export type ContextPressureSnapshot = {
   persistedCompactionEventRefs: string[];
 };
 
+export type StateContextCollapseCommittedSpan = {
+  collapseId: string;
+  summary: string;
+  firstKeptEntryId: string;
+  sourceStartEntryId: string;
+  sourceEndEntryId: string;
+  messageCount: number;
+  estimatedTokens: number;
+  committedAt: number;
+};
+
+export type StateContextCollapseStagedSpan = {
+  collapseId: string;
+  summary: string;
+  firstEntryId: string;
+  lastEntryId: string;
+  firstKeptEntryId: string;
+  messageCount: number;
+  estimatedTokens: number;
+  stagedAt: number;
+};
+
+export type StateContextCollapseDroppedSpan = {
+  collapseId?: string;
+  sourceStartEntryId?: string;
+  sourceEndEntryId?: string;
+};
+
+export type StateContextCollapseLedgerRecord = {
+  sessionKey: string;
+  runId?: string;
+  updatedAt: number;
+  committedSpans: StateContextCollapseCommittedSpan[];
+  stagedSpans: StateContextCollapseStagedSpan[];
+  droppedSpans: StateContextCollapseDroppedSpan[];
+  restoredArtifacts: string[];
+  recoveryMode?: string;
+  visibleContextState?: string;
+  tokensBefore?: number;
+  tokensAfter?: number;
+  operatorSummary?: string;
+};
+
+export type StateContextCollapseLedgerUpsert = StateContextCollapseLedgerRecord;
+
 export type VerificationOutcome = "verified" | "not_verifiable" | "verification_failed";
 
 export type StateContextPressureSnapshotAppend = {
@@ -134,6 +225,25 @@ export type StateTeamMemorySyncEventAppend = {
 };
 
 export type StateTeamMemorySyncEventRecord = StateTeamMemorySyncEventAppend;
+
+export type StateTeamMemorySyncStateRecord = {
+  repoRoot: string;
+  remoteRoot?: string;
+  lastPulledHash?: string;
+  lastPushedHash?: string;
+  lastSyncAt?: number;
+  lastPullAt?: number;
+  lastPushAt?: number;
+  lastRetryAt?: number;
+  conflictRetryCount: number;
+  blockedFiles: string[];
+  checksumState?: Record<string, string>;
+  lastStatus?: TeamMemorySyncStatus;
+  lastDecision?: string;
+  updatedAt: number;
+};
+
+export type StateTeamMemorySyncStateUpsert = StateTeamMemorySyncStateRecord;
 
 export type AutomationLoopState = "active" | "paused" | "sleeping" | "disabled";
 
@@ -274,6 +384,17 @@ export type SuperPartialReadDescriptor = {
   omittedBytes?: number;
   byteLimit?: number;
   strategy?: string;
+  requestedRange?: {
+    startLine?: number;
+    endLine?: number;
+  };
+  returnedRange?: {
+    startLine?: number;
+    endLine?: number;
+  };
+  totalKnownLines?: number;
+  limitKind?: string;
+  continuationHint?: string;
 };
 
 export type StateArtifactRecord = {
@@ -417,11 +538,15 @@ export interface StateStore {
     sessionKey: string;
     limit?: number;
   }): ContextPressureSnapshot[];
+  upsertContextCollapseLedger(ledger: StateContextCollapseLedgerUpsert): void;
+  getContextCollapseLedger(sessionKey: string): StateContextCollapseLedgerRecord | null;
   appendTeamMemorySyncEvent(event: StateTeamMemorySyncEventAppend): void;
   listTeamMemorySyncEvents(params?: {
     repoRoot?: string;
     limit?: number;
   }): StateTeamMemorySyncEventRecord[];
+  upsertTeamMemorySyncState(state: StateTeamMemorySyncStateUpsert): void;
+  getTeamMemorySyncState(repoRoot: string): StateTeamMemorySyncStateRecord | null;
   getContextPressureSnapshot(params: {
     sessionKey: string;
     effectiveContextLimit?: number;

@@ -8,11 +8,15 @@ import { inspectHostExecEnvOverrides } from "../infra/host-env-security.js";
 
 const DESTRUCTIVE_COMMAND_PATTERNS = [
   /(^|\s)rm\s+-[^\r\n]*\brf\b/i,
+  /(^|\s)find\s+[^\r\n]+\s-delete\b/i,
+  /(^|\s)mv\s+\S+\s+\S+/i,
+  /(^|\s)sed\s+-[^\r\n]*i\b/i,
+  /(^|\s)dd\s+if=/i,
   /(^|\s)git\s+reset\s+--hard\b/i,
   /(^|\s)git\s+clean\s+-[^\r\n]*\bf\b/i,
   /(^|\s)git\s+checkout\s+--\b/i,
   /(^|\s)truncate\s+-s\s+0\b/i,
-  />{1,2}\s*[^\s]+/,
+  /(^|[;&|]\s*|\s)>\s*[^\s>]+/,
 ] as const;
 
 const SECRET_PATH_PATTERNS = [
@@ -21,6 +25,7 @@ const SECRET_PATH_PATTERNS = [
   /(^|\s)~\/\.openclaw\/credentials\b/,
   /(^|\s)~\/\.git-credentials\b/,
   /(^|\s)~\/\.npmrc\b/,
+  /(^|\s)~\/\.config\b/,
   /(^|\s)\.env(\.|\s|$)/,
 ] as const;
 
@@ -131,16 +136,25 @@ function classifyExecLikeArgs(args: ExecLikeArgs): CommandRiskClassification {
   };
 }
 
+function isCommandBearingToolName(toolName: string): boolean {
+  const normalized = toolName.trim().toLowerCase();
+  return (
+    normalized === "exec" ||
+    normalized === "bash" ||
+    normalized === "process" ||
+    normalized === "shell" ||
+    normalized === "terminal" ||
+    normalized === "run_command" ||
+    normalized === "command"
+  );
+}
+
 export function classifySuperCommandRisk(params: {
   toolName: string;
   args: unknown;
 }): CommandRiskClassification {
   const toolName = params.toolName.trim().toLowerCase();
-  if (
-    (toolName !== "exec" && toolName !== "bash") ||
-    !params.args ||
-    typeof params.args !== "object"
-  ) {
+  if (!isCommandBearingToolName(toolName) || !params.args || typeof params.args !== "object") {
     return { risk: "low", destructivePossible: false, reasons: [] };
   }
   return classifyExecLikeArgs(params.args as ExecLikeArgs);

@@ -138,7 +138,7 @@ describe("SuperhumanAgentRuntimeTurn", () => {
     stateStore.close();
   });
 
-  it("defaults code-editing runs to not-verifiable when no verifier reports back", () => {
+  it("records an explicit verification pipeline when no verifier reports back", () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-verify-"));
     cleanupPaths.add(workspaceDir);
     const stateStore = createSuperhumanStateStore({ workspaceDir });
@@ -168,6 +168,89 @@ describe("SuperhumanAgentRuntimeTurn", () => {
     expect(stateStore.getRuntimeInvocation("run-verify")).toMatchObject({
       verificationRequired: true,
       verificationOutcome: "not_verifiable",
+    });
+    expect(stateStore.getRuntimeStageEvents("run-verify")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stage: "verification_planning", boundary: "enter" }),
+        expect.objectContaining({ stage: "verification_execution", boundary: "enter" }),
+        expect.objectContaining({ stage: "verification_execution", boundary: "mark" }),
+      ]),
+    );
+
+    stateStore.close();
+  });
+
+  it("derives verified outcomes from explicit verification tool results", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-verified-"));
+    cleanupPaths.add(workspaceDir);
+    const stateStore = createSuperhumanStateStore({ workspaceDir });
+    const turn = new SuperhumanAgentRuntimeTurn({
+      workspaceDir,
+      runId: "run-verified",
+      sessionId: "session-verified",
+      sessionKey: "main",
+      mode: "interactive",
+      maxIterations: 1,
+      stateStore,
+    });
+
+    turn.handleAgentEvent({
+      runId: "run-verified",
+      seq: 1,
+      ts: 10,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "start",
+        name: "apply_patch",
+        toolCallId: "edit-1",
+      },
+    });
+    turn.handleAgentEvent({
+      runId: "run-verified",
+      seq: 2,
+      ts: 11,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "result",
+        name: "apply_patch",
+        toolCallId: "edit-1",
+        isError: false,
+      },
+    });
+    turn.handleAgentEvent({
+      runId: "run-verified",
+      seq: 3,
+      ts: 12,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "start",
+        name: "bash",
+        toolCallId: "verify-1",
+        args: { command: "pnpm test -- src/superhuman/super-agent-runtime.test.ts" },
+      },
+    });
+    turn.handleAgentEvent({
+      runId: "run-verified",
+      seq: 4,
+      ts: 13,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "result",
+        name: "bash",
+        toolCallId: "verify-1",
+        isError: false,
+        result: { exitCode: 0 },
+      },
+    });
+    turn.finish("completed");
+
+    expect(stateStore.getRuntimeInvocation("run-verified")).toMatchObject({
+      verificationRequired: true,
+      verificationOutcome: "verified",
     });
 
     stateStore.close();

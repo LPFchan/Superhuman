@@ -22,6 +22,7 @@ import {
   resolveSuperContextPressureOptionsFromConfig,
   type ContextPressureSnapshotOptions,
 } from "./super-context-pressure.js";
+import { extractSuperReplayAnnotations } from "./super-replay-annotations.js";
 import type {
   StateArtifactAppend,
   StateEvidenceProvenance,
@@ -277,6 +278,7 @@ function resolveMessageProvenance(message: unknown): StateEvidenceProvenance | u
     importedHistory,
     collapsed,
     restored,
+    replayAnnotations: extractSuperReplayAnnotations(meta ?? {}),
     descriptor:
       typeof meta?.descriptor === "string"
         ? meta.descriptor
@@ -510,6 +512,38 @@ function buildProvenanceArtifacts(params: {
         byteLimit:
           normalizeOptionalNumber(meta?.byteLimit) ?? normalizeOptionalNumber(meta?.byte_limit),
         strategy: normalizeOptionalString(meta?.strategy),
+        requestedRange: {
+          startLine:
+            normalizeOptionalNumber(meta?.requestedStartLine) ??
+            normalizeOptionalNumber(meta?.requested_start_line) ??
+            normalizeOptionalNumber(meta?.startLine) ??
+            normalizeOptionalNumber(meta?.start_line),
+          endLine:
+            normalizeOptionalNumber(meta?.requestedEndLine) ??
+            normalizeOptionalNumber(meta?.requested_end_line) ??
+            normalizeOptionalNumber(meta?.endLine) ??
+            normalizeOptionalNumber(meta?.end_line),
+        },
+        returnedRange: {
+          startLine:
+            normalizeOptionalNumber(meta?.returnedStartLine) ??
+            normalizeOptionalNumber(meta?.returned_start_line) ??
+            normalizeOptionalNumber(meta?.startLine) ??
+            normalizeOptionalNumber(meta?.start_line),
+          endLine:
+            normalizeOptionalNumber(meta?.returnedEndLine) ??
+            normalizeOptionalNumber(meta?.returned_end_line) ??
+            normalizeOptionalNumber(meta?.endLine) ??
+            normalizeOptionalNumber(meta?.end_line),
+        },
+        totalKnownLines:
+          normalizeOptionalNumber(meta?.totalKnownLines) ??
+          normalizeOptionalNumber(meta?.total_known_lines),
+        limitKind:
+          normalizeOptionalString(meta?.limitKind) ?? normalizeOptionalString(meta?.limit_kind),
+        continuationHint:
+          normalizeOptionalString(meta?.continuationHint) ??
+          normalizeOptionalString(meta?.continuation_hint),
       },
       metadata: {
         transcriptMessageId: params.transcriptMessageId,

@@ -3,18 +3,27 @@ import { spawnAcpDirect } from "../agents/acp-spawn.js";
 import { spawnSubagentDirect } from "../agents/subagent-spawn.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { callGateway } from "../gateway/call.js";
+import { loadGatewaySessionRow } from "../gateway/session-utils.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import { findTaskByRunId, patchTaskById } from "../tasks/runtime-internal.js";
+import {
+  createTaskRecord,
+  deleteTaskRecordById,
+  findTaskByRunId,
+  getTaskById,
+  patchTaskById,
+} from "../tasks/runtime-internal.js";
 import { formatTaskTerminalMessage, isTerminalTaskStatus } from "../tasks/task-executor-policy.js";
 import {
   configureTaskRegistryRuntime,
   getTaskRegistryHooks,
   type TaskRegistryHookEvent,
 } from "../tasks/task-registry.store.js";
-import type { TaskRecord } from "../tasks/task-registry.types.js";
+import type { TaskQueueState, TaskRecord, TaskStatus } from "../tasks/task-registry.types.js";
+import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
 import {
+  type OrchestrationApprovalHistoryEntry,
   createSuperOrchestrationStore,
   type OrchestrationApprovalRecord,
   type OrchestrationMailboxMessageKind,
@@ -34,6 +43,11 @@ export type LaunchWorkerParams = {
   agentId?: string;
   model?: string;
   thinking?: string;
+  parentBudget?: number;
+  childBudget?: number;
+  budgetUsed?: number;
+  spawnCount?: number;
+  concurrencySlot?: number;
   runTimeoutSeconds?: number;
   cleanup?: "delete" | "keep";
   thread?: boolean;
@@ -95,6 +109,20 @@ export type OrchestrationRuntime = {
   stop: () => void;
 };
 
+type QueuePolicy = {
+  maxConcurrentWorkersPerLead: number;
+  maxQueuedWorkersPerLead: number;
+  queueDrainPolicy: "oldest_first";
+};
+
+type CoordinatorNotificationStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "killed"
+  | "refused";
+
 let activeRuntime: OrchestrationRuntime | null = null;
 
 function resolveWorkerBackend(
@@ -110,6 +138,11 @@ function isActiveWorkerState(state: OrchestrationWorkerRecord["state"]): boolean
 function buildStartedMessage(worker: OrchestrationWorkerRecord): string {
   const label = worker.label?.trim() || worker.task.trim() || "Worker task";
   return `Worker started: ${label}.`;
+}
+
+function buildQueuedMessage(worker: OrchestrationWorkerRecord): string {
+  const label = worker.label?.trim() || worker.task.trim() || "Worker task";
+  return `Worker queued: ${label}.`;
 }
 
 function buildApprovalText(params: {
@@ -129,6 +162,77 @@ function buildApprovalRecordId(kind: "exec" | "plugin", requestId: string): stri
   return `${kind}:${requestId}`;
 }
 
+function xmlEscape(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function buildTaskNotificationEnvelope(params: {
+  worker: OrchestrationWorkerRecord;
+  status: CoordinatorNotificationStatus;
+  summary: string;
+  result?: string;
+  usage?: {
+    toolUses?: number;
+    durationMs?: number;
+    queueDelayMs?: number;
+  };
+}): string {
+  const lines = [
+    "<task-notification>",
+    `<task-id>${xmlEscape(params.worker.workerId)}</task-id>`,
+    `<status>${xmlEscape(params.status)}</status>`,
+    `<summary>${xmlEscape(params.summary)}</summary>`,
+  ];
+  const result = params.result?.trim();
+  if (result) {
+    lines.push(`<result>${xmlEscape(result)}</result>`);
+  }
+  const usageLines: string[] = [];
+  if (typeof params.usage?.toolUses === "number") {
+    usageLines.push(`  <tool_uses>${params.usage.toolUses}</tool_uses>`);
+  }
+  if (typeof params.usage?.durationMs === "number") {
+    usageLines.push(`  <duration_ms>${params.usage.durationMs}</duration_ms>`);
+  }
+  if (typeof params.usage?.queueDelayMs === "number") {
+    usageLines.push(`  <queue_delay_ms>${params.usage.queueDelayMs}</queue_delay_ms>`);
+  }
+  if (usageLines.length > 0) {
+    lines.push("<usage>");
+    lines.push(...usageLines);
+    lines.push("</usage>");
+  }
+  lines.push("</task-notification>");
+  return lines.join("\n");
+}
+
+function mapTaskStatusToCoordinatorStatus(task: TaskRecord): CoordinatorNotificationStatus {
+  if (task.status === "succeeded") {
+    return task.terminalOutcome === "blocked" ? "failed" : "completed";
+  }
+  if (task.status === "cancelled") {
+    return "killed";
+  }
+  return "failed";
+}
+
+function resolveQueuePolicy(cfg: OpenClawConfig): QueuePolicy {
+  const maxConcurrentWorkersPerLead = Math.max(
+    1,
+    Math.floor(cfg.agents?.defaults?.subagents?.maxChildrenPerAgent ?? 5),
+  );
+  return {
+    maxConcurrentWorkersPerLead,
+    maxQueuedWorkersPerLead: maxConcurrentWorkersPerLead,
+    queueDrainPolicy: "oldest_first",
+  };
+}
+
+function resolveMailboxSessionBusy(sessionKey: string): boolean {
+  const status = loadGatewaySessionRow(sessionKey)?.status?.trim().toLowerCase();
+  return status === "running";
+}
+
 function queueMailboxMessage(params: {
   store: OrchestrationStore;
   recipientSessionKey: string;
@@ -138,7 +242,8 @@ function queueMailboxMessage(params: {
   text: string;
   payload?: Record<string, unknown>;
 }) {
-  const deliveredAt = Date.now();
+  const now = Date.now();
+  const busy = resolveMailboxSessionBusy(params.recipientSessionKey);
   const message = params.store.appendMailbox({
     recipientSessionKey: params.recipientSessionKey,
     senderSessionKey: params.senderSessionKey,
@@ -146,18 +251,139 @@ function queueMailboxMessage(params: {
     kind: params.kind,
     text: params.text,
     payload: params.payload,
-    deliveryStatus: "session_queued",
-    deliveredAt,
+    deliveryStatus: busy ? "session_queued" : "idle_delivered",
+    deliveryStateUpdatedAt: now,
+    deliveredAt: busy ? undefined : now,
+    correlationId: params.workerId,
   });
-  enqueueSystemEvent(params.text, {
-    sessionKey: params.recipientSessionKey,
-    contextKey: `mailbox:${message.messageId}`,
-  });
-  requestHeartbeatNow({
-    reason: "worker-mailbox",
-    sessionKey: params.recipientSessionKey,
-  });
+  if (!busy) {
+    enqueueSystemEvent(params.text, {
+      sessionKey: params.recipientSessionKey,
+      contextKey: `mailbox:${message.messageId}`,
+    });
+    requestHeartbeatNow({
+      reason: "worker-mailbox",
+      sessionKey: params.recipientSessionKey,
+    });
+  }
   return message;
+}
+
+function drainMailboxForSession(params: {
+  store: OrchestrationStore;
+  recipientSessionKey: string;
+}) {
+  if (resolveMailboxSessionBusy(params.recipientSessionKey)) {
+    return;
+  }
+  const queued = params.store
+    .listMailbox(params.recipientSessionKey)
+    .filter((message) => message.deliveryStatus === "session_queued")
+    .toSorted((left, right) => left.createdAt - right.createdAt);
+  for (const message of queued) {
+    const deliveredAt = Date.now();
+    params.store.patchMailbox(message.messageId, {
+      deliveryStatus: "drained",
+      deliveryStateUpdatedAt: deliveredAt,
+      deliveredAt,
+    });
+    enqueueSystemEvent(message.text, {
+      sessionKey: params.recipientSessionKey,
+      contextKey: `mailbox:${message.messageId}`,
+    });
+  }
+  if (queued.length > 0) {
+    requestHeartbeatNow({
+      reason: "worker-mailbox-drain",
+      sessionKey: params.recipientSessionKey,
+    });
+  }
+}
+
+function createApprovalHistoryEntry(params: {
+  status: OrchestrationApprovalHistoryEntry["status"];
+  payload?: Record<string, unknown>;
+}): OrchestrationApprovalHistoryEntry {
+  return {
+    status: params.status,
+    at: Date.now(),
+    ...(params.payload ? { payload: params.payload } : {}),
+  };
+}
+
+function createOrchestrationTaskRecord(params: {
+  worker: OrchestrationWorkerRecord;
+  queueState: TaskQueueState;
+  status?: TaskStatus;
+  terminalSummary?: string;
+  error?: string;
+  refusalReason?: string;
+}) {
+  const now = Date.now();
+  return createTaskRecord({
+    runtime: params.worker.runtime,
+    ownerKey: params.worker.controllerSessionKey,
+    requesterSessionKey: params.worker.requesterSessionKey,
+    scopeKind: "session",
+    task: params.worker.task,
+    label: params.worker.label,
+    status: params.status ?? "queued",
+    startedAt: params.status === "running" ? now : undefined,
+    terminalSummary: params.terminalSummary,
+    progressSummary: params.status === "queued" ? buildQueuedMessage(params.worker) : undefined,
+    ...(params.error ? { error: params.error } : {}),
+    orchestration: {
+      executionRole: params.worker.runtime === "acp" ? "worker" : "subagent",
+      workerBackend: params.worker.backend,
+      controllerSessionKey: params.worker.controllerSessionKey,
+      queueState: params.queueState,
+      notificationMode: "mailbox",
+      stableWorkerId: params.worker.workerId,
+      queueDelayMs: 0,
+      parentBudget: 0,
+      childBudget: 0,
+      budgetUsed: 0,
+      spawnCount: params.worker.queuePosition ?? 1,
+      concurrencySlot:
+        typeof params.worker.launchRequest.concurrencySlot === "number"
+          ? params.worker.launchRequest.concurrencySlot
+          : undefined,
+      queueDrainPolicy: params.worker.queueDrainPolicy ?? "oldest_first",
+      refusalReason: params.refusalReason,
+      toolCount: 0,
+      lastHeartbeatAt: now,
+      lastActivityAt: now,
+      launchRequest: {
+        backend: params.worker.backend,
+        mode: params.worker.launchRequest.mode === "session" ? "session" : "run",
+        model:
+          typeof params.worker.launchRequest.model === "string"
+            ? params.worker.launchRequest.model
+            : undefined,
+        thinking:
+          typeof params.worker.launchRequest.thinking === "string"
+            ? params.worker.launchRequest.thinking
+            : undefined,
+        cleanup: params.worker.launchRequest.cleanup === "delete" ? "delete" : "keep",
+        thread: params.worker.launchRequest.thread === true,
+        sandbox: params.worker.launchRequest.sandbox === "require" ? "require" : "inherit",
+        streamTo: params.worker.launchRequest.streamTo === "parent" ? "parent" : undefined,
+        requesterAgentIdOverride:
+          typeof params.worker.launchRequest.requesterAgentIdOverride === "string"
+            ? params.worker.launchRequest.requesterAgentIdOverride
+            : undefined,
+        queueDrainPolicy: params.worker.queueDrainPolicy ?? "oldest_first",
+        resumeSessionId:
+          typeof params.worker.launchRequest.resumeSessionId === "string"
+            ? params.worker.launchRequest.resumeSessionId
+            : undefined,
+        workspaceDir:
+          typeof params.worker.launchRequest.workspaceDir === "string"
+            ? params.worker.launchRequest.workspaceDir
+            : undefined,
+      },
+    },
+  });
 }
 
 async function markLeadSession(sessionKey: string): Promise<void> {
@@ -232,14 +458,47 @@ export function startSuperOrchestrationRuntime(params: {
       worker,
       task,
     });
+    store.patchWorker(workerId, {
+      updatedAt: Date.now(),
+      taskStatus: task.status,
+      childSessionKey: task.childSessionKey,
+      runId: task.runId,
+      ...(task.status === "running" ? { queueStartedAt: task.startedAt ?? Date.now() } : {}),
+    });
     if (isTerminalTaskStatus(task.status) && worker.state !== "terminal") {
+      const summary = formatTaskTerminalMessage(task);
+      getActiveSuperNotificationCenter()?.publish({
+        kind: "task_complete",
+        title: worker.label?.trim() || worker.task.trim() || "Background task finished",
+        message: summary,
+        sessionKey: controllerSessionKey,
+        runId: task.runId,
+        metadata: {
+          taskId: task.taskId,
+          status: task.status,
+          terminalOutcome: task.terminalOutcome,
+        },
+      });
       queueMailboxMessage({
         store,
         recipientSessionKey: controllerSessionKey,
         senderSessionKey: task.childSessionKey,
         workerId,
         kind: "worker_terminal",
-        text: formatTaskTerminalMessage(task),
+        text: buildTaskNotificationEnvelope({
+          worker: updatedWorker,
+          status: mapTaskStatusToCoordinatorStatus(task),
+          summary,
+          result: task.terminalSummary ?? task.error,
+          usage: {
+            toolUses: task.orchestration?.toolCount,
+            durationMs:
+              typeof task.startedAt === "number" && typeof task.endedAt === "number"
+                ? task.endedAt - task.startedAt
+                : undefined,
+            queueDelayMs: task.orchestration?.queueDelayMs,
+          },
+        }),
         payload: {
           taskId: task.taskId,
           runId: task.runId,
@@ -249,22 +508,52 @@ export function startSuperOrchestrationRuntime(params: {
           error: task.error,
         },
       });
+      patchTaskById({
+        taskId: task.taskId,
+        patch: {
+          orchestration: {
+            queueState: "terminal",
+            budgetUsed:
+              typeof task.startedAt === "number" && typeof task.endedAt === "number"
+                ? Math.max(0, task.endedAt - task.startedAt)
+                : task.orchestration?.budgetUsed,
+            lastHeartbeatAt: Date.now(),
+            lastActivityAt: Date.now(),
+          },
+        },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: controllerSessionKey,
+      });
       void processQueue(controllerSessionKey);
       return;
     }
     if (task.status === "running" && worker.state !== "running") {
+      const summary = buildStartedMessage(updatedWorker);
       queueMailboxMessage({
         store,
         recipientSessionKey: controllerSessionKey,
         senderSessionKey: task.childSessionKey,
         workerId,
         kind: "worker_started",
-        text: buildStartedMessage(updatedWorker),
+        text: buildTaskNotificationEnvelope({
+          worker: updatedWorker,
+          status: "running",
+          summary,
+          usage: {
+            queueDelayMs: task.orchestration?.queueDelayMs,
+          },
+        }),
         payload: {
           taskId: task.taskId,
           runId: task.runId,
           childSessionKey: task.childSessionKey,
         },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: controllerSessionKey,
       });
     }
   };
@@ -309,14 +598,14 @@ export function startSuperOrchestrationRuntime(params: {
     if (!trimmed || stopped) {
       return;
     }
-    const maxChildren = params.cfg.agents?.defaults?.subagents?.maxChildrenPerAgent ?? 5;
+    const queuePolicy = resolveQueuePolicy(params.cfg);
     let activeCount = countActiveWorkersForController(trimmed);
     const queuedWorkers = store
       .listWorkers()
       .filter((worker) => worker.controllerSessionKey === trimmed && worker.state === "queued")
       .toSorted((left, right) => left.createdAt - right.createdAt);
     for (const worker of queuedWorkers) {
-      if (activeCount >= maxChildren) {
+      if (activeCount >= queuePolicy.maxConcurrentWorkersPerLead) {
         break;
       }
       if (launchPromises.has(worker.workerId)) {
@@ -334,9 +623,27 @@ export function startSuperOrchestrationRuntime(params: {
     if (stopped) {
       return;
     }
+    if (worker.taskId) {
+      patchTaskById({
+        taskId: worker.taskId,
+        patch: {
+          status: "running",
+          startedAt: Date.now(),
+          lastEventAt: Date.now(),
+          progressSummary: buildStartedMessage(worker),
+          orchestration: {
+            queueState: "launching",
+            queueDelayMs: Date.now() - worker.createdAt,
+            lastHeartbeatAt: Date.now(),
+            lastActivityAt: Date.now(),
+          },
+        },
+      });
+    }
     const current = store.patchWorker(worker.workerId, {
       state: "launching",
       updatedAt: Date.now(),
+      queueStartedAt: Date.now(),
     });
     if (!current) {
       return;
@@ -453,33 +760,93 @@ export function startSuperOrchestrationRuntime(params: {
             );
 
       if (result.status !== "accepted") {
+        const refusalReason =
+          result.status === "forbidden" ? "agent_policy_refused" : "launch_error";
         store.patchWorker(current.workerId, {
           state: "refused",
           updatedAt: Date.now(),
           lastError: result.error,
           childSessionKey: result.childSessionKey,
           runId: result.runId,
+          refusalReason,
         });
+        if (current.taskId) {
+          patchTaskById({
+            taskId: current.taskId,
+            patch: {
+              status: "failed",
+              endedAt: Date.now(),
+              lastEventAt: Date.now(),
+              error: result.error,
+              terminalSummary: result.error ?? "Worker launch failed.",
+              orchestration: {
+                queueState: "refused",
+                refusalReason,
+                lastHeartbeatAt: Date.now(),
+                lastActivityAt: Date.now(),
+              },
+            },
+          });
+        }
+        const summary = result.error
+          ? `Worker launch failed: ${result.error}`
+          : "Worker launch failed.";
         queueMailboxMessage({
           store,
           recipientSessionKey: current.controllerSessionKey,
           senderSessionKey: result.childSessionKey,
           workerId: current.workerId,
           kind: "worker_terminal",
-          text: result.error ? `Worker launch failed: ${result.error}` : "Worker launch failed.",
+          text: buildTaskNotificationEnvelope({
+            worker: {
+              ...current,
+              childSessionKey: result.childSessionKey,
+              runId: result.runId,
+            },
+            status: "refused",
+            summary,
+            result: result.error,
+          }),
           payload: {
             status: result.status,
             error: result.error,
             childSessionKey: result.childSessionKey,
             runId: result.runId,
+            refusalReason,
           },
+        });
+        drainMailboxForSession({
+          store,
+          recipientSessionKey: current.controllerSessionKey,
         });
         return;
       }
 
       const runId = result.runId?.trim();
-      const task = runId ? findTaskByRunId(runId) : undefined;
+      let task = runId ? findTaskByRunId(runId) : undefined;
+      if (!task && current.taskId) {
+        patchTaskById({
+          taskId: current.taskId,
+          patch: {
+            runId,
+            childSessionKey: result.childSessionKey,
+            status: "running",
+            startedAt: Date.now(),
+            lastEventAt: Date.now(),
+            orchestration: {
+              queueState: "running",
+              queueDelayMs: Date.now() - current.createdAt,
+              lastHeartbeatAt: Date.now(),
+              lastActivityAt: Date.now(),
+            },
+          },
+        });
+        task = getTaskById(current.taskId) ?? undefined;
+      }
       if (task) {
+        if (current.taskId && current.taskId !== task.taskId) {
+          deleteTaskRecordById(current.taskId);
+        }
         patchTaskById({
           taskId: task.taskId,
           patch: {
@@ -491,6 +858,33 @@ export function startSuperOrchestrationRuntime(params: {
               notificationMode: "mailbox",
               stableWorkerId: current.workerId,
               queueDelayMs: Date.now() - current.createdAt,
+              parentBudget:
+                typeof current.launchRequest.parentBudget === "number"
+                  ? current.launchRequest.parentBudget
+                  : undefined,
+              childBudget:
+                typeof current.launchRequest.childBudget === "number"
+                  ? current.launchRequest.childBudget
+                  : undefined,
+              budgetUsed:
+                typeof current.launchRequest.budgetUsed === "number"
+                  ? current.launchRequest.budgetUsed
+                  : 0,
+              spawnCount:
+                typeof current.launchRequest.spawnCount === "number"
+                  ? current.launchRequest.spawnCount
+                  : undefined,
+              concurrencySlot:
+                typeof current.launchRequest.concurrencySlot === "number"
+                  ? current.launchRequest.concurrencySlot
+                  : undefined,
+              queueDrainPolicy:
+                current.queueDrainPolicy ??
+                (current.launchRequest.queueDrainPolicy === "oldest_first"
+                  ? "oldest_first"
+                  : undefined),
+              lastHeartbeatAt: Date.now(),
+              lastActivityAt: Date.now(),
               launchRequest: {
                 backend: current.backend,
                 mode: current.launchRequest.mode === "session" ? "session" : "run",
@@ -501,6 +895,30 @@ export function startSuperOrchestrationRuntime(params: {
                 thinking:
                   typeof current.launchRequest.thinking === "string"
                     ? current.launchRequest.thinking
+                    : undefined,
+                parentBudget:
+                  typeof current.launchRequest.parentBudget === "number"
+                    ? current.launchRequest.parentBudget
+                    : undefined,
+                childBudget:
+                  typeof current.launchRequest.childBudget === "number"
+                    ? current.launchRequest.childBudget
+                    : undefined,
+                budgetUsed:
+                  typeof current.launchRequest.budgetUsed === "number"
+                    ? current.launchRequest.budgetUsed
+                    : undefined,
+                spawnCount:
+                  typeof current.launchRequest.spawnCount === "number"
+                    ? current.launchRequest.spawnCount
+                    : undefined,
+                concurrencySlot:
+                  typeof current.launchRequest.concurrencySlot === "number"
+                    ? current.launchRequest.concurrencySlot
+                    : undefined,
+                queueDrainPolicy:
+                  current.launchRequest.queueDrainPolicy === "oldest_first"
+                    ? "oldest_first"
                     : undefined,
                 cleanup: current.launchRequest.cleanup === "delete" ? "delete" : "keep",
                 thread: current.launchRequest.thread === true,
@@ -528,43 +946,83 @@ export function startSuperOrchestrationRuntime(params: {
         updatedAt: Date.now(),
         childSessionKey: result.childSessionKey,
         runId,
+        taskId: task?.taskId ?? current.taskId,
         ...(task
           ? {
-              taskId: task.taskId,
               taskStatus: task.status,
             }
           : {}),
       });
       if (!task && patchedWorker) {
+        const summary = buildStartedMessage(patchedWorker);
         queueMailboxMessage({
           store,
           recipientSessionKey: patchedWorker.controllerSessionKey,
           senderSessionKey: patchedWorker.childSessionKey,
           workerId: patchedWorker.workerId,
           kind: "worker_started",
-          text: buildStartedMessage(patchedWorker),
+          text: buildTaskNotificationEnvelope({
+            worker: patchedWorker,
+            status: "running",
+            summary,
+          }),
           payload: {
             childSessionKey: patchedWorker.childSessionKey,
             runId: patchedWorker.runId,
           },
         });
+        drainMailboxForSession({
+          store,
+          recipientSessionKey: patchedWorker.controllerSessionKey,
+        });
       }
     } catch (error) {
       log.warn("Worker launch failed", { error, workerId: current.workerId });
+      const refusalReason = "launch_exception";
       store.patchWorker(current.workerId, {
         state: "refused",
         updatedAt: Date.now(),
         lastError: error instanceof Error ? error.message : String(error),
+        refusalReason,
       });
+      if (current.taskId) {
+        patchTaskById({
+          taskId: current.taskId,
+          patch: {
+            status: "failed",
+            endedAt: Date.now(),
+            lastEventAt: Date.now(),
+            error: error instanceof Error ? error.message : String(error),
+            terminalSummary: error instanceof Error ? error.message : String(error),
+            orchestration: {
+              queueState: "refused",
+              refusalReason,
+              lastHeartbeatAt: Date.now(),
+              lastActivityAt: Date.now(),
+            },
+          },
+        });
+      }
+      const summary = `Worker launch failed: ${error instanceof Error ? error.message : String(error)}`;
       queueMailboxMessage({
         store,
         recipientSessionKey: current.controllerSessionKey,
         workerId: current.workerId,
         kind: "worker_terminal",
-        text: `Worker launch failed: ${error instanceof Error ? error.message : String(error)}`,
+        text: buildTaskNotificationEnvelope({
+          worker: current,
+          status: "refused",
+          summary,
+          result: error instanceof Error ? error.message : String(error),
+        }),
         payload: {
           error: error instanceof Error ? error.message : String(error),
+          refusalReason,
         },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: current.controllerSessionKey,
       });
     } finally {
       void processQueue(current.controllerSessionKey);
@@ -575,6 +1033,18 @@ export function startSuperOrchestrationRuntime(params: {
     async launchWorker(launchParams) {
       const workerId = crypto.randomUUID();
       const now = Date.now();
+      const controllerSessionKey = launchParams.controllerSessionKey.trim();
+      const existingWorkers = store
+        .listWorkers()
+        .filter((worker) => worker.controllerSessionKey === controllerSessionKey);
+      const activeWorkers = existingWorkers.filter((worker) => isActiveWorkerState(worker.state));
+      const queuedWorkers = existingWorkers.filter((worker) => worker.state === "queued");
+      const queuePolicy = resolveQueuePolicy(params.cfg);
+      const spawnCount = existingWorkers.length + 1;
+      const concurrencySlot =
+        typeof launchParams.concurrencySlot === "number"
+          ? launchParams.concurrencySlot
+          : activeWorkers.length + 1;
       const record: OrchestrationWorkerRecord = {
         workerId,
         runtime: launchParams.runtime,
@@ -586,10 +1056,19 @@ export function startSuperOrchestrationRuntime(params: {
         createdAt: now,
         updatedAt: now,
         state: "queued",
+        queuePosition: queuedWorkers.length + 1,
+        queueEnteredAt: now,
+        queueDrainPolicy: queuePolicy.queueDrainPolicy,
         launchRequest: {
           agentId: launchParams.agentId,
           model: launchParams.model,
           thinking: launchParams.thinking,
+          parentBudget: launchParams.parentBudget,
+          childBudget: launchParams.childBudget,
+          budgetUsed: launchParams.budgetUsed ?? 0,
+          spawnCount: launchParams.spawnCount ?? spawnCount,
+          concurrencySlot,
+          queueDrainPolicy: queuePolicy.queueDrainPolicy,
           runTimeoutSeconds: launchParams.runTimeoutSeconds,
           cleanup: launchParams.cleanup,
           thread: launchParams.thread,
@@ -612,8 +1091,59 @@ export function startSuperOrchestrationRuntime(params: {
           mode: launchParams.mode ?? (launchParams.thread ? "session" : "run"),
         },
       };
-      const saved = store.upsertWorker(record);
+      const shouldRefuse =
+        activeWorkers.length >= queuePolicy.maxConcurrentWorkersPerLead &&
+        queuedWorkers.length >= queuePolicy.maxQueuedWorkersPerLead;
+      const taskRecord = createOrchestrationTaskRecord({
+        worker: record,
+        queueState: shouldRefuse ? "refused" : "queued",
+        status: shouldRefuse ? "failed" : "queued",
+        terminalSummary: shouldRefuse
+          ? "Worker refused because the per-lead queue cap is full."
+          : undefined,
+        error: shouldRefuse ? "Queue cap reached." : undefined,
+        refusalReason: shouldRefuse ? "queue_cap_reached" : undefined,
+      });
+      const saved = store.upsertWorker({
+        ...record,
+        taskId: taskRecord.taskId,
+        taskStatus: taskRecord.status,
+        ...(shouldRefuse ? { state: "refused" as const, refusalReason: "queue_cap_reached" } : {}),
+      });
       await markLeadSession(saved.controllerSessionKey);
+      if (shouldRefuse) {
+        patchTaskById({
+          taskId: taskRecord.taskId,
+          patch: {
+            endedAt: now,
+            lastEventAt: now,
+          },
+        });
+        queueMailboxMessage({
+          store,
+          recipientSessionKey: saved.controllerSessionKey,
+          workerId: saved.workerId,
+          kind: "worker_terminal",
+          text: buildTaskNotificationEnvelope({
+            worker: saved,
+            status: "refused",
+            summary: "Worker refused because the per-lead queue cap is full.",
+            result: "queue_cap_reached",
+          }),
+          payload: {
+            refusalReason: "queue_cap_reached",
+            maxConcurrentWorkersPerLead: queuePolicy.maxConcurrentWorkersPerLead,
+            maxQueuedWorkersPerLead: queuePolicy.maxQueuedWorkersPerLead,
+            queueDrainPolicy: queuePolicy.queueDrainPolicy,
+            taskId: taskRecord.taskId,
+          },
+        });
+        drainMailboxForSession({
+          store,
+          recipientSessionKey: saved.controllerSessionKey,
+        });
+        return saved;
+      }
       void processQueue(saved.controllerSessionKey);
       return saved;
     },
@@ -701,8 +1231,25 @@ export function startSuperOrchestrationRuntime(params: {
         createdAt: Date.now(),
         status: "requested",
         requestPayload: approvalParams.payload,
+        history: [
+          createApprovalHistoryEntry({ status: "requested", payload: approvalParams.payload }),
+        ],
       };
       store.upsertApproval(approvalRecord);
+      getActiveSuperNotificationCenter()?.publish({
+        kind: "approval_requested",
+        title: `Worker ${approvalParams.kind} approval requested`,
+        message: buildApprovalText({
+          kind: approvalParams.kind,
+          action: "requested",
+          sessionKey: worker.childSessionKey,
+        }),
+        sessionKey: worker.controllerSessionKey,
+        metadata: {
+          requestId: approvalParams.requestId,
+          workerId: worker.workerId,
+        },
+      });
       queueMailboxMessage({
         store,
         recipientSessionKey: worker.controllerSessionKey,
@@ -718,6 +1265,10 @@ export function startSuperOrchestrationRuntime(params: {
           requestId: approvalParams.requestId,
           ...approvalParams.payload,
         },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
       });
     },
 
@@ -742,6 +1293,13 @@ export function startSuperOrchestrationRuntime(params: {
         status: approvalParams.status,
         requestPayload: existing?.requestPayload,
         resolutionPayload: approvalParams.payload,
+        history: [
+          ...(existing?.history ?? []),
+          createApprovalHistoryEntry({
+            status: approvalParams.status,
+            payload: approvalParams.payload,
+          }),
+        ],
       });
       queueMailboxMessage({
         store,
@@ -760,6 +1318,10 @@ export function startSuperOrchestrationRuntime(params: {
           status: approvalParams.status,
           ...approvalParams.payload,
         },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
       });
     },
 
@@ -783,6 +1345,10 @@ export function startSuperOrchestrationRuntime(params: {
   }
   const controllers = new Set(store.listWorkers().map((worker) => worker.controllerSessionKey));
   for (const controllerSessionKey of controllers) {
+    drainMailboxForSession({
+      store,
+      recipientSessionKey: controllerSessionKey,
+    });
     void processQueue(controllerSessionKey);
   }
   return runtime;

@@ -27,12 +27,19 @@ export type TaskExecutionRole = "lead" | "worker" | "subagent" | "remote_peer";
 export type TaskWorkerBackend = "in_process" | "out_of_process";
 export type TaskQueueState = "queued" | "launching" | "running" | "refused" | "terminal";
 export type TaskNotificationMode = "direct" | "mailbox";
+export type TaskQueueDrainPolicy = "oldest_first";
 
 export type TaskLaunchRequest = {
   backend: TaskWorkerBackend;
   mode?: "run" | "session";
   model?: string;
   thinking?: string;
+  parentBudget?: number;
+  childBudget?: number;
+  budgetUsed?: number;
+  spawnCount?: number;
+  concurrencySlot?: number;
+  queueDrainPolicy?: TaskQueueDrainPolicy;
   cleanup?: "delete" | "keep";
   thread?: boolean;
   sandbox?: "inherit" | "require";
@@ -54,6 +61,8 @@ export type TaskOrchestrationMetadata = {
   childBudget?: number;
   budgetUsed?: number;
   spawnCount?: number;
+  concurrencySlot?: number;
+  queueDrainPolicy?: TaskQueueDrainPolicy;
   refusalReason?: string;
   toolCount?: number;
   lastHeartbeatAt?: number;

@@ -162,4 +162,57 @@ describe("SuperSessionPersistenceAdapter", () => {
     restarted.stop();
     stateStore.close();
   });
+
+  it("persists replay-safe annotations for partial reads and previews", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-adapter-annotations-"));
+    cleanupPaths.add(workspaceDir);
+    const stateStore = createSuperhumanStateStore({ workspaceDir });
+    const adapter = new SuperSessionPersistenceAdapter({
+      cfg: {
+        agents: {
+          defaults: {
+            workspace: workspaceDir,
+          },
+        },
+      },
+      workspaceDir,
+      stateStore,
+    });
+
+    adapter.start();
+    emitSessionTranscriptUpdate({
+      sessionFile: path.join(workspaceDir, "sessions", "main.jsonl"),
+      sessionKey: "main",
+      messageId: "assistant-preview",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "partial preview" }],
+        timestamp: 110,
+        __openclaw: {
+          partialRead: true,
+          persistedPreview: true,
+          sourceTool: "read",
+          startLine: 10,
+          endLine: 20,
+          totalKnownLines: 80,
+          limitKind: "line_cap",
+          continuationHint: "read lines 21-40 next",
+          storagePath: "/tmp/preview.txt",
+          previewBytes: 128,
+          fullBytes: 512,
+        },
+      },
+    });
+
+    const window = stateStore.getConversationWindow({ sessionKey: "main" });
+    expect(window.messages[0]?.provenance?.replayAnnotations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "partial_read", sourceTool: "read" }),
+        expect.objectContaining({ kind: "persisted_preview", storagePath: "/tmp/preview.txt" }),
+      ]),
+    );
+
+    adapter.stop();
+    stateStore.close();
+  });
 });

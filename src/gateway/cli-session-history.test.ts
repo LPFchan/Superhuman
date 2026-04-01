@@ -235,6 +235,13 @@ describe("cli session history", () => {
           source: "imported_history",
           importedFrom: "claude-cli",
         },
+        replayAnnotations: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "imported_history",
+            importedFrom: "claude-cli",
+            externalId: "user-2",
+          }),
+        ]),
       },
     });
   });
