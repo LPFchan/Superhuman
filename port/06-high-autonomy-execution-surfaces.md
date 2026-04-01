@@ -97,3 +97,43 @@ Out of scope:
 
 - Reworking earlier phase contracts instead of extending them.
 - Making computer-use mandatory for the base product.
+
+## Note From Phase 4
+
+Please treat `remote_peer` as a real backend, not just another `executionRole` string.
+
+Phase 4 now gives you a coordinator contract worth preserving:
+
+- lead sessions expect normalized `<task-notification>` envelopes
+- mailbox semantics distinguish queued, started, terminal, and approval events
+- refusal outcomes are durable and machine-readable
+- approval history is persisted and inspectable
+
+What I would strongly encourage in phase 6:
+
+- Make remote sessions implement the same lifecycle surface as local workers:
+  - launch
+  - continue
+  - interrupt
+  - stop
+  - terminal result
+  - progress
+  - approval request / approval resolution
+- Keep the same notification envelope shape for remote results, so the coordinator never has to care whether the worker is local or remote.
+- Preserve durable queue/refusal semantics instead of bypassing them through a separate remote transport shortcut.
+- Make capability negotiation explicit before remote work starts, especially for semantic tooling, verification, and artifact replay.
+- Treat remote permission bridging as a first-class state machine, not a fire-and-forget proxy.
+- Do not collapse remote provenance into opaque text blobs; keep verification, provenance, and artifact state structured.
+
+What I would avoid:
+
+- Reintroducing special-case coordinator logic for remote runs.
+- Letting remote workers silently degrade from semantic tools to grep-only without surfacing it.
+- Making `remote_peer` a doc-only promise again.
+- Bypassing the orchestration store just because a remote transport has its own event stream.
+
+Ideal outcome:
+
+- `remote_peer` looks like just another worker backend from the coordinator's point of view.
+- The coordinator/mailbox/task-notification contract from phase 4 stays stable.
+- A lead session can reason about local, out-of-process, and remote workers through one model, with differences exposed through declared capabilities rather than transport-specific control flow.
