@@ -1240,6 +1240,7 @@ export async function startGatewayServer(
 
     const gatewayRequestContext: import("./server-methods/types.js").GatewayRequestContext = {
       deps,
+      superhumanRuntime,
       cron,
       cronStorePath,
       execApprovalManager,
@@ -1400,6 +1401,10 @@ export async function startGatewayServer(
         log,
         logHooks,
         logChannels,
+        cron,
+        broadcastAutomationChange: (payload) => {
+          broadcast("automation.changed", payload, { dropIfSlow: true });
+        },
       }));
     }
 

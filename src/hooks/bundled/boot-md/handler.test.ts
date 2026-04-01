@@ -5,6 +5,7 @@ import type { InternalHookEvent } from "../../internal-hooks.js";
 const runBootOnce = vi.fn();
 const listAgentIds = vi.fn();
 const resolveAgentWorkspaceDir = vi.fn();
+const recordBootRun = vi.fn();
 const logWarn = vi.fn();
 const logDebug = vi.fn();
 const MAIN_WORKSPACE_DIR = path.join(path.sep, "ws", "main");
@@ -25,6 +26,11 @@ vi.mock("../../../agents/agent-scope.js", () => ({
 }));
 vi.mock("../../../logging/subsystem.js", () => ({
   createSubsystemLogger: () => createMockLogger(),
+}));
+vi.mock("../../../superhuman/super-automation-runtime.js", () => ({
+  getActiveSuperAutomationRuntime: () => ({
+    recordBootRun,
+  }),
 }));
 
 const { default: runBootChecklist } = await import("./handler.js");
@@ -90,6 +96,21 @@ describe("boot-md handler", () => {
     expect(runBootOnce).toHaveBeenCalledWith(
       expect.objectContaining({ cfg, workspaceDir: OPS_WORKSPACE_DIR, agentId: "ops" }),
     );
+    expect(recordBootRun).toHaveBeenCalledTimes(2);
+    expect(recordBootRun).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        agentId: "main",
+        result: { status: "ran" },
+      }),
+    );
+    expect(recordBootRun).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        agentId: "ops",
+        result: { status: "ran" },
+      }),
+    );
   });
 
   it("runs boot for single default agent when no agents configured", async () => {
@@ -113,6 +134,7 @@ describe("boot-md handler", () => {
     await runBootChecklist(makeEvent({ context: { cfg } }));
 
     expect(logWarn).toHaveBeenCalledTimes(1);
+    expect(recordBootRun).toHaveBeenCalledTimes(2);
     expect(logWarn).toHaveBeenCalledWith("boot-md failed for agent startup run", {
       agentId: "ops",
       workspaceDir: OPS_WORKSPACE_DIR,
@@ -126,6 +148,10 @@ describe("boot-md handler", () => {
 
     await runBootChecklist(makeEvent({ context: { cfg } }));
 
+    expect(recordBootRun).toHaveBeenCalledWith({
+      agentId: "main",
+      result: { status: "skipped", reason: "missing" },
+    });
     expect(logDebug).toHaveBeenCalledWith("boot-md skipped for agent startup run", {
       agentId: "main",
       workspaceDir: MAIN_WORKSPACE_DIR,

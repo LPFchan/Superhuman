@@ -80,6 +80,26 @@ describe("SuperhumanAgentRuntimeTurn", () => {
       verificationRequired: true,
       verificationOutcome: "verified",
     });
+    expect(stateStore.getActions({ runId: "run-1" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionKind: "verification",
+          verificationStage: "completed",
+          verifierKind: "manual",
+        }),
+      ]),
+    );
+    expect(stateStore.getArtifacts({ sessionKey: "main" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "verification-log",
+          metadata: expect.objectContaining({
+            outcome: "verified",
+            verifierKind: "manual",
+          }),
+        }),
+      ]),
+    );
     expect(stateStore.getIterationBudgets("run-1")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: "root", usedIterations: 1 }),
@@ -169,6 +189,15 @@ describe("SuperhumanAgentRuntimeTurn", () => {
       verificationRequired: true,
       verificationOutcome: "not_verifiable",
     });
+    expect(stateStore.getActions({ runId: "run-verify" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionKind: "verification",
+          verificationStage: "skipped",
+          verifierKind: "runtime",
+        }),
+      ]),
+    );
     expect(stateStore.getRuntimeStageEvents("run-verify")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ stage: "verification_planning", boundary: "enter" }),
@@ -252,6 +281,28 @@ describe("SuperhumanAgentRuntimeTurn", () => {
       verificationRequired: true,
       verificationOutcome: "verified",
     });
+    expect(stateStore.getActions({ runId: "run-verified" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionKind: "verification",
+          verificationStage: "completed",
+          verifierKind: "test_command",
+          command: "pnpm test -- src/superhuman/super-agent-runtime.test.ts",
+          exitCode: 0,
+        }),
+      ]),
+    );
+    expect(stateStore.getArtifacts({ sessionKey: "main" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "verification-log",
+          metadata: expect.objectContaining({
+            outcome: "verified",
+            exitCode: 0,
+          }),
+        }),
+      ]),
+    );
 
     stateStore.close();
   });

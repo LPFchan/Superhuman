@@ -3,14 +3,27 @@ import { listChannelPlugins } from "../channels/plugins/index.js";
 import type { CliDeps } from "../cli/deps.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveAgentMainSessionKey } from "../config/sessions/main-session.js";
+import type { CronService } from "../cron/service.js";
 import { runBootOnce, type BootRunResult } from "../gateway/boot.js";
 import { resolveSessionKeyForRun } from "../gateway/server-session-key.js";
 import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
+import {
+  startSuperAutomationRuntime,
+  type SuperAutomationRuntime,
+} from "./super-automation-runtime.js";
 import { SuperContextEngineCompactionManager } from "./super-compaction-manager.js";
+import {
+  startSuperNotificationCenter,
+  type SuperNotificationCenter,
+} from "./super-notification-center.js";
 import {
   startSuperOrchestrationRuntime,
   type OrchestrationRuntime,
 } from "./super-orchestration-runtime.js";
+import {
+  startSuperRemoteScheduleRuntime,
+  type SuperRemoteScheduleRuntime,
+} from "./super-remote-schedule-runtime.js";
 import {
   createSuperPluginCapabilityRegistry,
   type ChannelRegistry,
@@ -24,9 +37,17 @@ import {
 } from "./super-runtime-seams.js";
 import { SuperSessionPersistenceAdapter } from "./super-session-persistence-adapter.js";
 import { createSuperhumanStateStore } from "./super-state-store.js";
+import {
+  startSuperSubscriptionManager,
+  type SuperSubscriptionManager,
+} from "./super-subscription-manager.js";
 
 export type SuperhumanGatewayRuntime = {
   stateStore: StateStore;
+  automationRuntime: SuperAutomationRuntime;
+  notificationCenter: SuperNotificationCenter;
+  subscriptionManager: SuperSubscriptionManager;
+  remoteScheduleRuntime: SuperRemoteScheduleRuntime;
   orchestrationRuntime: OrchestrationRuntime;
   sessionRegistry: SessionRegistry;
   channelRegistry: ChannelRegistry;
@@ -127,9 +148,12 @@ export function startSuperhumanGatewayRuntime(params: {
   deps: CliDeps;
   workspaceDir: string;
   pluginRegistry: OpenClawPluginRegistry;
+  cron?: CronService;
+  broadcastAutomationChange?: (payload: Record<string, unknown>) => void;
 }): SuperhumanGatewayRuntime {
   const stateStore = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
   const sessionRegistry = createSessionRegistry(params.cfg);
+  const shellCapabilityRegistry = createShellCapabilityRegistry(stateStore);
   const adapter = new SuperSessionPersistenceAdapter({
     cfg: params.cfg,
     workspaceDir: params.workspaceDir,
@@ -140,14 +164,39 @@ export function startSuperhumanGatewayRuntime(params: {
     cfg: params.cfg,
     workspaceDir: params.workspaceDir,
   });
+  const automationRuntime = startSuperAutomationRuntime({
+    stateStore,
+    sessionRegistry,
+  });
+  const notificationCenter = startSuperNotificationCenter({
+    workspaceDir: params.workspaceDir,
+    stateStore,
+    onChange: params.broadcastAutomationChange,
+  });
+  const subscriptionManager = startSuperSubscriptionManager({
+    workspaceDir: params.workspaceDir,
+    stateStore,
+  });
+  const remoteScheduleRuntime = startSuperRemoteScheduleRuntime({
+    workspaceDir: params.workspaceDir,
+    stateStore,
+    sessionRegistry,
+    shellCapabilityRegistry,
+    notificationCenter,
+    cron: params.cron,
+  });
   adapter.start();
   return {
     stateStore,
+    automationRuntime,
+    notificationCenter,
+    subscriptionManager,
+    remoteScheduleRuntime,
     orchestrationRuntime,
     sessionRegistry,
     channelRegistry: createChannelRegistry(),
     pluginRegistry: createSuperPluginCapabilityRegistry(params.pluginRegistry),
-    shellCapabilityRegistry: createShellCapabilityRegistry(stateStore),
+    shellCapabilityRegistry,
     sandboxRuntimeRegistry: createSandboxRuntimeRegistry(stateStore),
     workspaceBootstrap: createWorkspaceBootstrap({
       cfg: params.cfg,
@@ -160,6 +209,10 @@ export function startSuperhumanGatewayRuntime(params: {
       stateStore,
     }),
     stop: () => {
+      remoteScheduleRuntime.stop();
+      subscriptionManager.stop();
+      notificationCenter.stop();
+      automationRuntime.stop();
       orchestrationRuntime.stop();
       adapter.stop();
       stateStore.close();

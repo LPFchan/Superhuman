@@ -4,6 +4,7 @@ import type { CliDeps } from "../../../cli/deps.js";
 import type { OpenClawConfig } from "../../../config/config.js";
 
 const runBootOnce = vi.fn();
+const recordBootRun = vi.fn();
 
 function createMockLogger() {
   return {
@@ -17,6 +18,11 @@ vi.mock("../../../gateway/boot.js", () => ({ runBootOnce }));
 vi.mock("../../../logging/subsystem.js", () => ({
   createSubsystemLogger: () => createMockLogger(),
 }));
+vi.mock("../../../superhuman/super-automation-runtime.js", () => ({
+  getActiveSuperAutomationRuntime: () => ({
+    recordBootRun,
+  }),
+}));
 
 const { default: runBootChecklist } = await import("./handler.js");
 const { clearInternalHooks, createInternalHookEvent, registerInternalHook, triggerInternalHook } =
@@ -25,6 +31,7 @@ const { clearInternalHooks, createInternalHookEvent, registerInternalHook, trigg
 describe("boot-md startup hook integration", () => {
   beforeEach(() => {
     runBootOnce.mockClear();
+    recordBootRun.mockClear();
     clearInternalHooks();
   });
 
@@ -61,5 +68,13 @@ describe("boot-md startup hook integration", () => {
       2,
       expect.objectContaining({ cfg, deps, workspaceDir: opsWorkspaceDir, agentId: "ops" }),
     );
+    expect(recordBootRun).toHaveBeenNthCalledWith(1, {
+      agentId: "main",
+      result: { status: "ran" },
+    });
+    expect(recordBootRun).toHaveBeenNthCalledWith(2, {
+      agentId: "ops",
+      result: { status: "ran" },
+    });
   });
 });

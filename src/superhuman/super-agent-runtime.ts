@@ -12,16 +12,11 @@ import type {
   StateStore,
   VerificationOutcome,
 } from "./super-runtime-seams.js";
+import { SuperRuntimeVerificationTracker } from "./super-runtime-verification.js";
 import { createSuperhumanStateStore } from "./super-state-store.js";
 
 type RuntimeBudgetState = StateIterationBudgetRecord;
 type RuntimeAbortNodeState = StateAbortNodeRecord;
-type PendingVerificationToolCall = {
-  toolCallId: string;
-  verifierKind: string;
-  command?: string;
-  toolName: string;
-};
 
 export type RuntimeAbortScope = {
   abortNodeId: string;
@@ -84,120 +79,14 @@ function describeRiskFromEvent(event: AgentEventPayload): string | undefined {
   return `${classification.risk}: ${classification.reasons.join(", ")}`;
 }
 
-function isProcessExecutionToolName(toolName: string): boolean {
-  const normalized = toolName.trim().toLowerCase();
-  return (
-    normalized === "bash" ||
-    normalized === "exec" ||
-    normalized === "process" ||
-    normalized === "shell" ||
-    normalized === "terminal" ||
-    normalized === "run_command"
-  );
-}
-
-function resolveToolCommandText(data: Record<string, unknown>): string | undefined {
-  const nestedArgs =
-    data.args && typeof data.args === "object" && !Array.isArray(data.args)
-      ? (data.args as Record<string, unknown>)
-      : undefined;
-  if (nestedArgs) {
-    const nestedCommand = resolveToolCommandText(nestedArgs);
-    if (nestedCommand) {
-      return nestedCommand;
-    }
-  }
-  const candidates = [data.command, data.cmd, data.script];
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim();
-    }
-  }
-  if (Array.isArray(data.argv)) {
-    const argv = data.argv.filter(
-      (entry): entry is string => typeof entry === "string" && entry.length > 0,
-    );
-    if (argv.length > 0) {
-      return argv.join(" ").trim();
-    }
-  }
-  return undefined;
-}
-
-function resolveVerificationKind(commandText: string | undefined): string | undefined {
-  const normalized = commandText?.trim().toLowerCase();
-  if (!normalized) {
-    return undefined;
-  }
-  if (
-    normalized.includes("vitest") ||
-    normalized.includes("jest") ||
-    normalized.includes("pnpm test") ||
-    normalized.includes("bun test") ||
-    normalized.includes("npm test")
-  ) {
-    return "test_command";
-  }
-  if (
-    normalized.includes("lint") ||
-    normalized.includes("eslint") ||
-    normalized.includes("oxlint")
-  ) {
-    return "lint";
-  }
-  if (
-    normalized.includes("typecheck") ||
-    normalized.includes("tsc") ||
-    normalized.includes("tsgo")
-  ) {
-    return "typecheck";
-  }
-  if (normalized.includes("build")) {
-    return "runtime";
-  }
-  if (normalized.includes("verify") || normalized.includes("check")) {
-    return "shell_command";
-  }
-  return undefined;
-}
-
-function resolveToolResultExitCode(data: Record<string, unknown>): number | undefined {
-  const candidates = [data.exitCode, data.exit_code, data.code];
-  for (const candidate of candidates) {
-    if (typeof candidate === "number" && Number.isFinite(candidate)) {
-      return candidate;
-    }
-  }
-  const result =
-    data.result && typeof data.result === "object" && !Array.isArray(data.result)
-      ? (data.result as Record<string, unknown>)
-      : undefined;
-  if (!result) {
-    return undefined;
-  }
-  return resolveToolResultExitCode(result);
-}
-
-function isCodeEditingToolName(toolName: string): boolean {
-  const normalized = toolName.trim().toLowerCase();
-  return (
-    normalized === "write" ||
-    normalized === "edit" ||
-    normalized === "apply_patch" ||
-    normalized === "vscode_renamesymbol" ||
-    normalized === "symbol_rename"
-  );
-}
-
 export class SuperhumanAgentRuntimeTurn {
   private readonly stateStore: StateStore;
   private readonly invocation: StateRuntimeInvocationRecord;
   private readonly budgets = new Map<string, RuntimeBudgetState>();
   private readonly abortNodes = new Map<string, RuntimeAbortNodeState>();
+  private readonly verificationTracker: SuperRuntimeVerificationTracker;
   private activeStage?: AgentRuntimeStage;
   private awaitingPostToolContinuation = false;
-  private codeEditingOccurred = false;
-  private pendingVerificationToolCalls = new Map<string, PendingVerificationToolCall>();
 
   constructor(params: {
     workspaceDir: string;
@@ -250,6 +139,17 @@ export class SuperhumanAgentRuntimeTurn {
     };
     this.budgets.set(rootBudgetId, rootBudget);
     this.abortNodes.set(rootAbortNodeId, rootAbortNode);
+    this.verificationTracker = new SuperRuntimeVerificationTracker({
+      stateStore: this.stateStore,
+      runId: params.runId,
+      sessionKey: params.sessionKey,
+      hooks: {
+        enterPlanning: (detail) => this.enterVerificationPlanningStage(detail),
+        enterExecution: (detail) => this.enterVerificationExecutionStage(detail),
+        markExecution: (detail) => this.markStage("verification_execution", detail),
+        markPlanning: (detail) => this.markStage("verification_planning", detail),
+      },
+    });
     this.stateStore.upsertRuntimeInvocation(this.invocation);
     this.stateStore.upsertIterationBudget(rootBudget);
     this.stateStore.upsertAbortNode(rootAbortNode);
@@ -257,6 +157,14 @@ export class SuperhumanAgentRuntimeTurn {
 
   get rootBudgetId(): string {
     return this.invocation.rootBudgetId;
+  }
+
+  private enterVerificationPlanningStage(detail?: string): void {
+    this.enterStage("verification_planning", detail);
+  }
+
+  private enterVerificationExecutionStage(detail?: string): void {
+    this.enterStage("verification_execution", detail);
   }
 
   enterStage(stage: AgentRuntimeStage, detail?: string): void {
@@ -311,14 +219,17 @@ export class SuperhumanAgentRuntimeTurn {
   }
 
   beginVerification(detail?: string): void {
-    this.enterStage("verification_planning", detail);
+    this.enterVerificationPlanningStage(detail);
+    this.verificationTracker.noteManualPlanning(detail);
   }
 
   executeVerification(detail?: string): void {
-    this.enterStage("verification_execution", detail);
+    this.enterVerificationExecutionStage(detail);
+    this.verificationTracker.noteManualExecution(detail);
   }
 
   recordVerificationOutcome(outcome: VerificationOutcome, detail?: string): void {
+    this.verificationTracker.recordManualOutcome(outcome, detail);
     this.invocation.verificationRequired = true;
     this.invocation.verificationOutcome = outcome;
     this.invocation.updatedAt = Date.now();
@@ -326,24 +237,6 @@ export class SuperhumanAgentRuntimeTurn {
     if (detail) {
       this.markStage("verification_execution", detail);
     }
-  }
-
-  private ensureExplicitVerificationOutcome(status: RuntimeInvocationStatus): void {
-    if (!this.codeEditingOccurred || this.invocation.verificationOutcome) {
-      return;
-    }
-    this.beginVerification("code-editing tools ran; runtime requires verification planning");
-    this.markStage(
-      "verification_planning",
-      "no explicit verification tool was recorded for this code-editing run",
-    );
-    this.executeVerification("verification pipeline completed without executable verifier");
-    this.recordVerificationOutcome(
-      status === "failed" || status === "aborted" ? "verification_failed" : "not_verifiable",
-      status === "failed" || status === "aborted"
-        ? "runtime ended before verification could complete"
-        : "verification unavailable: no explicit verification command result recorded",
-    );
   }
 
   consumeIteration(detail?: string): void {
@@ -565,27 +458,15 @@ export class SuperhumanAgentRuntimeTurn {
           ? event.data.toolCallId.trim()
           : undefined;
       if (phase === "start") {
-        if (isCodeEditingToolName(toolName)) {
-          this.codeEditingOccurred = true;
+        this.verificationTracker.noteToolStart({
+          toolName,
+          toolCallId,
+          data: event.data,
+        });
+        if (this.verificationTracker.verificationRequired) {
           this.invocation.verificationRequired = true;
           this.invocation.updatedAt = Date.now();
           this.stateStore.upsertRuntimeInvocation(this.invocation);
-        }
-        if (this.codeEditingOccurred && isProcessExecutionToolName(toolName) && toolCallId) {
-          const command = resolveToolCommandText(event.data);
-          const verifierKind = resolveVerificationKind(command);
-          if (verifierKind) {
-            this.pendingVerificationToolCalls.set(toolCallId, {
-              toolCallId,
-              verifierKind,
-              command,
-              toolName,
-            });
-            this.markStage(
-              "tool_planning",
-              `verification planned via ${verifierKind}: ${command ?? toolName}`,
-            );
-          }
         }
         this.enterStage("tool_planning", toolName);
         this.markStage("tool_planning", `start ${toolName}`);
@@ -599,28 +480,17 @@ export class SuperhumanAgentRuntimeTurn {
       }
       if (phase === "result" || phase === "end" || phase === "error") {
         this.exitStage("tool_execution", toolName);
-        if (toolCallId) {
-          const verification = this.pendingVerificationToolCalls.get(toolCallId);
-          if (verification) {
-            const exitCode = resolveToolResultExitCode(event.data);
-            const failed =
-              phase === "error" ||
-              event.data.isError === true ||
-              (typeof exitCode === "number" && exitCode !== 0);
-            this.beginVerification(
-              `${verification.verifierKind}: ${verification.command ?? verification.toolName}`,
-            );
-            this.executeVerification(
-              `${verification.verifierKind}: ${verification.command ?? verification.toolName}`,
-            );
-            this.recordVerificationOutcome(
-              failed ? "verification_failed" : "verified",
-              `${verification.verifierKind}: ${verification.command ?? verification.toolName}${
-                typeof exitCode === "number" ? ` (exit ${String(exitCode)})` : ""
-              }`,
-            );
-            this.pendingVerificationToolCalls.delete(toolCallId);
-          }
+        const verificationOutcome = this.verificationTracker.noteToolResult({
+          toolCallId,
+          phase,
+          isError: event.data.isError === true,
+          data: event.data,
+        });
+        if (verificationOutcome) {
+          this.invocation.verificationRequired = true;
+          this.invocation.verificationOutcome = verificationOutcome;
+          this.invocation.updatedAt = Date.now();
+          this.stateStore.upsertRuntimeInvocation(this.invocation);
         }
         this.enterStage("post_tool_continuation", toolName);
         return;
@@ -638,7 +508,11 @@ export class SuperhumanAgentRuntimeTurn {
     if (this.activeStage) {
       this.exitStage(this.activeStage);
     }
-    this.ensureExplicitVerificationOutcome(status);
+    const verificationOutcome = this.verificationTracker.ensureTerminalOutcome(status);
+    if (verificationOutcome) {
+      this.invocation.verificationRequired = true;
+      this.invocation.verificationOutcome = verificationOutcome;
+    }
     this.invocation.status = status;
     this.invocation.updatedAt = now;
     this.invocation.endedAt = now;

@@ -2,6 +2,7 @@ import { listAgentIds, resolveAgentWorkspaceDir } from "../../../agents/agent-sc
 import { createDefaultDeps } from "../../../cli/deps.js";
 import { runBootOnce } from "../../../gateway/boot.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
+import { getActiveSuperAutomationRuntime } from "../../../superhuman/super-automation-runtime.js";
 import type { HookHandler } from "../../hooks.js";
 import { isGatewayStartupEvent } from "../../internal-hooks.js";
 
@@ -23,6 +24,7 @@ const runBootChecklist: HookHandler = async (event) => {
   for (const agentId of agentIds) {
     const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
     const result = await runBootOnce({ cfg, deps, workspaceDir, agentId });
+    getActiveSuperAutomationRuntime()?.recordBootRun({ result, agentId });
     if (result.status === "failed") {
       log.warn("boot-md failed for agent startup run", {
         agentId,

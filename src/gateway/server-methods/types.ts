@@ -4,6 +4,7 @@ import type { HealthSummary } from "../../commands/health.js";
 import type { CronService } from "../../cron/service.js";
 import type { PluginApprovalRequestPayload } from "../../infra/plugin-approvals.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
+import type { SuperhumanGatewayRuntime } from "../../superhuman/super-gateway-runtime.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
 import type { ExecApprovalManager } from "../exec-approval-manager.js";
@@ -37,6 +38,7 @@ export type RespondFn = (
 
 export type GatewayRequestContext = {
   deps: ReturnType<typeof createDefaultDeps>;
+  superhumanRuntime: SuperhumanGatewayRuntime | null;
   cron: CronService;
   cronStorePath: string;
   execApprovalManager?: ExecApprovalManager;

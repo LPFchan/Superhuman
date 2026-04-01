@@ -29,6 +29,7 @@ import { enqueueSystemEvent } from "../infra/system-events.js";
 import { getChildLogger } from "../logging.js";
 import { normalizeAgentId, toAgentStoreSessionKey } from "../routing/session-key.js";
 import { defaultRuntime } from "../runtime.js";
+import { getActiveSuperAutomationRuntime } from "../superhuman/super-automation-runtime.js";
 
 export type GatewayCronState = {
   cron: CronService;
@@ -364,6 +365,7 @@ export function buildGatewayCronService(params: {
     log: getChildLogger({ module: "cron", storePath }),
     onEvent: (evt) => {
       params.broadcast("cron", evt, { dropIfSlow: true });
+      getActiveSuperAutomationRuntime()?.recordCronEvent(evt);
       if (evt.action === "finished") {
         const webhookToken = trimToOptionalString(params.cfg.cron?.webhookToken);
         const legacyWebhook = trimToOptionalString(params.cfg.cron?.webhook);

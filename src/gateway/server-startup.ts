@@ -16,6 +16,7 @@ import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
 import { resolveAgentModelPrimaryValue } from "../config/model-input.js";
 import { resolveStateDir } from "../config/paths.js";
+import type { CronService } from "../cron/service.js";
 import { startGmailWatcherWithLogs } from "../hooks/gmail-watcher-lifecycle.js";
 import {
   clearInternalHooks,
@@ -81,6 +82,8 @@ export async function startGatewaySidecars(params: {
     error: (msg: string) => void;
   };
   logChannels: { info: (msg: string) => void; error: (msg: string) => void };
+  cron: CronService;
+  broadcastAutomationChange?: (payload: Record<string, unknown>) => void;
 }): Promise<{
   pluginServices: PluginServicesHandle | null;
   superhumanRuntime: SuperhumanGatewayRuntime | null;
@@ -223,6 +226,8 @@ export async function startGatewaySidecars(params: {
       deps: params.deps,
       workspaceDir: params.defaultWorkspaceDir,
       pluginRegistry: params.pluginRegistry,
+      cron: params.cron,
+      broadcastAutomationChange: params.broadcastAutomationChange,
     });
   } catch (err) {
     params.log.warn(`superhuman startup initialization failed: ${String(err)}`);
