@@ -11,6 +11,7 @@ import { createSubsystemLogger } from "../logging/subsystem.js";
 import { listMemoryFiles } from "../plugin-sdk/memory-core-host-runtime-files.js";
 import { resolveMemoryFlushPlan } from "../plugins/memory-state.js";
 import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
+import type { StateEvidenceSource } from "../superhuman/super-runtime-seams.js";
 import {
   createSuperhumanStateStore,
   resolveSuperhumanStateDir,
@@ -99,9 +100,9 @@ type Phase3EngineState = {
   teamSync: TeamMemorySyncState;
 };
 
-const pendingExtractions = new Set<string>();
-const pendingConsolidations = new Set<string>();
-const pendingTeamSyncs = new Set<string>();
+const pendingExtractions = new Map<string, Promise<void>>();
+const pendingConsolidations = new Map<string, Promise<void>>();
+const pendingTeamSyncs = new Map<string, Promise<void>>();
 
 type VisibleContextState = "original_content" | "collapsed_content" | "restored_files" | "mixed";
 
@@ -123,6 +124,150 @@ function normalizeTextContent(content: unknown): string {
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractOpenClawMeta(message: AgentMessage): Record<string, unknown> | undefined {
+  if (!message || typeof message !== "object") {
+    return undefined;
+  }
+  const meta = (message as { __openclaw?: unknown }).__openclaw;
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? (meta as Record<string, unknown>)
+    : undefined;
+}
+
+function classifyEvidenceSource(message: AgentMessage): StateEvidenceSource {
+  const meta = extractOpenClawMeta(message);
+  const importedHistory =
+    typeof meta?.importedFrom === "string" && meta.importedFrom.trim().length > 0;
+  const partialRead =
+    meta?.truncated === true || meta?.partialRead === true || meta?.partial_read === true;
+  const persistedPreview =
+    meta?.persistedPreview === true ||
+    meta?.persisted_preview === true ||
+    meta?.previewDerived === true;
+  const collapsed = meta?.kind === "compaction" || meta?.collapsed === true;
+  const restored = meta?.restored === true || Array.isArray(meta?.restoredArtifacts);
+  const matched = [
+    importedHistory ? "imported_history" : undefined,
+    partialRead ? "partial_read" : undefined,
+    persistedPreview ? "persisted_preview" : undefined,
+    collapsed ? "collapsed" : undefined,
+    restored ? "restored" : undefined,
+  ].filter((value): value is StateEvidenceSource => Boolean(value));
+  if (matched.length === 0) {
+    return "original";
+  }
+  if (matched.length === 1) {
+    return matched[0];
+  }
+  return "mixed";
+}
+
+function summarizeEvidenceSources(messages: AgentMessage[]) {
+  const counts: Record<StateEvidenceSource, number> = {
+    original: 0,
+    imported_history: 0,
+    collapsed: 0,
+    partial_read: 0,
+    persisted_preview: 0,
+    restored: 0,
+    mixed: 0,
+  };
+  for (const message of messages) {
+    if (!extractMessageText(message)) {
+      continue;
+    }
+    counts[classifyEvidenceSource(message)] += 1;
+  }
+  const originalCount = counts.original;
+  const provisionalCount =
+    counts.imported_history +
+    counts.collapsed +
+    counts.partial_read +
+    counts.persisted_preview +
+    counts.restored +
+    counts.mixed;
+  return {
+    counts,
+    originalCount,
+    provisionalCount,
+    allowDurableWrite: provisionalCount === 0,
+  };
+}
+
+function fingerprintFromMessages(messages: AgentMessage[]): string {
+  return crypto
+    .createHash("sha256")
+    .update(
+      JSON.stringify(
+        messages.map((message) => ({
+          role: message.role,
+          text: extractMessageText(message),
+          source: classifyEvidenceSource(message),
+        })),
+      ),
+    )
+    .digest("hex");
+}
+
+function persistCollapseLedger(params: {
+  workspaceDir: string;
+  sessionKey?: string;
+  runId?: string;
+  state: Phase3EngineState;
+  tokensBefore?: number;
+  tokensAfter?: number;
+  recoveryMode?: string;
+  visibleContextState?: string;
+  restoredArtifacts?: string[];
+  droppedSpans?: Array<{
+    collapseId?: string;
+    sourceStartEntryId?: string;
+    sourceEndEntryId?: string;
+  }>;
+  operatorSummary?: string;
+}): void {
+  if (!params.sessionKey) {
+    return;
+  }
+  const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+  try {
+    store.upsertContextCollapseLedger({
+      sessionKey: params.sessionKey,
+      runId: params.runId,
+      updatedAt: Date.now(),
+      committedSpans: params.state.committed.map((entry) => ({
+        collapseId: entry.id,
+        summary: entry.summary,
+        firstKeptEntryId: entry.firstKeptEntryId,
+        sourceStartEntryId: entry.sourceStartEntryId,
+        sourceEndEntryId: entry.sourceEndEntryId,
+        messageCount: entry.messageCount,
+        estimatedTokens: entry.estimatedTokens,
+        committedAt: entry.committedAt,
+      })),
+      stagedSpans: params.state.staged.map((entry) => ({
+        collapseId: entry.id,
+        summary: entry.summary,
+        firstEntryId: entry.firstEntryId,
+        lastEntryId: entry.lastEntryId,
+        firstKeptEntryId: entry.firstKeptEntryId,
+        messageCount: entry.messageCount,
+        estimatedTokens: entry.estimatedTokens,
+        stagedAt: entry.createdAt,
+      })),
+      droppedSpans: params.droppedSpans ?? [],
+      restoredArtifacts: params.restoredArtifacts ?? [],
+      recoveryMode: params.recoveryMode,
+      visibleContextState: params.visibleContextState,
+      tokensBefore: params.tokensBefore,
+      tokensAfter: params.tokensAfter,
+      operatorSummary: params.operatorSummary,
+    });
+  } finally {
+    store.close();
+  }
 }
 
 function extractMessageText(message: AgentMessage): string {
@@ -235,6 +380,9 @@ async function loadState(workspaceDir: string, sessionId: string, sessionKey?: s
   try {
     const raw = await fsp.readFile(statePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<Phase3EngineState>;
+    const store = createSuperhumanStateStore({ workspaceDir });
+    const persistedLedger = sessionKey ? store.getContextCollapseLedger(sessionKey) : null;
+    store.close();
     return {
       statePath,
       state: {
@@ -242,8 +390,34 @@ async function loadState(workspaceDir: string, sessionId: string, sessionKey?: s
         ...parsed,
         sessionId,
         sessionKey,
-        committed: Array.isArray(parsed.committed) ? parsed.committed : [],
-        staged: Array.isArray(parsed.staged) ? parsed.staged : [],
+        committed: persistedLedger
+          ? persistedLedger.committedSpans.map((entry) => ({
+              id: entry.collapseId,
+              summary: entry.summary,
+              firstKeptEntryId: entry.firstKeptEntryId,
+              sourceStartEntryId: entry.sourceStartEntryId,
+              sourceEndEntryId: entry.sourceEndEntryId,
+              messageCount: entry.messageCount,
+              estimatedTokens: entry.estimatedTokens,
+              committedAt: entry.committedAt,
+            }))
+          : Array.isArray(parsed.committed)
+            ? parsed.committed
+            : [],
+        staged: persistedLedger
+          ? persistedLedger.stagedSpans.map((entry) => ({
+              id: entry.collapseId,
+              summary: entry.summary,
+              firstEntryId: entry.firstEntryId,
+              lastEntryId: entry.lastEntryId,
+              firstKeptEntryId: entry.firstKeptEntryId,
+              messageCount: entry.messageCount,
+              estimatedTokens: entry.estimatedTokens,
+              createdAt: entry.stagedAt,
+            }))
+          : Array.isArray(parsed.staged)
+            ? parsed.staged
+            : [],
         breaker: parsed.breaker ?? { consecutiveFailures: 0 },
         extraction: parsed.extraction ?? {},
         consolidation: {
@@ -254,7 +428,44 @@ async function loadState(workspaceDir: string, sessionId: string, sessionKey?: s
       } satisfies Phase3EngineState,
     };
   } catch {
-    return { statePath, state: createEmptyState(sessionId, sessionKey) };
+    if (!sessionKey) {
+      return { statePath, state: createEmptyState(sessionId, sessionKey) };
+    }
+    const store = createSuperhumanStateStore({ workspaceDir });
+    try {
+      const persistedLedger = store.getContextCollapseLedger(sessionKey);
+      if (!persistedLedger) {
+        return { statePath, state: createEmptyState(sessionId, sessionKey) };
+      }
+      return {
+        statePath,
+        state: {
+          ...createEmptyState(sessionId, sessionKey),
+          committed: persistedLedger.committedSpans.map((entry) => ({
+            id: entry.collapseId,
+            summary: entry.summary,
+            firstKeptEntryId: entry.firstKeptEntryId,
+            sourceStartEntryId: entry.sourceStartEntryId,
+            sourceEndEntryId: entry.sourceEndEntryId,
+            messageCount: entry.messageCount,
+            estimatedTokens: entry.estimatedTokens,
+            committedAt: entry.committedAt,
+          })),
+          staged: persistedLedger.stagedSpans.map((entry) => ({
+            id: entry.collapseId,
+            summary: entry.summary,
+            firstEntryId: entry.firstEntryId,
+            lastEntryId: entry.lastEntryId,
+            firstKeptEntryId: entry.firstKeptEntryId,
+            messageCount: entry.messageCount,
+            estimatedTokens: entry.estimatedTokens,
+            createdAt: entry.stagedAt,
+          })),
+        },
+      };
+    } finally {
+      store.close();
+    }
   }
 }
 
@@ -370,17 +581,34 @@ async function runMemoryExtraction(params: {
     return;
   }
 
-  const fingerprint = crypto
-    .createHash("sha256")
-    .update(
-      JSON.stringify(
-        params.recentMessages.map((message) => ({
-          role: message.role,
-          text: extractMessageText(message),
-        })),
-      ),
-    )
-    .digest("hex");
+  const evidence = summarizeEvidenceSources(params.recentMessages);
+  const extractionActionId = `memory-extract:${params.sessionKey ?? params.sessionId}:${fingerprintFromMessages(params.recentMessages)}`;
+  const stateStore = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+  try {
+    if (!evidence.allowDurableWrite) {
+      stateStore.appendAction({
+        actionId: extractionActionId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        actionType: "super.memory.extraction",
+        actionKind: "automation",
+        summary: "Skipped memory extraction due to provisional-only evidence",
+        status: "skipped",
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        details: {
+          evidenceQuality: "provisional_only",
+          sourceCounts: evidence.counts,
+          memoryTarget: memoryPlan.relativePath,
+        },
+      });
+      return;
+    }
+  } finally {
+    stateStore.close();
+  }
+
+  const fingerprint = fingerprintFromMessages(params.recentMessages);
   if (params.state.extraction.lastFingerprint === fingerprint) {
     return;
   }
@@ -389,8 +617,22 @@ async function runMemoryExtraction(params: {
   if (pendingExtractions.has(extractionKey)) {
     return;
   }
-  pendingExtractions.add(extractionKey);
-  void (async () => {
+  const task = (async () => {
+    const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+    store.appendAction({
+      actionId: extractionActionId,
+      sessionKey: params.sessionKey,
+      runId: params.sessionId,
+      actionType: "super.memory.extraction",
+      actionKind: "automation",
+      summary: "Running memory extraction",
+      status: "running",
+      createdAt: Date.now(),
+      details: {
+        sourceCounts: evidence.counts,
+        memoryTarget: memoryPlan.relativePath,
+      },
+    });
     try {
       const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.js");
       const tempSessionFile = path.join(
@@ -428,12 +670,47 @@ async function runMemoryExtraction(params: {
       params.state.extraction.lastFingerprint = fingerprint;
       params.state.extraction.lastRunAt = Date.now();
       await saveState(params.statePath, params.state);
+      store.appendAction({
+        actionId: extractionActionId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        actionType: "super.memory.extraction",
+        actionKind: "automation",
+        summary: "Completed memory extraction",
+        status: "completed",
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        details: {
+          sourceCounts: evidence.counts,
+          memoryTarget: memoryPlan.relativePath,
+          extractionFingerprint: fingerprint,
+        },
+      });
     } catch (error) {
+      store.appendAction({
+        actionId: extractionActionId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        actionType: "super.memory.extraction",
+        actionKind: "automation",
+        summary: "Memory extraction failed",
+        status: "failed",
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        details: {
+          sourceCounts: evidence.counts,
+          memoryTarget: memoryPlan.relativePath,
+          error: String(error),
+        },
+      });
       log.warn(`super-context memory extraction failed: ${String(error)}`);
     } finally {
+      store.close();
       pendingExtractions.delete(extractionKey);
     }
   })();
+  pendingExtractions.set(extractionKey, task);
+  void task;
 }
 
 async function runMemoryConsolidation(params: {
@@ -456,6 +733,8 @@ async function runMemoryConsolidation(params: {
     return;
   }
 
+  const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+
   const touchedSessions = Object.entries(params.state.consolidation.touchedSessions)
     .filter(([, touchedAt]) => typeof touchedAt === "number" && Number.isFinite(touchedAt))
     .toSorted((a, b) => a[1] - b[1]);
@@ -465,16 +744,70 @@ async function runMemoryConsolidation(params: {
     touchedSessions.length > 0 &&
     now - (params.state.consolidation.lastRunAt ?? 0) >= CONSOLIDATION_INTERVAL_MS;
   if (!dueByCount && !dueByTime) {
+    store.close();
     return;
   }
 
   const consolidationKey = params.workspaceDir;
   if (pendingConsolidations.has(consolidationKey)) {
+    store.close();
     return;
   }
-  pendingConsolidations.add(consolidationKey);
-  void (async () => {
+  const evidenceMessages = touchedSessions.flatMap(
+    ([sessionKey]) =>
+      store.getConversationWindow({ sessionKey, limit: 200 }).messages.map((message) => ({
+        role: message.role as AgentMessage["role"],
+        content: [{ type: "text", text: message.contentText }],
+        timestamp: message.createdAt,
+        __openclaw: {
+          importedFrom: message.provenance?.importedFrom,
+          partialRead: message.provenance?.partialRead,
+          persistedPreview: message.provenance?.persistedPreview,
+          collapsed: message.provenance?.collapsed,
+          restored: message.provenance?.restored,
+        },
+      })) as AgentMessage[],
+  );
+  const evidence = summarizeEvidenceSources(evidenceMessages);
+  const actionId = `memory-consolidate:${params.sessionKey ?? "workspace"}:${touchedSessions.map(([key]) => key).join(",")}`;
+  if (!evidence.allowDurableWrite) {
+    store.appendAction({
+      actionId,
+      sessionKey: params.sessionKey,
+      runId: params.sessionKey,
+      actionType: "super.memory.consolidation",
+      actionKind: "automation",
+      summary: "Skipped memory consolidation due to provisional-only evidence",
+      status: "skipped",
+      createdAt: Date.now(),
+      completedAt: Date.now(),
+      details: {
+        evidenceQuality: "provisional_only",
+        sourceCounts: evidence.counts,
+        touchedSessions: touchedSessions.map(([sessionKey]) => sessionKey),
+        memoryTarget: memoryPlan.relativePath,
+      },
+    });
+    store.close();
+    return;
+  }
+  const task = (async () => {
     try {
+      store.appendAction({
+        actionId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionKey,
+        actionType: "super.memory.consolidation",
+        actionKind: "automation",
+        summary: "Running memory consolidation",
+        status: "running",
+        createdAt: Date.now(),
+        details: {
+          sourceCounts: evidence.counts,
+          touchedSessions: touchedSessions.map(([sessionKey]) => sessionKey),
+          memoryTarget: memoryPlan.relativePath,
+        },
+      });
       const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.js");
       const { appendInjectedAssistantMessageToTranscript } =
         await import("../gateway/server-methods/chat-transcript-inject.js");
@@ -515,16 +848,52 @@ async function runMemoryConsolidation(params: {
         label: "memory consolidation",
         message: `Completed memory consolidation for ${touchedSessions.length} touched session${touchedSessions.length === 1 ? "" : "s"}. Target: ${memoryPlan.relativePath}.`,
       });
+      store.appendAction({
+        actionId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionKey,
+        actionType: "super.memory.consolidation",
+        actionKind: "automation",
+        summary: "Completed memory consolidation",
+        status: "completed",
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        details: {
+          sourceCounts: evidence.counts,
+          touchedSessions: touchedSessions.map(([sessionKey]) => sessionKey),
+          memoryTarget: memoryPlan.relativePath,
+        },
+      });
       await runTeamMemorySyncIfEnabled({
         workspaceDir: params.workspaceDir,
         config: params.config,
       });
     } catch (error) {
+      store.appendAction({
+        actionId,
+        sessionKey: params.sessionKey,
+        runId: params.sessionKey,
+        actionType: "super.memory.consolidation",
+        actionKind: "automation",
+        summary: "Memory consolidation failed",
+        status: "failed",
+        createdAt: Date.now(),
+        completedAt: Date.now(),
+        details: {
+          sourceCounts: evidence.counts,
+          touchedSessions: touchedSessions.map(([sessionKey]) => sessionKey),
+          memoryTarget: memoryPlan.relativePath,
+          error: String(error),
+        },
+      });
       log.warn(`super-context memory consolidation failed: ${String(error)}`);
     } finally {
+      store.close();
       pendingConsolidations.delete(consolidationKey);
     }
   })();
+  pendingConsolidations.set(consolidationKey, task);
+  void task;
 }
 
 async function copyFileEnsuringDir(source: string, target: string): Promise<void> {
@@ -552,58 +921,56 @@ async function runTeamMemorySyncIfEnabled(params: {
   if (pendingTeamSyncs.has(syncKey)) {
     return;
   }
-  pendingTeamSyncs.add(syncKey);
-  try {
-    const statePath = path.join(
-      resolveSuperhumanStateDir(params.workspaceDir),
-      ENGINE_STATE_DIR,
-      "team-memory-sync.json",
-    );
-    let syncState: TeamMemorySyncState = {};
+  const task = (async () => {
+    const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
     try {
-      syncState = JSON.parse(await fsp.readFile(statePath, "utf8")) as TeamMemorySyncState;
-    } catch {}
+      const persistedState = store.getTeamMemorySyncState(repoRoot);
+      let syncState: TeamMemorySyncState = {
+        lastPulledHash: persistedState?.lastPulledHash,
+        lastPushedHash: persistedState?.lastPushedHash,
+        lastSyncAt: persistedState?.lastSyncAt,
+      };
+      let conflictRetryCount = persistedState?.conflictRetryCount ?? 0;
 
-    const memoryFiles = await listMemoryFiles(repoRoot);
-    const localEntries = await Promise.all(
-      memoryFiles.map(async (filePath) => {
-        const content = await fsp.readFile(filePath, "utf8");
-        const relPath = path.relative(repoRoot, filePath).replace(/\\/g, "/");
-        return {
-          path: relPath,
-          absPath: filePath,
-          hash: crypto.createHash("sha256").update(content).digest("hex"),
-          content,
-        };
-      }),
-    );
-    const localManifestHash = hashMemorySnapshot(
-      localEntries.map((entry) => ({ path: entry.path, hash: entry.hash })),
-    );
-    const remoteManifestPath = path.join(remoteRoot, "manifest.json");
-    let remoteManifest: { baseHash?: string; files?: Record<string, string> } = {};
-    try {
-      remoteManifest = JSON.parse(
-        await fsp.readFile(remoteManifestPath, "utf8"),
-      ) as typeof remoteManifest;
-    } catch {}
-
-    if (
-      remoteManifest.baseHash &&
-      syncState.lastPulledHash &&
-      remoteManifest.baseHash !== syncState.lastPulledHash
-    ) {
-      const remoteFiles = Object.entries(remoteManifest.files ?? {});
-      for (const [relPath] of remoteFiles) {
-        const source = path.join(remoteRoot, relPath);
-        const target = path.join(repoRoot, relPath);
-        if (fs.existsSync(source)) {
-          await copyFileEnsuringDir(source, target);
-        }
-      }
-      syncState.lastPulledHash = remoteManifest.baseHash;
-      const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+      const memoryFiles = await listMemoryFiles(repoRoot);
+      const localEntries = await Promise.all(
+        memoryFiles.map(async (filePath) => {
+          const content = await fsp.readFile(filePath, "utf8");
+          const relPath = path.relative(repoRoot, filePath).replace(/\\/g, "/");
+          return {
+            path: relPath,
+            absPath: filePath,
+            hash: crypto.createHash("sha256").update(content).digest("hex"),
+            content,
+          };
+        }),
+      );
+      const localManifestHash = hashMemorySnapshot(
+        localEntries.map((entry) => ({ path: entry.path, hash: entry.hash })),
+      );
+      const remoteManifestPath = path.join(remoteRoot, "manifest.json");
+      let remoteManifest: { baseHash?: string; files?: Record<string, string> } = {};
       try {
+        remoteManifest = JSON.parse(
+          await fsp.readFile(remoteManifestPath, "utf8"),
+        ) as typeof remoteManifest;
+      } catch {}
+
+      if (
+        remoteManifest.baseHash &&
+        syncState.lastPulledHash &&
+        remoteManifest.baseHash !== syncState.lastPulledHash
+      ) {
+        conflictRetryCount += 1;
+        const remoteFiles = Object.entries(remoteManifest.files ?? {});
+        for (const [relPath] of remoteFiles) {
+          const source = path.join(remoteRoot, relPath);
+          const target = path.join(repoRoot, relPath);
+          if (fs.existsSync(source)) {
+            await copyFileEnsuringDir(source, target);
+          }
+        }
+        syncState.lastPulledHash = remoteManifest.baseHash;
         store.appendTeamMemorySyncEvent({
           eventId: crypto.randomUUID(),
           repoRoot,
@@ -614,15 +981,25 @@ async function runTeamMemorySyncIfEnabled(params: {
           details: "Pulled remote memory after checksum mismatch before push retry.",
           createdAt: Date.now(),
         });
-      } finally {
-        store.close();
+        store.upsertTeamMemorySyncState({
+          repoRoot,
+          remoteRoot,
+          lastPulledHash: syncState.lastPulledHash,
+          lastPushedHash: syncState.lastPushedHash,
+          lastSyncAt: syncState.lastSyncAt,
+          lastPullAt: Date.now(),
+          lastRetryAt: Date.now(),
+          conflictRetryCount,
+          blockedFiles: [],
+          checksumState: remoteManifest.files ?? {},
+          lastStatus: "success",
+          lastDecision: "pull-before-push-retry",
+          updatedAt: Date.now(),
+        });
       }
-    }
 
-    const blockedFiles = localEntries.filter((entry) => hasSecretLikeContent(entry.content));
-    if (blockedFiles.length > 0) {
-      const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
-      try {
+      const blockedFiles = localEntries.filter((entry) => hasSecretLikeContent(entry.content));
+      if (blockedFiles.length > 0) {
         store.appendTeamMemorySyncEvent({
           eventId: crypto.randomUUID(),
           repoRoot,
@@ -633,43 +1010,59 @@ async function runTeamMemorySyncIfEnabled(params: {
           details: `Blocked secret-bearing files: ${blockedFiles.map((entry) => entry.path).join(", ")}`,
           createdAt: Date.now(),
         });
-      } finally {
-        store.close();
-      }
-      return;
-    }
-
-    const changed = localEntries.filter(
-      (entry) => remoteManifest.files?.[entry.path] !== entry.hash,
-    );
-    for (const entry of changed) {
-      await copyFileEnsuringDir(entry.absPath, path.join(remoteRoot, entry.path));
-    }
-    await fsp.mkdir(remoteRoot, { recursive: true });
-    await fsp.writeFile(
-      remoteManifestPath,
-      JSON.stringify(
-        {
-          baseHash: localManifestHash,
-          files: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
+        store.upsertTeamMemorySyncState({
+          repoRoot,
+          remoteRoot,
+          lastPulledHash: syncState.lastPulledHash,
+          lastPushedHash: syncState.lastPushedHash,
+          lastSyncAt: syncState.lastSyncAt,
+          conflictRetryCount,
+          blockedFiles: blockedFiles.map((entry) => entry.path),
+          checksumState: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
+          lastStatus: "blocked",
+          lastDecision: "secret-scan-blocked-push",
           updatedAt: Date.now(),
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
-    syncState.lastPushedHash = localManifestHash;
-    syncState.lastPulledHash = localManifestHash;
-    syncState.lastSyncAt = Date.now();
-    await fsp.mkdir(path.dirname(statePath), { recursive: true });
-    await fsp.writeFile(statePath, JSON.stringify(syncState, null, 2), {
-      encoding: "utf8",
-      mode: 0o600,
-    });
+        });
+        return;
+      }
 
-    const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
-    try {
+      const changed = localEntries.filter(
+        (entry) => remoteManifest.files?.[entry.path] !== entry.hash,
+      );
+      for (const entry of changed) {
+        await copyFileEnsuringDir(entry.absPath, path.join(remoteRoot, entry.path));
+      }
+      await fsp.mkdir(remoteRoot, { recursive: true });
+      await fsp.writeFile(
+        remoteManifestPath,
+        JSON.stringify(
+          {
+            baseHash: localManifestHash,
+            files: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
+            updatedAt: Date.now(),
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+      syncState.lastPushedHash = localManifestHash;
+      syncState.lastPulledHash = localManifestHash;
+      syncState.lastSyncAt = Date.now();
+      store.upsertTeamMemorySyncState({
+        repoRoot,
+        remoteRoot,
+        lastPulledHash: syncState.lastPulledHash,
+        lastPushedHash: syncState.lastPushedHash,
+        lastSyncAt: syncState.lastSyncAt,
+        lastPushAt: Date.now(),
+        conflictRetryCount,
+        blockedFiles: [],
+        checksumState: Object.fromEntries(localEntries.map((entry) => [entry.path, entry.hash])),
+        lastStatus: changed.length > 0 ? "success" : "skipped",
+        lastDecision: changed.length > 0 ? "uploaded-delta" : "no-op",
+        updatedAt: Date.now(),
+      });
       store.appendTeamMemorySyncEvent({
         eventId: crypto.randomUUID(),
         repoRoot,
@@ -683,13 +1076,8 @@ async function runTeamMemorySyncIfEnabled(params: {
             : "No local memory changes to upload.",
         createdAt: Date.now(),
       });
-    } finally {
-      store.close();
-    }
-  } catch (error) {
-    const repoRoot = findGitRoot(params.workspaceDir) ?? params.workspaceDir;
-    const store = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
-    try {
+    } catch (error) {
+      const repoRoot = findGitRoot(params.workspaceDir) ?? params.workspaceDir;
       store.appendTeamMemorySyncEvent({
         eventId: crypto.randomUUID(),
         repoRoot,
@@ -699,13 +1087,23 @@ async function runTeamMemorySyncIfEnabled(params: {
         details: String(error),
         createdAt: Date.now(),
       });
+      store.upsertTeamMemorySyncState({
+        repoRoot,
+        remoteRoot,
+        conflictRetryCount: store.getTeamMemorySyncState(repoRoot)?.conflictRetryCount ?? 0,
+        blockedFiles: [],
+        lastStatus: "failed",
+        lastDecision: String(error),
+        updatedAt: Date.now(),
+      });
+      log.warn(`super-context team memory sync failed: ${String(error)}`);
     } finally {
       store.close();
+      pendingTeamSyncs.delete(syncKey);
     }
-    log.warn(`super-context team memory sync failed: ${String(error)}`);
-  } finally {
-    pendingTeamSyncs.delete(syncKey);
-  }
+  })();
+  pendingTeamSyncs.set(syncKey, task);
+  await task;
 }
 
 export class SuperContextEngine implements ContextEngine {
@@ -792,6 +1190,16 @@ export class SuperContextEngine implements ContextEngine {
       state.consolidation.touchedSessions[params.sessionKey] = Date.now();
     }
     await saveState(statePath, state);
+    persistCollapseLedger({
+      workspaceDir,
+      sessionKey: params.sessionKey,
+      runId: params.sessionId,
+      state,
+      operatorSummary:
+        state.staged.length > 0
+          ? `Prepared ${state.staged.length} staged collapse span${state.staged.length === 1 ? "" : "s"} for future compaction.`
+          : "No staged collapse spans are pending.",
+    });
     if (!params.isHeartbeat) {
       const recentMessages = params.messages.slice(params.prePromptMessageCount);
       await runMemoryExtraction({
@@ -911,6 +1319,23 @@ export class SuperContextEngine implements ContextEngine {
         false,
       );
       emitSessionTranscriptUpdate(params.sessionFile);
+      persistCollapseLedger({
+        workspaceDir,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        state,
+        tokensBefore,
+        tokensAfter,
+        recoveryMode: "collapse",
+        visibleContextState,
+        restoredArtifacts: [],
+        droppedSpans: committedNow.map((entry) => ({
+          collapseId: entry.id,
+          sourceStartEntryId: entry.sourceStartEntryId,
+          sourceEndEntryId: entry.sourceEndEntryId,
+        })),
+        operatorSummary: `Collapsed ${compactedCount} staged span${compactedCount === 1 ? "" : "s"} and projected the summaries at read time.`,
+      });
       return {
         ok: true,
         compacted: true,
@@ -967,6 +1392,22 @@ export class SuperContextEngine implements ContextEngine {
           restoredArtifacts: [],
         };
       }
+      persistCollapseLedger({
+        workspaceDir,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        state,
+        tokensBefore,
+        tokensAfter: fallback.result?.tokensAfter,
+        recoveryMode: "runtime_fallback",
+        visibleContextState: fallbackVisibleContextState,
+        restoredArtifacts: [],
+        droppedSpans: [],
+        operatorSummary:
+          fallback.ok && fallback.compacted
+            ? "Context engine fell back to runtime compaction after staged collapse could not make progress."
+            : "Context engine attempted runtime fallback without durable collapse progress.",
+      });
       return fallback;
     } catch (error) {
       state.breaker = {
@@ -975,6 +1416,21 @@ export class SuperContextEngine implements ContextEngine {
         lastFailureReason: String(error),
       };
       await saveState(statePath, state);
+      persistCollapseLedger({
+        workspaceDir,
+        sessionKey: params.sessionKey,
+        runId: params.sessionId,
+        state,
+        tokensBefore,
+        recoveryMode: "runtime_fallback",
+        visibleContextState: resolveVisibleContextState({
+          committedCollapseCount: state.committed.length,
+          projectedMessageCount: branchMessages.length,
+        }),
+        restoredArtifacts: [],
+        droppedSpans: [],
+        operatorSummary: `Compaction failed after fallback: ${String(error)}`,
+      });
       return {
         ok: false,
         compacted: false,
@@ -984,7 +1440,13 @@ export class SuperContextEngine implements ContextEngine {
     }
   }
 
-  async dispose(): Promise<void> {}
+  async dispose(): Promise<void> {
+    await Promise.allSettled([
+      ...pendingExtractions.values(),
+      ...pendingConsolidations.values(),
+      ...pendingTeamSyncs.values(),
+    ]);
+  }
 }
 
 export function registerSuperContextEngine(): void {

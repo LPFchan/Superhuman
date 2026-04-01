@@ -137,6 +137,69 @@ describe("createSuperhumanStateStore", () => {
     store.close();
   });
 
+  it("stores durable context collapse ledgers", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-collapse-ledger-"));
+    cleanupPaths.add(workspaceDir);
+    const store = createSuperhumanStateStore({ workspaceDir });
+
+    store.upsertSession({
+      sessionKey: "main",
+      agentId: "main",
+      workspaceDir,
+      status: "running",
+    });
+    store.upsertContextCollapseLedger({
+      sessionKey: "main",
+      runId: "run-1",
+      updatedAt: 100,
+      committedSpans: [
+        {
+          collapseId: "collapse-1",
+          summary: "summary",
+          firstKeptEntryId: "entry-9",
+          sourceStartEntryId: "entry-1",
+          sourceEndEntryId: "entry-8",
+          messageCount: 8,
+          estimatedTokens: 120,
+          committedAt: 90,
+        },
+      ],
+      stagedSpans: [
+        {
+          collapseId: "staged-1",
+          summary: "stage",
+          firstEntryId: "entry-10",
+          lastEntryId: "entry-15",
+          firstKeptEntryId: "entry-16",
+          messageCount: 6,
+          estimatedTokens: 80,
+          stagedAt: 95,
+        },
+      ],
+      droppedSpans: [{ collapseId: "collapse-1", sourceStartEntryId: "entry-1" }],
+      restoredArtifacts: ["artifact:a"],
+      recoveryMode: "collapse",
+      visibleContextState: "mixed",
+      tokensBefore: 200,
+      tokensAfter: 90,
+      operatorSummary: "collapsed old turns",
+    });
+
+    expect(store.getContextCollapseLedger("main")).toEqual(
+      expect.objectContaining({
+        sessionKey: "main",
+        runId: "run-1",
+        recoveryMode: "collapse",
+        visibleContextState: "mixed",
+        tokensBefore: 200,
+        tokensAfter: 90,
+        restoredArtifacts: ["artifact:a"],
+      }),
+    );
+
+    store.close();
+  });
+
   it("stores runtime invocations, stage events, budgets, and abort nodes", () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-state-"));
     cleanupPaths.add(workspaceDir);
@@ -292,6 +355,42 @@ describe("createSuperhumanStateStore", () => {
         transferHash: "abc123",
       }),
     ]);
+
+    store.close();
+  });
+
+  it("stores durable team-memory sync state", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-team-sync-state-"));
+    cleanupPaths.add(workspaceDir);
+    const store = createSuperhumanStateStore({ workspaceDir });
+
+    store.upsertTeamMemorySyncState({
+      repoRoot: "/repo",
+      remoteRoot: "/remote",
+      lastPulledHash: "pull-hash",
+      lastPushedHash: "push-hash",
+      lastSyncAt: 40,
+      lastPullAt: 20,
+      lastPushAt: 40,
+      lastRetryAt: 15,
+      conflictRetryCount: 2,
+      blockedFiles: ["MEMORY.md"],
+      checksumState: { "MEMORY.md": "sha256:abc" },
+      lastStatus: "blocked",
+      lastDecision: "secret-scan-blocked-push",
+      updatedAt: 50,
+    });
+
+    expect(store.getTeamMemorySyncState("/repo")).toEqual(
+      expect.objectContaining({
+        repoRoot: "/repo",
+        remoteRoot: "/remote",
+        conflictRetryCount: 2,
+        blockedFiles: ["MEMORY.md"],
+        checksumState: { "MEMORY.md": "sha256:abc" },
+        lastStatus: "blocked",
+      }),
+    );
 
     store.close();
   });

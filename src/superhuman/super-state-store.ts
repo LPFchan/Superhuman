@@ -26,6 +26,11 @@ import type {
   StateAbortNodeUpsert,
   StateArtifactAppend,
   StateArtifactRecord,
+  StateContextCollapseCommittedSpan,
+  StateContextCollapseDroppedSpan,
+  StateContextCollapseLedgerRecord,
+  StateContextCollapseLedgerUpsert,
+  StateContextCollapseStagedSpan,
   StateContextPressureSnapshotAppend,
   StateEvidenceProvenance,
   StateIterationBudgetRecord,
@@ -40,9 +45,12 @@ import type {
   StateStore,
   StateTeamMemorySyncEventAppend,
   StateTeamMemorySyncEventRecord,
+  StateTeamMemorySyncStateRecord,
+  StateTeamMemorySyncStateUpsert,
   SuperPartialReadDescriptor,
   SuperSandboxRuntimeSnapshot,
   SuperShellCapabilitySnapshot,
+  SuperVerificationStage,
   TeamMemorySyncDirection,
   TeamMemorySyncStatus,
   VerificationOutcome,
@@ -78,8 +86,12 @@ type StateStoreStatements = {
   selectApproxTokens: StatementSync;
   insertContextPressureSnapshot: StatementSync;
   selectContextPressureSnapshots: StatementSync;
+  upsertContextCollapseLedger: StatementSync;
+  selectContextCollapseLedger: StatementSync;
   insertTeamMemorySyncEvent: StatementSync;
   selectTeamMemorySyncEvents: StatementSync;
+  upsertTeamMemorySyncState: StatementSync;
+  selectTeamMemorySyncState: StatementSync;
 };
 
 type StateDatabase = {
@@ -262,6 +274,21 @@ type ContextPressureSnapshotRow = {
   compaction_action_refs_json: string | null;
 };
 
+type ContextCollapseLedgerRow = {
+  session_key: string;
+  run_id: string | null;
+  updated_at: number;
+  committed_spans_json: string | null;
+  staged_spans_json: string | null;
+  dropped_spans_json: string | null;
+  restored_artifacts_json: string | null;
+  recovery_mode: string | null;
+  visible_context_state: string | null;
+  tokens_before: number | null;
+  tokens_after: number | null;
+  operator_summary: string | null;
+};
+
 type TeamMemorySyncEventRow = {
   event_id: string;
   repo_root: string;
@@ -271,6 +298,23 @@ type TeamMemorySyncEventRow = {
   transfer_hash: string | null;
   details: string | null;
   created_at: number;
+};
+
+type TeamMemorySyncStateRow = {
+  repo_root: string;
+  remote_root: string | null;
+  last_pulled_hash: string | null;
+  last_pushed_hash: string | null;
+  last_sync_at: number | null;
+  last_pull_at: number | null;
+  last_push_at: number | null;
+  last_retry_at: number | null;
+  conflict_retry_count: number;
+  blocked_files_json: string | null;
+  checksum_state_json: string | null;
+  last_status: string | null;
+  last_decision: string | null;
+  updated_at: number;
 };
 
 const openDatabases = new Map<string, StateDatabase>();
@@ -565,6 +609,22 @@ function ensureSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_context_pressure_session_created
       ON context_pressure_snapshots(session_key, created_at DESC, rowid DESC);
 
+    CREATE TABLE IF NOT EXISTS context_collapse_ledger (
+      session_key TEXT PRIMARY KEY,
+      run_id TEXT,
+      updated_at INTEGER NOT NULL,
+      committed_spans_json TEXT,
+      staged_spans_json TEXT,
+      dropped_spans_json TEXT,
+      restored_artifacts_json TEXT,
+      recovery_mode TEXT,
+      visible_context_state TEXT,
+      tokens_before INTEGER,
+      tokens_after INTEGER,
+      operator_summary TEXT,
+      FOREIGN KEY(session_key) REFERENCES sessions(session_key)
+    );
+
     CREATE TABLE IF NOT EXISTS team_memory_sync_events (
       event_id TEXT PRIMARY KEY,
       repo_root TEXT NOT NULL,
@@ -578,6 +638,23 @@ function ensureSchema(db: DatabaseSync): void {
 
     CREATE INDEX IF NOT EXISTS idx_team_memory_sync_repo_created
       ON team_memory_sync_events(repo_root, created_at DESC, event_id DESC);
+
+    CREATE TABLE IF NOT EXISTS team_memory_sync_state (
+      repo_root TEXT PRIMARY KEY,
+      remote_root TEXT,
+      last_pulled_hash TEXT,
+      last_pushed_hash TEXT,
+      last_sync_at INTEGER,
+      last_pull_at INTEGER,
+      last_push_at INTEGER,
+      last_retry_at INTEGER,
+      conflict_retry_count INTEGER NOT NULL DEFAULT 0,
+      blocked_files_json TEXT,
+      checksum_state_json TEXT,
+      last_status TEXT,
+      last_decision TEXT,
+      updated_at INTEGER NOT NULL
+    );
   `);
   ensureColumn(db, "sessions", "execution_role", "TEXT");
   ensureColumn(db, "sessions", "capability_snapshot_json", "TEXT");
@@ -620,6 +697,28 @@ function ensureSchema(db: DatabaseSync): void {
     "INTEGER NOT NULL DEFAULT 0",
   );
   ensureColumn(db, "context_pressure_snapshots", "compaction_action_refs_json", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "run_id", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "committed_spans_json", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "staged_spans_json", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "dropped_spans_json", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "restored_artifacts_json", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "recovery_mode", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "visible_context_state", "TEXT");
+  ensureColumn(db, "context_collapse_ledger", "tokens_before", "INTEGER");
+  ensureColumn(db, "context_collapse_ledger", "tokens_after", "INTEGER");
+  ensureColumn(db, "context_collapse_ledger", "operator_summary", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "remote_root", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "last_pulled_hash", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "last_pushed_hash", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "last_sync_at", "INTEGER");
+  ensureColumn(db, "team_memory_sync_state", "last_pull_at", "INTEGER");
+  ensureColumn(db, "team_memory_sync_state", "last_push_at", "INTEGER");
+  ensureColumn(db, "team_memory_sync_state", "last_retry_at", "INTEGER");
+  ensureColumn(db, "team_memory_sync_state", "conflict_retry_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "team_memory_sync_state", "blocked_files_json", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "checksum_state_json", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "last_status", "TEXT");
+  ensureColumn(db, "team_memory_sync_state", "last_decision", "TEXT");
 }
 
 function createStatements(db: DatabaseSync): StateStoreStatements {
@@ -1192,6 +1291,69 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
       ORDER BY created_at DESC, rowid DESC
       LIMIT ?
     `),
+    upsertContextCollapseLedger: db.prepare(`
+      INSERT INTO context_collapse_ledger (
+        session_key,
+        run_id,
+        updated_at,
+        committed_spans_json,
+        staged_spans_json,
+        dropped_spans_json,
+        restored_artifacts_json,
+        recovery_mode,
+        visible_context_state,
+        tokens_before,
+        tokens_after,
+        operator_summary
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_key) DO UPDATE SET
+        run_id = COALESCE(excluded.run_id, context_collapse_ledger.run_id),
+        updated_at = excluded.updated_at,
+        committed_spans_json = COALESCE(
+          excluded.committed_spans_json,
+          context_collapse_ledger.committed_spans_json
+        ),
+        staged_spans_json = COALESCE(
+          excluded.staged_spans_json,
+          context_collapse_ledger.staged_spans_json
+        ),
+        dropped_spans_json = COALESCE(
+          excluded.dropped_spans_json,
+          context_collapse_ledger.dropped_spans_json
+        ),
+        restored_artifacts_json = COALESCE(
+          excluded.restored_artifacts_json,
+          context_collapse_ledger.restored_artifacts_json
+        ),
+        recovery_mode = COALESCE(excluded.recovery_mode, context_collapse_ledger.recovery_mode),
+        visible_context_state = COALESCE(
+          excluded.visible_context_state,
+          context_collapse_ledger.visible_context_state
+        ),
+        tokens_before = COALESCE(excluded.tokens_before, context_collapse_ledger.tokens_before),
+        tokens_after = COALESCE(excluded.tokens_after, context_collapse_ledger.tokens_after),
+        operator_summary = COALESCE(
+          excluded.operator_summary,
+          context_collapse_ledger.operator_summary
+        )
+    `),
+    selectContextCollapseLedger: db.prepare(`
+      SELECT
+        session_key,
+        run_id,
+        updated_at,
+        committed_spans_json,
+        staged_spans_json,
+        dropped_spans_json,
+        restored_artifacts_json,
+        recovery_mode,
+        visible_context_state,
+        tokens_before,
+        tokens_after,
+        operator_summary
+      FROM context_collapse_ledger
+      WHERE session_key = ?
+    `),
     insertTeamMemorySyncEvent: db.prepare(`
       INSERT OR REPLACE INTO team_memory_sync_events (
         event_id,
@@ -1218,6 +1380,69 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
       WHERE (? IS NULL OR repo_root = ?)
       ORDER BY created_at DESC, event_id DESC
       LIMIT ?
+    `),
+    upsertTeamMemorySyncState: db.prepare(`
+      INSERT INTO team_memory_sync_state (
+        repo_root,
+        remote_root,
+        last_pulled_hash,
+        last_pushed_hash,
+        last_sync_at,
+        last_pull_at,
+        last_push_at,
+        last_retry_at,
+        conflict_retry_count,
+        blocked_files_json,
+        checksum_state_json,
+        last_status,
+        last_decision,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(repo_root) DO UPDATE SET
+        remote_root = COALESCE(excluded.remote_root, team_memory_sync_state.remote_root),
+        last_pulled_hash = COALESCE(
+          excluded.last_pulled_hash,
+          team_memory_sync_state.last_pulled_hash
+        ),
+        last_pushed_hash = COALESCE(
+          excluded.last_pushed_hash,
+          team_memory_sync_state.last_pushed_hash
+        ),
+        last_sync_at = COALESCE(excluded.last_sync_at, team_memory_sync_state.last_sync_at),
+        last_pull_at = COALESCE(excluded.last_pull_at, team_memory_sync_state.last_pull_at),
+        last_push_at = COALESCE(excluded.last_push_at, team_memory_sync_state.last_push_at),
+        last_retry_at = COALESCE(excluded.last_retry_at, team_memory_sync_state.last_retry_at),
+        conflict_retry_count = excluded.conflict_retry_count,
+        blocked_files_json = COALESCE(
+          excluded.blocked_files_json,
+          team_memory_sync_state.blocked_files_json
+        ),
+        checksum_state_json = COALESCE(
+          excluded.checksum_state_json,
+          team_memory_sync_state.checksum_state_json
+        ),
+        last_status = COALESCE(excluded.last_status, team_memory_sync_state.last_status),
+        last_decision = COALESCE(excluded.last_decision, team_memory_sync_state.last_decision),
+        updated_at = excluded.updated_at
+    `),
+    selectTeamMemorySyncState: db.prepare(`
+      SELECT
+        repo_root,
+        remote_root,
+        last_pulled_hash,
+        last_pushed_hash,
+        last_sync_at,
+        last_pull_at,
+        last_push_at,
+        last_retry_at,
+        conflict_retry_count,
+        blocked_files_json,
+        checksum_state_json,
+        last_status,
+        last_decision,
+        updated_at
+      FROM team_memory_sync_state
+      WHERE repo_root = ?
     `),
   };
 }
@@ -1305,7 +1530,7 @@ function mapActionRow(row: ActionRow): StateActionRecord {
     status: row.status ?? undefined,
     createdAt: row.created_at,
     completedAt: row.completed_at ?? undefined,
-    verificationStage: row.verification_stage ?? undefined,
+    verificationStage: parseVerificationStage(row.verification_stage),
     verifierKind: row.verifier_kind ?? undefined,
     command: row.command ?? undefined,
     exitCode: row.exit_code ?? undefined,
@@ -1315,6 +1540,31 @@ function mapActionRow(row: ActionRow): StateActionRecord {
     targetArtifactId: row.target_artifact_id ?? undefined,
     details: parseJsonValue<StateStructuredDetails>(row.details_json),
   };
+}
+
+function parseVerificationStage(value: string | null): SuperVerificationStage | undefined {
+  switch (value) {
+    case "planned":
+    case "running":
+    case "completed":
+    case "failed":
+    case "skipped":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function parseTeamMemorySyncStatus(value: string | null): TeamMemorySyncStatus | undefined {
+  switch (value) {
+    case "success":
+    case "blocked":
+    case "failed":
+    case "skipped":
+      return value;
+    default:
+      return undefined;
+  }
 }
 
 function mapArtifactRow(row: ArtifactRow): StateArtifactRecord {
@@ -1454,6 +1704,26 @@ function mapContextPressureSnapshotRow(row: ContextPressureSnapshotRow): Context
   };
 }
 
+function mapContextCollapseLedgerRow(
+  row: ContextCollapseLedgerRow,
+): StateContextCollapseLedgerRecord {
+  return {
+    sessionKey: row.session_key,
+    runId: row.run_id ?? undefined,
+    updatedAt: row.updated_at,
+    committedSpans:
+      parseJsonValue<StateContextCollapseCommittedSpan[]>(row.committed_spans_json) ?? [],
+    stagedSpans: parseJsonValue<StateContextCollapseStagedSpan[]>(row.staged_spans_json) ?? [],
+    droppedSpans: parseJsonValue<StateContextCollapseDroppedSpan[]>(row.dropped_spans_json) ?? [],
+    restoredArtifacts: parseJsonValue<string[]>(row.restored_artifacts_json) ?? [],
+    recoveryMode: row.recovery_mode ?? undefined,
+    visibleContextState: row.visible_context_state ?? undefined,
+    tokensBefore: row.tokens_before ?? undefined,
+    tokensAfter: row.tokens_after ?? undefined,
+    operatorSummary: row.operator_summary ?? undefined,
+  };
+}
+
 function mapTeamMemorySyncEventRow(row: TeamMemorySyncEventRow): StateTeamMemorySyncEventRecord {
   return {
     eventId: row.event_id,
@@ -1464,6 +1734,25 @@ function mapTeamMemorySyncEventRow(row: TeamMemorySyncEventRow): StateTeamMemory
     transferHash: row.transfer_hash ?? undefined,
     details: row.details ?? undefined,
     createdAt: row.created_at,
+  };
+}
+
+function mapTeamMemorySyncStateRow(row: TeamMemorySyncStateRow): StateTeamMemorySyncStateRecord {
+  return {
+    repoRoot: row.repo_root,
+    remoteRoot: row.remote_root ?? undefined,
+    lastPulledHash: row.last_pulled_hash ?? undefined,
+    lastPushedHash: row.last_pushed_hash ?? undefined,
+    lastSyncAt: row.last_sync_at ?? undefined,
+    lastPullAt: row.last_pull_at ?? undefined,
+    lastPushAt: row.last_push_at ?? undefined,
+    lastRetryAt: row.last_retry_at ?? undefined,
+    conflictRetryCount: row.conflict_retry_count,
+    blockedFiles: parseJsonValue<string[]>(row.blocked_files_json) ?? [],
+    checksumState: parseJsonValue<Record<string, string>>(row.checksum_state_json),
+    lastStatus: parseTeamMemorySyncStatus(row.last_status),
+    lastDecision: row.last_decision ?? undefined,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1845,6 +2134,36 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       return rows.map((row) => mapContextPressureSnapshotRow(row));
     },
 
+    upsertContextCollapseLedger(ledger: StateContextCollapseLedgerUpsert): void {
+      const existingSession = opened.statements.selectSession.get(ledger.sessionKey) as
+        | SessionRow
+        | undefined;
+      const workspaceDir = existingSession?.workspace_dir ?? params.workspaceDir;
+      const agentId = existingSession?.agent_id ?? "main";
+      opened.statements.ensureSession.run(ledger.sessionKey, agentId, workspaceDir);
+      opened.statements.upsertContextCollapseLedger.run(
+        ledger.sessionKey,
+        ledger.runId ?? null,
+        ledger.updatedAt,
+        stringifyJson(ledger.committedSpans),
+        stringifyJson(ledger.stagedSpans),
+        stringifyJson(ledger.droppedSpans),
+        stringifyJson(ledger.restoredArtifacts),
+        ledger.recoveryMode ?? null,
+        ledger.visibleContextState ?? null,
+        ledger.tokensBefore ?? null,
+        ledger.tokensAfter ?? null,
+        ledger.operatorSummary ?? null,
+      );
+    },
+
+    getContextCollapseLedger(sessionKey: string): StateContextCollapseLedgerRecord | null {
+      const row = opened.statements.selectContextCollapseLedger.get(sessionKey) as
+        | ContextCollapseLedgerRow
+        | undefined;
+      return row ? mapContextCollapseLedgerRow(row) : null;
+    },
+
     appendTeamMemorySyncEvent(event: StateTeamMemorySyncEventAppend): void {
       opened.statements.insertTeamMemorySyncEvent.run(
         event.eventId,
@@ -1873,6 +2192,32 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         limit,
       ) as TeamMemorySyncEventRow[];
       return rows.map((row) => mapTeamMemorySyncEventRow(row));
+    },
+
+    upsertTeamMemorySyncState(state: StateTeamMemorySyncStateUpsert): void {
+      opened.statements.upsertTeamMemorySyncState.run(
+        state.repoRoot,
+        state.remoteRoot ?? null,
+        state.lastPulledHash ?? null,
+        state.lastPushedHash ?? null,
+        state.lastSyncAt ?? null,
+        state.lastPullAt ?? null,
+        state.lastPushAt ?? null,
+        state.lastRetryAt ?? null,
+        state.conflictRetryCount,
+        stringifyJson(state.blockedFiles),
+        stringifyJson(state.checksumState),
+        state.lastStatus ?? null,
+        state.lastDecision ?? null,
+        state.updatedAt,
+      );
+    },
+
+    getTeamMemorySyncState(repoRoot: string): StateTeamMemorySyncStateRecord | null {
+      const row = opened.statements.selectTeamMemorySyncState.get(repoRoot) as
+        | TeamMemorySyncStateRow
+        | undefined;
+      return row ? mapTeamMemorySyncStateRow(row) : null;
     },
 
     getContextPressureSnapshot(paramsIn: {

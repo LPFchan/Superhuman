@@ -11,15 +11,46 @@ type FrozenMemoryPromptSnapshot = {
 };
 
 const SNAPSHOT_DIR = "memory-prompt-snapshots";
+const ENTRY_DELIMITER = "\n§\n";
 const SUSPICIOUS_MEMORY_PATTERNS = [
-  /ignore (all|any|the) (previous|prior|system) instructions/i,
-  /reveal (the )?(system prompt|hidden prompt)/i,
-  /tool call/i,
+  /ignore\s+(previous|all|above|prior)\s+instructions/i,
+  /you\s+are\s+now\s+/i,
+  /do\s+not\s+tell\s+the\s+user/i,
+  /system\s+prompt\s+override/i,
+  /disregard\s+(your|all|any)\s+(instructions|rules|guidelines)/i,
+  /act\s+as\s+(if|though)\s+you\s+(have\s+no|don't\s+have)\s+(restrictions|limits|rules)/i,
+  /reveal\s+(the\s+)?(system prompt|hidden prompt)/i,
+  /curl\s+[^\n]*\$\{?\w*(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i,
+  /wget\s+[^\n]*\$\{?\w*(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)/i,
+  /cat\s+[^\n]*(\.env|credentials|\.netrc|\.pgpass|\.npmrc|\.pypirc)/i,
+  /authorized_keys/i,
+  /\$HOME\/\.ssh|~\/\.ssh/i,
+  /\$HOME\/\.hermes\/\.env|~\/\.hermes\/\.env/i,
   /<tool>/i,
+];
+const INVISIBLE_CHARS = [
+  "\u200b",
+  "\u200c",
+  "\u200d",
+  "\u2060",
+  "\ufeff",
+  "\u202a",
+  "\u202b",
+  "\u202c",
+  "\u202d",
+  "\u202e",
 ];
 
 function sanitizeSnapshotLines(lines: string[]): string[] {
-  return lines.filter((line) => !SUSPICIOUS_MEMORY_PATTERNS.some((pattern) => pattern.test(line)));
+  return lines.filter((line) => {
+    if (line.includes(ENTRY_DELIMITER)) {
+      return false;
+    }
+    if (INVISIBLE_CHARS.some((char) => line.includes(char))) {
+      return false;
+    }
+    return !SUSPICIOUS_MEMORY_PATTERNS.some((pattern) => pattern.test(line));
+  });
 }
 
 function resolveSnapshotPath(workspaceDir: string, sessionKey: string): string {
