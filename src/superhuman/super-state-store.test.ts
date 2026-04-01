@@ -216,6 +216,56 @@ describe("createSuperhumanStateStore", () => {
     store.close();
   });
 
+  it("stores proactive loop state and automation events", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-automation-state-"));
+    cleanupPaths.add(workspaceDir);
+    const store = createSuperhumanStateStore({ workspaceDir });
+
+    store.upsertAutomationLoopState({
+      sessionKey: "main",
+      state: "sleeping",
+      reason: "post-dispatch backoff",
+      wakeAt: 5_000,
+      lastActivityAt: 1_000,
+      lastWakeAt: 2_000,
+      lastTransitionAt: 2_500,
+      updatedAt: 2_500,
+    });
+    store.appendAutomationEvent({
+      eventId: "automation-1",
+      sessionKey: "main",
+      automationKind: "proactive_loop",
+      triggerSource: "idle",
+      reason: "session idle threshold reached",
+      actionSummary: "Queued proactive wake for main session",
+      resultStatus: "queued",
+      details: {
+        idleForMs: 120_000,
+      },
+      createdAt: 3_000,
+    });
+
+    expect(store.getAutomationLoopState("main")).toEqual(
+      expect.objectContaining({
+        state: "sleeping",
+        wakeAt: 5_000,
+        lastActivityAt: 1_000,
+        lastWakeAt: 2_000,
+      }),
+    );
+    expect(store.listAutomationEvents({ sessionKey: "main" })).toEqual([
+      expect.objectContaining({
+        eventId: "automation-1",
+        automationKind: "proactive_loop",
+        triggerSource: "idle",
+        resultStatus: "queued",
+        details: expect.objectContaining({ idleForMs: 120_000 }),
+      }),
+    ]);
+
+    store.close();
+  });
+
   it("stores team-memory sync audit events", () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-sync-state-"));
     cleanupPaths.add(workspaceDir);

@@ -16,6 +16,8 @@ import {
   type ChannelRegistry,
   type CompactionManager,
   type PluginRegistry,
+  type SandboxRuntimeRegistry,
+  type ShellCapabilityRegistry,
   type SessionRegistry,
   type StateStore,
   type WorkspaceBootstrap,
@@ -29,6 +31,8 @@ export type SuperhumanGatewayRuntime = {
   sessionRegistry: SessionRegistry;
   channelRegistry: ChannelRegistry;
   pluginRegistry: PluginRegistry;
+  shellCapabilityRegistry: ShellCapabilityRegistry;
+  sandboxRuntimeRegistry: SandboxRuntimeRegistry;
   workspaceBootstrap: WorkspaceBootstrap;
   compactionManager: CompactionManager;
   stop: () => void;
@@ -72,6 +76,35 @@ function createChannelRegistry(): ChannelRegistry {
   };
 }
 
+function createShellCapabilityRegistry(stateStore: StateStore): ShellCapabilityRegistry {
+  return {
+    getSnapshot({ sessionKey }) {
+      const snapshot = stateStore.getSessionSnapshot(sessionKey)?.capabilitySnapshot;
+      if (!snapshot) {
+        throw new Error(
+          `Superhuman shell capability snapshot unavailable for session ${sessionKey}`,
+        );
+      }
+      return snapshot;
+    },
+  };
+}
+
+function createSandboxRuntimeRegistry(stateStore: StateStore): SandboxRuntimeRegistry {
+  return {
+    getSnapshot({ sessionKey }) {
+      const resolvedSessionKey = sessionKey?.trim() || "main";
+      const snapshot = stateStore.getSessionSnapshot(resolvedSessionKey)?.sandboxRuntime;
+      if (!snapshot) {
+        throw new Error(
+          `Superhuman sandbox runtime snapshot unavailable for session ${resolvedSessionKey}`,
+        );
+      }
+      return snapshot;
+    },
+  };
+}
+
 function createWorkspaceBootstrap(params: {
   cfg: OpenClawConfig;
   deps: CliDeps;
@@ -96,10 +129,12 @@ export function startSuperhumanGatewayRuntime(params: {
   pluginRegistry: OpenClawPluginRegistry;
 }): SuperhumanGatewayRuntime {
   const stateStore = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
+  const sessionRegistry = createSessionRegistry(params.cfg);
   const adapter = new SuperSessionPersistenceAdapter({
     cfg: params.cfg,
     workspaceDir: params.workspaceDir,
     stateStore,
+    pluginRegistry: params.pluginRegistry,
   });
   const orchestrationRuntime = startSuperOrchestrationRuntime({
     cfg: params.cfg,
@@ -109,9 +144,11 @@ export function startSuperhumanGatewayRuntime(params: {
   return {
     stateStore,
     orchestrationRuntime,
-    sessionRegistry: createSessionRegistry(params.cfg),
+    sessionRegistry,
     channelRegistry: createChannelRegistry(),
     pluginRegistry: createSuperPluginCapabilityRegistry(params.pluginRegistry),
+    shellCapabilityRegistry: createShellCapabilityRegistry(stateStore),
+    sandboxRuntimeRegistry: createSandboxRuntimeRegistry(stateStore),
     workspaceBootstrap: createWorkspaceBootstrap({
       cfg: params.cfg,
       deps: params.deps,

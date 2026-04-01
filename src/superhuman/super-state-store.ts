@@ -17,9 +17,15 @@ import type {
   RuntimeInvocationMode,
   RuntimeInvocationStatus,
   StateActionAppend,
+  StateActionRecord,
+  StateAutomationEventAppend,
+  StateAutomationEventRecord,
+  StateAutomationLoopStateRecord,
+  StateAutomationLoopStateUpsert,
   StateAbortNodeRecord,
   StateAbortNodeUpsert,
   StateArtifactAppend,
+  StateArtifactRecord,
   StateContextPressureSnapshotAppend,
   StateEvidenceProvenance,
   StateIterationBudgetRecord,
@@ -34,6 +40,9 @@ import type {
   StateStore,
   StateTeamMemorySyncEventAppend,
   StateTeamMemorySyncEventRecord,
+  SuperPartialReadDescriptor,
+  SuperSandboxRuntimeSnapshot,
+  SuperShellCapabilitySnapshot,
   TeamMemorySyncDirection,
   TeamMemorySyncStatus,
   VerificationOutcome,
@@ -49,7 +58,12 @@ type StateStoreStatements = {
   insertMessage: StatementSync;
   touchSessionAfterMessage: StatementSync;
   upsertAction: StatementSync;
+  selectActions: StatementSync;
   upsertArtifact: StatementSync;
+  upsertAutomationLoopState: StatementSync;
+  selectAutomationLoopState: StatementSync;
+  insertAutomationEvent: StatementSync;
+  selectAutomationEvents: StatementSync;
   upsertRuntimeInvocation: StatementSync;
   insertRuntimeStageEvent: StatementSync;
   upsertIterationBudget: StatementSync;
@@ -90,6 +104,8 @@ type SessionRow = {
   last_message_id: string | null;
   last_user_turn_id: string | null;
   last_assistant_turn_id: string | null;
+  capability_snapshot_json: string | null;
+  sandbox_runtime_json: string | null;
   message_count: number;
 };
 
@@ -113,7 +129,63 @@ type ArtifactRow = {
   location: string | null;
   created_at: number;
   provenance_json: string | null;
+  relationship_kind: string | null;
+  parent_artifact_id: string | null;
+  preview_artifact_id: string | null;
+  full_artifact_id: string | null;
+  preview_bytes: number | null;
+  full_bytes: number | null;
+  storage_path: string | null;
+  reopened_at: number | null;
+  partial_read_json: string | null;
+  verification_action_id: string | null;
   metadata_json: string | null;
+};
+
+type ActionRow = {
+  action_id: string;
+  session_key: string | null;
+  run_id: string | null;
+  action_type: string;
+  action_kind: string | null;
+  summary: string;
+  status: string | null;
+  created_at: number;
+  completed_at: number | null;
+  verification_stage: string | null;
+  verifier_kind: string | null;
+  command: string | null;
+  exit_code: number | null;
+  capability_snapshot_json: string | null;
+  sandbox_runtime_json: string | null;
+  source_artifact_id: string | null;
+  target_artifact_id: string | null;
+  details_json: string | null;
+};
+
+type AutomationLoopStateRow = {
+  session_key: string;
+  state: string;
+  reason: string | null;
+  wake_at: number | null;
+  last_activity_at: number | null;
+  last_wake_at: number | null;
+  last_transition_at: number;
+  updated_at: number;
+};
+
+type AutomationEventRow = {
+  event_id: string;
+  session_key: string | null;
+  run_id: string | null;
+  automation_kind: string;
+  trigger_source: string;
+  reason: string | null;
+  plan_summary: string | null;
+  action_summary: string | null;
+  result_status: string;
+  details_json: string | null;
+  created_at: number;
 };
 
 type RuntimeInvocationRow = {
@@ -181,10 +253,13 @@ type ContextPressureSnapshotRow = {
   configured_context_limit: number;
   reserved_output_tokens: number;
   effective_context_limit: number;
+  autocompact_buffer_tokens: number;
+  blocking_buffer_tokens: number;
   autocompact_threshold: number;
   blocking_threshold: number;
   remaining_budget: number;
   overflow_risk: number;
+  compaction_action_refs_json: string | null;
 };
 
 type TeamMemorySyncEventRow = {
@@ -244,9 +319,7 @@ function ensureColumn(
   db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition};`);
 }
 
-function stringifyJson(
-  value: StateStructuredDetails | StateEvidenceProvenance | undefined,
-): string | null {
+function stringifyJson(value: unknown): string | null {
   if (!value) {
     return null;
   }
@@ -282,6 +355,8 @@ function ensureSchema(db: DatabaseSync): void {
       last_message_id TEXT,
       last_user_turn_id TEXT,
       last_assistant_turn_id TEXT,
+      capability_snapshot_json TEXT,
+      sandbox_runtime_json TEXT,
       message_count INTEGER NOT NULL DEFAULT 0
     );
 
@@ -305,10 +380,19 @@ function ensureSchema(db: DatabaseSync): void {
       session_key TEXT,
       run_id TEXT,
       action_type TEXT NOT NULL,
+      action_kind TEXT,
       summary TEXT NOT NULL,
       status TEXT,
       created_at INTEGER NOT NULL,
       completed_at INTEGER,
+      verification_stage TEXT,
+      verifier_kind TEXT,
+      command TEXT,
+      exit_code INTEGER,
+      capability_snapshot_json TEXT,
+      sandbox_runtime_json TEXT,
+      source_artifact_id TEXT,
+      target_artifact_id TEXT,
       details_json TEXT
     );
 
@@ -321,7 +405,44 @@ function ensureSchema(db: DatabaseSync): void {
       location TEXT,
       created_at INTEGER NOT NULL,
       provenance_json TEXT,
+      relationship_kind TEXT,
+      parent_artifact_id TEXT,
+      preview_artifact_id TEXT,
+      full_artifact_id TEXT,
+      preview_bytes INTEGER,
+      full_bytes INTEGER,
+      storage_path TEXT,
+      reopened_at INTEGER,
+      partial_read_json TEXT,
+      verification_action_id TEXT,
       metadata_json TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS automation_loop_state (
+      session_key TEXT PRIMARY KEY,
+      state TEXT NOT NULL,
+      reason TEXT,
+      wake_at INTEGER,
+      last_activity_at INTEGER,
+      last_wake_at INTEGER,
+      last_transition_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY(session_key) REFERENCES sessions(session_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS automation_events (
+      event_id TEXT PRIMARY KEY,
+      session_key TEXT,
+      run_id TEXT,
+      automation_kind TEXT NOT NULL,
+      trigger_source TEXT NOT NULL,
+      reason TEXT,
+      plan_summary TEXT,
+      action_summary TEXT,
+      result_status TEXT NOT NULL,
+      details_json TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY(session_key) REFERENCES sessions(session_key)
     );
 
     CREATE TABLE IF NOT EXISTS runtime_invocations (
@@ -409,8 +530,12 @@ function ensureSchema(db: DatabaseSync): void {
       ON messages(session_key, created_at, rowid);
     CREATE INDEX IF NOT EXISTS idx_actions_session_created
       ON actions(session_key, created_at);
+    CREATE INDEX IF NOT EXISTS idx_actions_session_kind_created
+      ON actions(session_key, action_kind, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_artifacts_session_created
       ON artifacts(session_key, created_at);
+    CREATE INDEX IF NOT EXISTS idx_automation_events_session_created
+      ON automation_events(session_key, created_at DESC, event_id DESC);
     CREATE INDEX IF NOT EXISTS idx_runtime_stage_events_run_created
       ON runtime_stage_events(run_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_iteration_budgets_run_updated
@@ -427,10 +552,13 @@ function ensureSchema(db: DatabaseSync): void {
       configured_context_limit INTEGER NOT NULL,
       reserved_output_tokens INTEGER NOT NULL,
       effective_context_limit INTEGER NOT NULL,
+      autocompact_buffer_tokens INTEGER NOT NULL,
+      blocking_buffer_tokens INTEGER NOT NULL,
       autocompact_threshold INTEGER NOT NULL,
       blocking_threshold INTEGER NOT NULL,
       remaining_budget INTEGER NOT NULL,
       overflow_risk INTEGER NOT NULL DEFAULT 0,
+      compaction_action_refs_json TEXT,
       FOREIGN KEY(session_key) REFERENCES sessions(session_key)
     );
 
@@ -452,12 +580,46 @@ function ensureSchema(db: DatabaseSync): void {
       ON team_memory_sync_events(repo_root, created_at DESC, event_id DESC);
   `);
   ensureColumn(db, "sessions", "execution_role", "TEXT");
+  ensureColumn(db, "sessions", "capability_snapshot_json", "TEXT");
+  ensureColumn(db, "sessions", "sandbox_runtime_json", "TEXT");
   ensureColumn(db, "messages", "provenance_json", "TEXT");
+  ensureColumn(db, "actions", "action_kind", "TEXT");
+  ensureColumn(db, "actions", "verification_stage", "TEXT");
+  ensureColumn(db, "actions", "verifier_kind", "TEXT");
+  ensureColumn(db, "actions", "command", "TEXT");
+  ensureColumn(db, "actions", "exit_code", "INTEGER");
+  ensureColumn(db, "actions", "capability_snapshot_json", "TEXT");
+  ensureColumn(db, "actions", "sandbox_runtime_json", "TEXT");
+  ensureColumn(db, "actions", "source_artifact_id", "TEXT");
+  ensureColumn(db, "actions", "target_artifact_id", "TEXT");
   ensureColumn(db, "actions", "details_json", "TEXT");
   ensureColumn(db, "artifacts", "provenance_json", "TEXT");
+  ensureColumn(db, "artifacts", "relationship_kind", "TEXT");
+  ensureColumn(db, "artifacts", "parent_artifact_id", "TEXT");
+  ensureColumn(db, "artifacts", "preview_artifact_id", "TEXT");
+  ensureColumn(db, "artifacts", "full_artifact_id", "TEXT");
+  ensureColumn(db, "artifacts", "preview_bytes", "INTEGER");
+  ensureColumn(db, "artifacts", "full_bytes", "INTEGER");
+  ensureColumn(db, "artifacts", "storage_path", "TEXT");
+  ensureColumn(db, "artifacts", "reopened_at", "INTEGER");
+  ensureColumn(db, "artifacts", "partial_read_json", "TEXT");
+  ensureColumn(db, "artifacts", "verification_action_id", "TEXT");
   ensureColumn(db, "artifacts", "metadata_json", "TEXT");
   ensureColumn(db, "runtime_invocations", "verification_outcome", "TEXT");
   ensureColumn(db, "runtime_invocations", "verification_required", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(
+    db,
+    "context_pressure_snapshots",
+    "autocompact_buffer_tokens",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureColumn(
+    db,
+    "context_pressure_snapshots",
+    "blocking_buffer_tokens",
+    "INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureColumn(db, "context_pressure_snapshots", "compaction_action_refs_json", "TEXT");
 }
 
 function createStatements(db: DatabaseSync): StateStoreStatements {
@@ -479,8 +641,10 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         last_message_id,
         last_user_turn_id,
         last_assistant_turn_id,
+        capability_snapshot_json,
+        sandbox_runtime_json,
         message_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_key) DO UPDATE SET
         session_id = COALESCE(excluded.session_id, sessions.session_id),
         agent_id = excluded.agent_id,
@@ -503,6 +667,14 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         last_assistant_turn_id = COALESCE(
           excluded.last_assistant_turn_id,
           sessions.last_assistant_turn_id
+        ),
+        capability_snapshot_json = COALESCE(
+          excluded.capability_snapshot_json,
+          sessions.capability_snapshot_json
+        ),
+        sandbox_runtime_json = COALESCE(
+          excluded.sandbox_runtime_json,
+          sessions.sandbox_runtime_json
         ),
         message_count = CASE
           WHEN excluded.message_count IS NULL OR excluded.message_count = 0 THEN sessions.message_count
@@ -546,21 +718,74 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         session_key,
         run_id,
         action_type,
+        action_kind,
         summary,
         status,
         created_at,
         completed_at,
+        verification_stage,
+        verifier_kind,
+        command,
+        exit_code,
+        capability_snapshot_json,
+        sandbox_runtime_json,
+        source_artifact_id,
+        target_artifact_id,
         details_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(action_id) DO UPDATE SET
         session_key = COALESCE(excluded.session_key, actions.session_key),
         run_id = COALESCE(excluded.run_id, actions.run_id),
         action_type = excluded.action_type,
+        action_kind = COALESCE(excluded.action_kind, actions.action_kind),
         summary = excluded.summary,
         status = COALESCE(excluded.status, actions.status),
         created_at = excluded.created_at,
         completed_at = COALESCE(excluded.completed_at, actions.completed_at),
+        verification_stage = COALESCE(
+          excluded.verification_stage,
+          actions.verification_stage
+        ),
+        verifier_kind = COALESCE(excluded.verifier_kind, actions.verifier_kind),
+        command = COALESCE(excluded.command, actions.command),
+        exit_code = COALESCE(excluded.exit_code, actions.exit_code),
+        capability_snapshot_json = COALESCE(
+          excluded.capability_snapshot_json,
+          actions.capability_snapshot_json
+        ),
+        sandbox_runtime_json = COALESCE(
+          excluded.sandbox_runtime_json,
+          actions.sandbox_runtime_json
+        ),
+        source_artifact_id = COALESCE(excluded.source_artifact_id, actions.source_artifact_id),
+        target_artifact_id = COALESCE(excluded.target_artifact_id, actions.target_artifact_id),
         details_json = COALESCE(excluded.details_json, actions.details_json)
+    `),
+    selectActions: db.prepare(`
+      SELECT
+        action_id,
+        session_key,
+        run_id,
+        action_type,
+        action_kind,
+        summary,
+        status,
+        created_at,
+        completed_at,
+        verification_stage,
+        verifier_kind,
+        command,
+        exit_code,
+        capability_snapshot_json,
+        sandbox_runtime_json,
+        source_artifact_id,
+        target_artifact_id,
+        details_json
+      FROM actions
+      WHERE (? IS NULL OR session_key = ?)
+        AND (? IS NULL OR run_id = ?)
+      ORDER BY created_at DESC, action_id DESC
+      LIMIT ?
     `),
     upsertArtifact: db.prepare(`
       INSERT INTO artifacts (
@@ -572,8 +797,18 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         location,
         created_at,
         provenance_json,
+        relationship_kind,
+        parent_artifact_id,
+        preview_artifact_id,
+        full_artifact_id,
+        preview_bytes,
+        full_bytes,
+        storage_path,
+        reopened_at,
+        partial_read_json,
+        verification_action_id,
         metadata_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(artifact_id) DO UPDATE SET
         session_key = COALESCE(excluded.session_key, artifacts.session_key),
         message_id = COALESCE(excluded.message_id, artifacts.message_id),
@@ -582,7 +817,92 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         location = COALESCE(excluded.location, artifacts.location),
         created_at = excluded.created_at,
         provenance_json = COALESCE(excluded.provenance_json, artifacts.provenance_json),
+        relationship_kind = COALESCE(excluded.relationship_kind, artifacts.relationship_kind),
+        parent_artifact_id = COALESCE(excluded.parent_artifact_id, artifacts.parent_artifact_id),
+        preview_artifact_id = COALESCE(
+          excluded.preview_artifact_id,
+          artifacts.preview_artifact_id
+        ),
+        full_artifact_id = COALESCE(excluded.full_artifact_id, artifacts.full_artifact_id),
+        preview_bytes = COALESCE(excluded.preview_bytes, artifacts.preview_bytes),
+        full_bytes = COALESCE(excluded.full_bytes, artifacts.full_bytes),
+        storage_path = COALESCE(excluded.storage_path, artifacts.storage_path),
+        reopened_at = COALESCE(excluded.reopened_at, artifacts.reopened_at),
+        partial_read_json = COALESCE(excluded.partial_read_json, artifacts.partial_read_json),
+        verification_action_id = COALESCE(
+          excluded.verification_action_id,
+          artifacts.verification_action_id
+        ),
         metadata_json = COALESCE(excluded.metadata_json, artifacts.metadata_json)
+    `),
+    upsertAutomationLoopState: db.prepare(`
+      INSERT INTO automation_loop_state (
+        session_key,
+        state,
+        reason,
+        wake_at,
+        last_activity_at,
+        last_wake_at,
+        last_transition_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(session_key) DO UPDATE SET
+        state = excluded.state,
+        reason = COALESCE(excluded.reason, automation_loop_state.reason),
+        wake_at = excluded.wake_at,
+        last_activity_at = COALESCE(
+          excluded.last_activity_at,
+          automation_loop_state.last_activity_at
+        ),
+        last_wake_at = COALESCE(excluded.last_wake_at, automation_loop_state.last_wake_at),
+        last_transition_at = excluded.last_transition_at,
+        updated_at = excluded.updated_at
+    `),
+    selectAutomationLoopState: db.prepare(`
+      SELECT
+        session_key,
+        state,
+        reason,
+        wake_at,
+        last_activity_at,
+        last_wake_at,
+        last_transition_at,
+        updated_at
+      FROM automation_loop_state
+      WHERE session_key = ?
+    `),
+    insertAutomationEvent: db.prepare(`
+      INSERT OR REPLACE INTO automation_events (
+        event_id,
+        session_key,
+        run_id,
+        automation_kind,
+        trigger_source,
+        reason,
+        plan_summary,
+        action_summary,
+        result_status,
+        details_json,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    selectAutomationEvents: db.prepare(`
+      SELECT
+        event_id,
+        session_key,
+        run_id,
+        automation_kind,
+        trigger_source,
+        reason,
+        plan_summary,
+        action_summary,
+        result_status,
+        details_json,
+        created_at
+      FROM automation_events
+      WHERE (? IS NULL OR session_key = ?)
+      ORDER BY created_at DESC, event_id DESC
+      LIMIT ?
     `),
     upsertRuntimeInvocation: db.prepare(`
       INSERT INTO runtime_invocations (
@@ -706,6 +1026,8 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         last_message_id,
         last_user_turn_id,
         last_assistant_turn_id,
+        capability_snapshot_json,
+        sandbox_runtime_json,
         message_count
       FROM sessions
       WHERE session_key = ?
@@ -720,6 +1042,16 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         location,
         created_at,
         provenance_json,
+        relationship_kind,
+        parent_artifact_id,
+        preview_artifact_id,
+        full_artifact_id,
+        preview_bytes,
+        full_bytes,
+        storage_path,
+        reopened_at,
+        partial_read_json,
+        verification_action_id,
         metadata_json
       FROM artifacts
       WHERE (? IS NULL OR session_key = ?)
@@ -815,10 +1147,13 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         configured_context_limit,
         reserved_output_tokens,
         effective_context_limit,
+        autocompact_buffer_tokens,
+        blocking_buffer_tokens,
         autocompact_threshold,
         blocking_threshold,
         remaining_budget,
-        overflow_risk
+        overflow_risk,
+        compaction_action_refs_json
       ) VALUES (
         $sessionKey,
         $runId,
@@ -827,10 +1162,13 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         $configuredContextLimit,
         $reservedOutputTokens,
         $effectiveContextLimit,
+        $autocompactBufferTokens,
+        $blockingBufferTokens,
         $autocompactThreshold,
         $blockingThreshold,
         $remainingBudget,
-        $overflowRisk
+        $overflowRisk,
+        $compactionActionRefsJson
       )
     `),
     selectContextPressureSnapshots: db.prepare(`
@@ -842,10 +1180,13 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         configured_context_limit,
         reserved_output_tokens,
         effective_context_limit,
+        autocompact_buffer_tokens,
+        blocking_buffer_tokens,
         autocompact_threshold,
         blocking_threshold,
         remaining_budget,
-        overflow_risk
+        overflow_risk,
+        compaction_action_refs_json
       FROM context_pressure_snapshots
       WHERE session_key = ?
       ORDER BY created_at DESC, rowid DESC
@@ -921,6 +1262,8 @@ function mapSessionRow(row: SessionRow): StateSessionRecord {
     lastMessageId: row.last_message_id ?? undefined,
     lastUserTurnId: row.last_user_turn_id ?? undefined,
     lastAssistantTurnId: row.last_assistant_turn_id ?? undefined,
+    capabilitySnapshot: parseJsonValue<SuperShellCapabilitySnapshot>(row.capability_snapshot_json),
+    sandboxRuntime: parseJsonValue<SuperSandboxRuntimeSnapshot>(row.sandbox_runtime_json),
     messageCount: row.message_count ?? 0,
   };
 }
@@ -951,7 +1294,30 @@ function mapConversationRows(
   };
 }
 
-function mapArtifactRow(row: ArtifactRow): StateArtifactAppend {
+function mapActionRow(row: ActionRow): StateActionRecord {
+  return {
+    actionId: row.action_id,
+    sessionKey: row.session_key ?? undefined,
+    runId: row.run_id ?? undefined,
+    actionType: row.action_type,
+    actionKind: row.action_kind ?? undefined,
+    summary: row.summary,
+    status: row.status ?? undefined,
+    createdAt: row.created_at,
+    completedAt: row.completed_at ?? undefined,
+    verificationStage: row.verification_stage ?? undefined,
+    verifierKind: row.verifier_kind ?? undefined,
+    command: row.command ?? undefined,
+    exitCode: row.exit_code ?? undefined,
+    capabilitySnapshot: parseJsonValue<SuperShellCapabilitySnapshot>(row.capability_snapshot_json),
+    sandboxRuntime: parseJsonValue<SuperSandboxRuntimeSnapshot>(row.sandbox_runtime_json),
+    sourceArtifactId: row.source_artifact_id ?? undefined,
+    targetArtifactId: row.target_artifact_id ?? undefined,
+    details: parseJsonValue<StateStructuredDetails>(row.details_json),
+  };
+}
+
+function mapArtifactRow(row: ArtifactRow): StateArtifactRecord {
   return {
     artifactId: row.artifact_id,
     sessionKey: row.session_key ?? undefined,
@@ -961,7 +1327,46 @@ function mapArtifactRow(row: ArtifactRow): StateArtifactAppend {
     location: row.location ?? undefined,
     createdAt: row.created_at,
     provenance: parseJsonValue<StateEvidenceProvenance>(row.provenance_json),
+    relationshipKind: row.relationship_kind ?? undefined,
+    parentArtifactId: row.parent_artifact_id ?? undefined,
+    previewArtifactId: row.preview_artifact_id ?? undefined,
+    fullArtifactId: row.full_artifact_id ?? undefined,
+    previewBytes: row.preview_bytes ?? undefined,
+    fullBytes: row.full_bytes ?? undefined,
+    storagePath: row.storage_path ?? undefined,
+    reopenedAt: row.reopened_at ?? undefined,
+    partialReadDescriptor: parseJsonValue<SuperPartialReadDescriptor>(row.partial_read_json),
+    verificationActionId: row.verification_action_id ?? undefined,
     metadata: parseJsonValue<StateStructuredDetails>(row.metadata_json),
+  };
+}
+
+function mapAutomationLoopStateRow(row: AutomationLoopStateRow): StateAutomationLoopStateRecord {
+  return {
+    sessionKey: row.session_key,
+    state: row.state as StateAutomationLoopStateRecord["state"],
+    reason: row.reason ?? undefined,
+    wakeAt: row.wake_at ?? undefined,
+    lastActivityAt: row.last_activity_at ?? undefined,
+    lastWakeAt: row.last_wake_at ?? undefined,
+    lastTransitionAt: row.last_transition_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAutomationEventRow(row: AutomationEventRow): StateAutomationEventRecord {
+  return {
+    eventId: row.event_id,
+    sessionKey: row.session_key ?? undefined,
+    runId: row.run_id ?? undefined,
+    automationKind: row.automation_kind,
+    triggerSource: row.trigger_source,
+    reason: row.reason ?? undefined,
+    planSummary: row.plan_summary ?? undefined,
+    actionSummary: row.action_summary ?? undefined,
+    resultStatus: row.result_status,
+    details: parseJsonValue<StateStructuredDetails>(row.details_json),
+    createdAt: row.created_at,
   };
 }
 
@@ -1039,10 +1444,13 @@ function mapContextPressureSnapshotRow(row: ContextPressureSnapshotRow): Context
     configuredContextLimit: row.configured_context_limit,
     reservedOutputTokens: row.reserved_output_tokens,
     effectiveContextLimit: row.effective_context_limit,
+    autocompactBufferTokens: row.autocompact_buffer_tokens,
+    blockingBufferTokens: row.blocking_buffer_tokens,
     autocompactThreshold: row.autocompact_threshold,
     blockingThreshold: row.blocking_threshold,
     remainingBudget: row.remaining_budget,
     overflowRisk: row.overflow_risk === 1,
+    persistedCompactionEventRefs: parseJsonValue<string[]>(row.compaction_action_refs_json) ?? [],
   };
 }
 
@@ -1089,6 +1497,8 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         session.lastMessageId ?? null,
         session.lastUserTurnId ?? null,
         session.lastAssistantTurnId ?? null,
+        stringifyJson(session.capabilitySnapshot),
+        stringifyJson(session.sandboxRuntime),
         session.messageCount ?? 0,
       );
     },
@@ -1140,12 +1550,42 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         action.sessionKey ?? null,
         action.runId ?? null,
         action.actionType,
+        action.actionKind ?? null,
         action.summary,
         action.status ?? null,
         action.createdAt,
         action.completedAt ?? null,
+        action.verificationStage ?? null,
+        action.verifierKind ?? null,
+        action.command ?? null,
+        action.exitCode ?? null,
+        stringifyJson(action.capabilitySnapshot),
+        stringifyJson(action.sandboxRuntime),
+        action.sourceArtifactId ?? null,
+        action.targetArtifactId ?? null,
         stringifyJson(action.details),
       );
+    },
+
+    getActions(paramsIn?: {
+      sessionKey?: string;
+      runId?: string;
+      limit?: number;
+    }): StateActionRecord[] {
+      const limit =
+        typeof paramsIn?.limit === "number" && Number.isFinite(paramsIn.limit)
+          ? Math.max(1, Math.floor(paramsIn.limit))
+          : 100;
+      const sessionKey = paramsIn?.sessionKey?.trim() || null;
+      const runId = paramsIn?.runId?.trim() || null;
+      const rows = opened.statements.selectActions.all(
+        sessionKey,
+        sessionKey,
+        runId,
+        runId,
+        limit,
+      ) as ActionRow[];
+      return rows.map((row) => mapActionRow(row));
     },
 
     appendArtifact(artifact: StateArtifactAppend): void {
@@ -1158,8 +1598,85 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         artifact.location ?? null,
         artifact.createdAt,
         stringifyJson(artifact.provenance),
+        artifact.relationshipKind ?? null,
+        artifact.parentArtifactId ?? null,
+        artifact.previewArtifactId ?? null,
+        artifact.fullArtifactId ?? null,
+        artifact.previewBytes ?? null,
+        artifact.fullBytes ?? null,
+        artifact.storagePath ?? null,
+        artifact.reopenedAt ?? null,
+        stringifyJson(artifact.partialReadDescriptor),
+        artifact.verificationActionId ?? null,
         stringifyJson(artifact.metadata),
       );
+    },
+
+    upsertAutomationLoopState(loopState: StateAutomationLoopStateUpsert): void {
+      const existingSession = opened.statements.selectSession.get(loopState.sessionKey) as
+        | SessionRow
+        | undefined;
+      const workspaceDir = existingSession?.workspace_dir ?? params.workspaceDir;
+      const agentId = existingSession?.agent_id ?? "main";
+      opened.statements.ensureSession.run(loopState.sessionKey, agentId, workspaceDir);
+      opened.statements.upsertAutomationLoopState.run(
+        loopState.sessionKey,
+        loopState.state,
+        loopState.reason ?? null,
+        loopState.wakeAt ?? null,
+        loopState.lastActivityAt ?? null,
+        loopState.lastWakeAt ?? null,
+        loopState.lastTransitionAt,
+        loopState.updatedAt,
+      );
+    },
+
+    getAutomationLoopState(sessionKey: string): StateAutomationLoopStateRecord | null {
+      const row = opened.statements.selectAutomationLoopState.get(sessionKey) as
+        | AutomationLoopStateRow
+        | undefined;
+      return row ? mapAutomationLoopStateRow(row) : null;
+    },
+
+    appendAutomationEvent(event: StateAutomationEventAppend): void {
+      if (event.sessionKey) {
+        const existingSession = opened.statements.selectSession.get(event.sessionKey) as
+          | SessionRow
+          | undefined;
+        const workspaceDir = existingSession?.workspace_dir ?? params.workspaceDir;
+        const agentId = existingSession?.agent_id ?? "main";
+        opened.statements.ensureSession.run(event.sessionKey, agentId, workspaceDir);
+      }
+      opened.statements.insertAutomationEvent.run(
+        event.eventId,
+        event.sessionKey ?? null,
+        event.runId ?? null,
+        event.automationKind,
+        event.triggerSource,
+        event.reason ?? null,
+        event.planSummary ?? null,
+        event.actionSummary ?? null,
+        event.resultStatus,
+        stringifyJson(event.details),
+        event.createdAt,
+      );
+    },
+
+    listAutomationEvents(paramsIn?: {
+      sessionKey?: string;
+      limit?: number;
+    }): StateAutomationEventRecord[] {
+      const limit =
+        typeof paramsIn?.limit === "number" && Number.isFinite(paramsIn.limit)
+          ? Math.max(1, Math.floor(paramsIn.limit))
+          : 50;
+      const sessionKey = paramsIn?.sessionKey?.trim() || null;
+      const rows = opened.statements.selectAutomationEvents.all(
+        sessionKey,
+        sessionKey,
+        limit,
+      ) as AutomationEventRow[];
+      return rows.map((row) => mapAutomationEventRow(row));
     },
 
     upsertRuntimeInvocation(invocation: StateRuntimeInvocationUpsert): void {
@@ -1232,7 +1749,7 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       return row ? mapSessionRow(row) : null;
     },
 
-    getArtifacts(paramsIn?: { sessionKey?: string }): StateArtifactAppend[] {
+    getArtifacts(paramsIn?: { sessionKey?: string }): StateArtifactRecord[] {
       const sessionKey = paramsIn?.sessionKey ?? null;
       const rows = opened.statements.selectArtifacts.all(sessionKey, sessionKey) as ArtifactRow[];
       return rows.map((row) => mapArtifactRow(row));
@@ -1285,6 +1802,7 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         estimatedInputTokens: Math.max(0, totalRow?.total_tokens ?? 0),
         createdAt: paramsIn.createdAt,
         runId: paramsIn.runId,
+        persistedCompactionEventRefs: [...(paramsIn.persistedCompactionEventRefs ?? [])],
         ...resolveSuperContextPressureOptionsForSession({
           sessionKey: paramsIn.sessionKey,
           configuredContextLimit: paramsIn.configuredContextLimit,
@@ -1301,10 +1819,13 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         configuredContextLimit: snapshot.configuredContextLimit,
         reservedOutputTokens: snapshot.reservedOutputTokens,
         effectiveContextLimit: snapshot.effectiveContextLimit,
+        autocompactBufferTokens: snapshot.autocompactBufferTokens,
+        blockingBufferTokens: snapshot.blockingBufferTokens,
         autocompactThreshold: snapshot.autocompactThreshold,
         blockingThreshold: snapshot.blockingThreshold,
         remainingBudget: snapshot.remainingBudget,
         overflowRisk: snapshot.overflowRisk ? 1 : 0,
+        compactionActionRefsJson: JSON.stringify(snapshot.persistedCompactionEventRefs),
       });
       return snapshot;
     },
@@ -1364,6 +1885,13 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       const totalRow = opened.statements.selectApproxTokens.get(paramsIn.sessionKey) as
         | { total_tokens?: number }
         | undefined;
+      const compactionActions = opened.statements.selectActions.all(
+        paramsIn.sessionKey,
+        paramsIn.sessionKey,
+        null,
+        null,
+        20,
+      ) as ActionRow[];
       return buildSuperContextPressureSnapshot({
         estimatedInputTokens: Math.max(0, totalRow?.total_tokens ?? 0),
         ...resolveSuperContextPressureOptionsForSession({
@@ -1373,6 +1901,10 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
           autocompactBufferTokens: paramsIn.autocompactBufferTokens,
           blockingBufferTokens: paramsIn.blockingBufferTokens,
         }),
+        persistedCompactionEventRefs: compactionActions
+          .map((row) => mapActionRow(row))
+          .filter((action) => action.actionKind === "compaction")
+          .map((action) => action.actionId),
       });
     },
 

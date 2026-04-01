@@ -17,6 +17,7 @@ export type ContextPressureSnapshotOptions = {
   reservedOutputTokens?: number;
   autocompactBufferTokens?: number;
   blockingBufferTokens?: number;
+  persistedCompactionEventRefs?: string[];
   createdAt?: number;
   runId?: string;
 };
@@ -73,11 +74,14 @@ export function buildSuperContextPressureSnapshot(
     configuredContextLimit,
     reservedOutputTokens,
     effectiveContextLimit,
+    autocompactBufferTokens,
+    blockingBufferTokens,
     autocompactThreshold,
     blockingThreshold,
     remainingBudget,
     overflowRisk:
       estimatedInputTokens >= autocompactThreshold || estimatedInputTokens >= blockingThreshold,
+    persistedCompactionEventRefs: [...(params.persistedCompactionEventRefs ?? [])],
   };
 }
 

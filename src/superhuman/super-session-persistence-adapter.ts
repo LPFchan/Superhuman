@@ -2,12 +2,15 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../agents/agent-scope.js";
+import { resolveSandboxRuntimeStatus } from "../agents/sandbox/runtime-status.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveSessionKeyForTranscriptFile } from "../gateway/session-transcript-key.js";
 import { loadGatewaySessionRow, loadSessionEntry } from "../gateway/session-utils.js";
 import { loadCombinedSessionStoreForGateway } from "../gateway/session-utils.js";
 import type { AgentEventPayload } from "../infra/agent-events.js";
 import { onAgentEvent } from "../infra/agent-events.js";
+import { inspectBundleLspRuntimeSupport } from "../plugins/bundle-lsp.js";
+import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
 import { normalizeInputProvenance } from "../sessions/input-provenance.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionStoreMutation } from "../sessions/session-store-events.js";
@@ -20,7 +23,11 @@ import {
   type ContextPressureSnapshotOptions,
 } from "./super-context-pressure.js";
 import type {
+  StateArtifactAppend,
   StateEvidenceProvenance,
+  SuperArtifactRelationship,
+  SuperShellCapabilitySnapshot,
+  SuperSandboxRuntimeSnapshot,
   StateStore,
   StateStructuredDetails,
   StateSessionUpsert,
@@ -38,6 +45,17 @@ function normalizePathForComparison(input: string): string {
 
 function isLifecycleStream(event: AgentEventPayload): boolean {
   return event.stream === "lifecycle";
+}
+
+function hasUnsafeControlChars(value: string): boolean {
+  return Array.from(value).some((char) => {
+    const codePoint = char.codePointAt(0) ?? 0;
+    return codePoint < 0x20 || codePoint === 0x7f;
+  });
+}
+
+function shellEscapeSingleArg(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 function resolveLifecyclePhase(event: AgentEventPayload): "start" | "end" | "error" | null {
@@ -108,6 +126,18 @@ function extractMessageText(message: unknown): string {
     .filter((part) => part.trim().length > 0)
     .join("\n")
     .trim();
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function resolveTranscriptMessageId(update: SessionTranscriptUpdate): string | undefined {
@@ -265,11 +295,238 @@ function buildTranscriptArtifactMetadata(update: SessionTranscriptUpdate): State
   };
 }
 
+function resolveSemanticToolProviderIds(registry?: OpenClawPluginRegistry): string[] {
+  if (!registry) {
+    return [];
+  }
+  const providerIds = new Set<string>();
+  for (const plugin of registry.plugins) {
+    if (
+      plugin.format === "bundle" &&
+      plugin.bundleFormat &&
+      plugin.rootDir &&
+      (plugin.bundleCapabilities ?? []).includes("lspServers")
+    ) {
+      const support = inspectBundleLspRuntimeSupport({
+        pluginId: plugin.id,
+        rootDir: plugin.rootDir,
+        bundleFormat: plugin.bundleFormat,
+      });
+      if (support.hasStdioServer) {
+        providerIds.add(plugin.id);
+      }
+    }
+    if (
+      plugin.toolNames.some((toolName) => {
+        const normalized = toolName.trim().toLowerCase();
+        return normalized.startsWith("lsp_references_");
+      })
+    ) {
+      providerIds.add(plugin.id);
+    }
+  }
+  return [...providerIds].toSorted();
+}
+
+function resolveSupportsSemanticRename(registry?: OpenClawPluginRegistry): boolean {
+  if (!registry) {
+    return false;
+  }
+  return registry.plugins.some((plugin) =>
+    plugin.toolNames.some((toolName) => {
+      const normalized = toolName.trim().toLowerCase();
+      return normalized === "symbol_rename" || normalized === "vscode_renamesymbol";
+    }),
+  );
+}
+
+function resolveShellCapabilitySnapshot(params: {
+  cfg: OpenClawConfig;
+  sessionKey: string;
+  pluginRegistry?: OpenClawPluginRegistry;
+}): SuperShellCapabilitySnapshot {
+  const sessionKey = params.sessionKey.trim();
+  const agentId = resolveSessionAgentId({ sessionKey, config: params.cfg });
+  const mainSessionKey = resolveSandboxRuntimeStatus({
+    cfg: params.cfg,
+    sessionKey,
+  }).mainSessionKey;
+  const semanticToolProviderIds = resolveSemanticToolProviderIds(params.pluginRegistry);
+  const supportsSymbolReferences = semanticToolProviderIds.length > 0;
+  const supportsSemanticRename = resolveSupportsSemanticRename(params.pluginRegistry);
+  const mode = supportsSemanticRename
+    ? "semantic_rename"
+    : supportsSymbolReferences
+      ? "symbol_references"
+      : "workspace_search_only";
+  return {
+    sessionKey,
+    agentId,
+    mainSessionKey,
+    createdAt: Date.now(),
+    mode,
+    supportsSymbolReferences,
+    supportsSemanticRename,
+    supportsWorkspaceSearchOnly: mode === "workspace_search_only",
+    semanticToolProviderIds,
+    workspaceSearchFallbackToolKinds: ["read", "exec"],
+  };
+}
+
+function resolveSandboxRuntimeSnapshot(params: {
+  cfg: OpenClawConfig;
+  sessionKey: string;
+}): SuperSandboxRuntimeSnapshot {
+  const runtime = resolveSandboxRuntimeStatus({
+    cfg: params.cfg,
+    sessionKey: params.sessionKey,
+  });
+  const explainCommand = runtime.sessionKey
+    ? hasUnsafeControlChars(runtime.sessionKey)
+      ? `openclaw sandbox explain --agent ${runtime.agentId}`
+      : `openclaw sandbox explain --session ${shellEscapeSingleArg(runtime.sessionKey)}`
+    : "openclaw sandbox explain";
+  return {
+    sessionKey: runtime.sessionKey,
+    agentId: runtime.agentId,
+    mainSessionKey: runtime.mainSessionKey,
+    createdAt: Date.now(),
+    mode: runtime.mode,
+    sandboxed: runtime.sandboxed,
+    toolPolicy: {
+      allow: [...runtime.toolPolicy.allow],
+      deny: [...runtime.toolPolicy.deny],
+      sourceKeys: {
+        allow: runtime.toolPolicy.sources.allow.key,
+        deny: runtime.toolPolicy.sources.deny.key,
+      },
+    },
+    remediation: {
+      explainCommand,
+      disableSandboxConfigKey: "agents.defaults.sandbox.mode=off",
+      suggestMainSession: runtime.mode === "non-main",
+    },
+  };
+}
+
+function buildProvenanceArtifacts(params: {
+  sessionKey: string;
+  createdAt: number;
+  transcriptMessageId?: string;
+  messageId: string;
+  provenance?: StateEvidenceProvenance;
+  message: unknown;
+}): StateArtifactAppend[] {
+  const meta = resolveOpenClawMeta(params.message);
+  const artifactKey = params.transcriptMessageId ?? params.messageId;
+  const artifacts: StateArtifactAppend[] = [];
+
+  let fullArtifactId: string | undefined;
+  const storagePath =
+    normalizeOptionalString(meta?.storagePath) ??
+    normalizeOptionalString(meta?.storage_path) ??
+    normalizeOptionalString(meta?.fullStoragePath) ??
+    normalizeOptionalString(meta?.full_storage_path);
+  const fullBytes =
+    normalizeOptionalNumber(meta?.fullBytes) ?? normalizeOptionalNumber(meta?.full_bytes);
+  if (storagePath || fullBytes !== undefined) {
+    fullArtifactId = `full:${params.sessionKey}:${artifactKey}`;
+    artifacts.push({
+      artifactId: fullArtifactId,
+      sessionKey: params.sessionKey,
+      messageId: params.messageId,
+      kind: "full-output",
+      label: "Persisted full output",
+      location: storagePath,
+      createdAt: params.createdAt,
+      provenance: params.provenance,
+      fullBytes,
+      storagePath,
+      metadata: {
+        transcriptMessageId: params.transcriptMessageId,
+      },
+    });
+  }
+
+  if (params.provenance?.persistedPreview) {
+    const previewArtifactId = `preview:${params.sessionKey}:${artifactKey}`;
+    if (params.provenance) {
+      params.provenance.previewArtifactId = previewArtifactId;
+      if (fullArtifactId) {
+        params.provenance.fullArtifactId = fullArtifactId;
+      }
+    }
+    artifacts.push({
+      artifactId: previewArtifactId,
+      sessionKey: params.sessionKey,
+      messageId: params.messageId,
+      kind: "persisted-preview",
+      label: "Persisted preview",
+      createdAt: params.createdAt,
+      provenance: params.provenance,
+      relationshipKind: "preview-of" satisfies SuperArtifactRelationship,
+      fullArtifactId,
+      previewBytes:
+        normalizeOptionalNumber(meta?.previewBytes) ?? normalizeOptionalNumber(meta?.preview_bytes),
+      fullBytes,
+      storagePath,
+      metadata: {
+        transcriptMessageId: params.transcriptMessageId,
+        descriptor: params.provenance.descriptor,
+      },
+    });
+  }
+
+  if (params.provenance?.partialRead) {
+    const partialArtifactId = `partial-read:${params.sessionKey}:${artifactKey}`;
+    if (params.provenance) {
+      params.provenance.partialReadArtifactId = partialArtifactId;
+      if (fullArtifactId) {
+        params.provenance.fullArtifactId = fullArtifactId;
+      }
+    }
+    artifacts.push({
+      artifactId: partialArtifactId,
+      sessionKey: params.sessionKey,
+      messageId: params.messageId,
+      kind: "partial-read-descriptor",
+      label: "Partial read descriptor",
+      createdAt: params.createdAt,
+      provenance: params.provenance,
+      relationshipKind: "partial-read-for" satisfies SuperArtifactRelationship,
+      fullArtifactId,
+      reopenedAt:
+        normalizeOptionalNumber(meta?.reopenedAt) ?? normalizeOptionalNumber(meta?.reopened_at),
+      partialReadDescriptor: {
+        startLine:
+          normalizeOptionalNumber(meta?.startLine) ?? normalizeOptionalNumber(meta?.start_line),
+        endLine: normalizeOptionalNumber(meta?.endLine) ?? normalizeOptionalNumber(meta?.end_line),
+        startByte:
+          normalizeOptionalNumber(meta?.startByte) ?? normalizeOptionalNumber(meta?.start_byte),
+        endByte: normalizeOptionalNumber(meta?.endByte) ?? normalizeOptionalNumber(meta?.end_byte),
+        omittedBytes:
+          normalizeOptionalNumber(meta?.omittedBytes) ??
+          normalizeOptionalNumber(meta?.omitted_bytes),
+        byteLimit:
+          normalizeOptionalNumber(meta?.byteLimit) ?? normalizeOptionalNumber(meta?.byte_limit),
+        strategy: normalizeOptionalString(meta?.strategy),
+      },
+      metadata: {
+        transcriptMessageId: params.transcriptMessageId,
+        descriptor: params.provenance.descriptor,
+      },
+    });
+  }
+
+  return artifacts;
+}
+
 function resolveSessionSnapshot(params: {
   cfg: OpenClawConfig;
   workspaceDir: string;
   sessionKey: string;
   runId?: string;
+  pluginRegistry?: OpenClawPluginRegistry;
 }): StateSessionUpsert | null {
   const agentId = resolveSessionAgentId({ sessionKey: params.sessionKey, config: params.cfg });
   const workspaceDir = resolveAgentWorkspaceDir(params.cfg, agentId);
@@ -294,6 +551,15 @@ function resolveSessionSnapshot(params: {
     displayName: gatewayRow?.displayName ?? loaded.entry?.displayName,
     label: gatewayRow?.label ?? loaded.entry?.label,
     parentSessionKey: gatewayRow?.parentSessionKey ?? loaded.entry?.parentSessionKey,
+    capabilitySnapshot: resolveShellCapabilitySnapshot({
+      cfg: params.cfg,
+      sessionKey: params.sessionKey,
+      pluginRegistry: params.pluginRegistry,
+    }),
+    sandboxRuntime: resolveSandboxRuntimeSnapshot({
+      cfg: params.cfg,
+      sessionKey: params.sessionKey,
+    }),
   };
 }
 
@@ -301,6 +567,7 @@ function resolveSessionSnapshotFromEntry(params: {
   cfg: OpenClawConfig;
   workspaceDir: string;
   sessionKey: string;
+  pluginRegistry?: OpenClawPluginRegistry;
   entry: {
     sessionId?: string;
     executionRole?: "lead" | "worker" | "subagent" | "remote_peer";
@@ -336,6 +603,15 @@ function resolveSessionSnapshotFromEntry(params: {
     displayName: params.entry.displayName,
     label: params.entry.label,
     parentSessionKey: params.entry.parentSessionKey,
+    capabilitySnapshot: resolveShellCapabilitySnapshot({
+      cfg: params.cfg,
+      sessionKey: params.sessionKey,
+      pluginRegistry: params.pluginRegistry,
+    }),
+    sandboxRuntime: resolveSandboxRuntimeSnapshot({
+      cfg: params.cfg,
+      sessionKey: params.sessionKey,
+    }),
   };
 }
 
@@ -357,6 +633,7 @@ export class SuperSessionPersistenceAdapter {
       cfg: OpenClawConfig;
       workspaceDir: string;
       stateStore: StateStore;
+      pluginRegistry?: OpenClawPluginRegistry;
     },
   ) {}
 
@@ -375,6 +652,32 @@ export class SuperSessionPersistenceAdapter {
     }
   }
 
+  private projectSessionSnapshot(snapshot: StateSessionUpsert): void {
+    this.params.stateStore.upsertSession(snapshot);
+    if (!snapshot.capabilitySnapshot && !snapshot.sandboxRuntime) {
+      return;
+    }
+    const createdAt = snapshot.updatedAt ?? snapshot.startedAt ?? snapshot.endedAt ?? Date.now();
+    this.params.stateStore.appendAction({
+      actionId: `session:${snapshot.sessionKey}:capability-negotiation`,
+      sessionKey: snapshot.sessionKey,
+      runId: snapshot.sessionId,
+      actionType: "super.session.capability-negotiation",
+      actionKind: "capability_negotiation",
+      summary: "Advertised shell capability and sandbox state",
+      status: "completed",
+      createdAt,
+      completedAt: createdAt,
+      capabilitySnapshot: snapshot.capabilitySnapshot,
+      sandboxRuntime: snapshot.sandboxRuntime,
+      details: {
+        executionRole: snapshot.executionRole,
+        status: snapshot.status,
+        parentSessionKey: snapshot.parentSessionKey,
+      },
+    });
+  }
+
   private seedSessions(): void {
     const { store } = loadCombinedSessionStoreForGateway(this.params.cfg);
     for (const sessionKey of Object.keys(store)) {
@@ -382,9 +685,10 @@ export class SuperSessionPersistenceAdapter {
         cfg: this.params.cfg,
         workspaceDir: this.params.workspaceDir,
         sessionKey,
+        pluginRegistry: this.params.pluginRegistry,
       });
       if (snapshot) {
-        this.params.stateStore.upsertSession(snapshot);
+        this.projectSessionSnapshot(snapshot);
       }
     }
   }
@@ -394,11 +698,12 @@ export class SuperSessionPersistenceAdapter {
       cfg: this.params.cfg,
       workspaceDir: this.params.workspaceDir,
       sessionKey: event.sessionKey,
+      pluginRegistry: this.params.pluginRegistry,
     });
     if (!snapshot) {
       return;
     }
-    this.params.stateStore.upsertSession(snapshot);
+    this.projectSessionSnapshot(snapshot);
   }
 
   private onSessionStoreMutation(event: {
@@ -424,12 +729,13 @@ export class SuperSessionPersistenceAdapter {
       cfg: this.params.cfg,
       workspaceDir: this.params.workspaceDir,
       sessionKey: event.sessionKey,
+      pluginRegistry: this.params.pluginRegistry,
       entry: event.entry,
     });
     if (!snapshot) {
       return;
     }
-    this.params.stateStore.upsertSession(snapshot);
+    this.projectSessionSnapshot(snapshot);
   }
 
   private onAgentEvent(event: AgentEventPayload): void {
@@ -445,6 +751,7 @@ export class SuperSessionPersistenceAdapter {
       workspaceDir: this.params.workspaceDir,
       sessionKey: event.sessionKey,
       runId: event.runId,
+      pluginRegistry: this.params.pluginRegistry,
     });
     if (!snapshot) {
       return;
@@ -461,16 +768,19 @@ export class SuperSessionPersistenceAdapter {
       snapshot.endedAt = endedAt;
       snapshot.updatedAt = endedAt;
     }
-    this.params.stateStore.upsertSession(snapshot);
+    this.projectSessionSnapshot(snapshot);
     this.params.stateStore.appendAction({
       actionId: `${event.runId}:lifecycle:${phase}`,
       sessionKey: event.sessionKey,
       runId: event.runId,
       actionType: "agent.lifecycle",
+      actionKind: "agent_lifecycle",
       summary: resolveActionSummary(event, phase),
       status: resolveActionStatus(phase),
       createdAt: event.ts,
       completedAt: phase === "start" ? undefined : event.ts,
+      capabilitySnapshot: snapshot.capabilitySnapshot,
+      sandboxRuntime: snapshot.sandboxRuntime,
     });
     if (phase === "end" || phase === "error") {
       this.params.stateStore.recordContextPressureSnapshot({
@@ -493,11 +803,12 @@ export class SuperSessionPersistenceAdapter {
       cfg: this.params.cfg,
       workspaceDir: this.params.workspaceDir,
       sessionKey,
+      pluginRegistry: this.params.pluginRegistry,
     });
     if (!snapshot) {
       return;
     }
-    this.params.stateStore.upsertSession(snapshot);
+    this.projectSessionSnapshot(snapshot);
     if (!update.message || typeof update.message !== "object") {
       return;
     }
@@ -513,22 +824,24 @@ export class SuperSessionPersistenceAdapter {
         ? timestampValue
         : Date.now();
     const sequence = resolveTranscriptSequence(update);
+    const provenance = resolveMessageProvenance(update.message);
+    const messageId = resolveMessageId({
+      sessionKey,
+      update,
+      role,
+      contentText,
+      createdAt,
+      sequence,
+    });
     this.params.stateStore.appendMessage({
-      messageId: resolveMessageId({
-        sessionKey,
-        update,
-        role,
-        contentText,
-        createdAt,
-        sequence,
-      }),
+      messageId,
       sessionKey,
       role,
       contentText,
       createdAt,
       transcriptMessageId: resolveTranscriptMessageId(update),
       sequence,
-      provenance: resolveMessageProvenance(update.message),
+      provenance,
     });
     this.params.stateStore.appendArtifact({
       artifactId: `transcript:${sessionKey}:${update.sessionFile}`,
@@ -537,8 +850,18 @@ export class SuperSessionPersistenceAdapter {
       label: "Session transcript",
       location: update.sessionFile,
       createdAt,
-      provenance: resolveMessageProvenance(update.message),
+      provenance,
       metadata: buildTranscriptArtifactMetadata(update),
     });
+    for (const artifact of buildProvenanceArtifacts({
+      sessionKey,
+      createdAt,
+      transcriptMessageId: resolveTranscriptMessageId(update),
+      messageId,
+      provenance,
+      message: update.message,
+    })) {
+      this.params.stateStore.appendArtifact(artifact);
+    }
   }
 }

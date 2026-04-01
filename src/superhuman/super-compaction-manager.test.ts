@@ -36,9 +36,13 @@ describe("SuperContextEngineCompactionManager", () => {
   const stateStore = {
     getContextPressureSnapshot: vi.fn(),
     recordContextPressureSnapshot: vi.fn(),
+    appendAction: vi.fn(),
+    appendArtifact: vi.fn(),
   } as unknown as {
     getContextPressureSnapshot: ReturnType<typeof vi.fn>;
     recordContextPressureSnapshot: ReturnType<typeof vi.fn>;
+    appendAction: ReturnType<typeof vi.fn>;
+    appendArtifact: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -57,12 +61,17 @@ describe("SuperContextEngineCompactionManager", () => {
       configuredContextLimit: 200,
       reservedOutputTokens: 32,
       effectiveContextLimit: 168,
+      autocompactBufferTokens: 78,
+      blockingBufferTokens: 48,
       autocompactThreshold: 90,
       blockingThreshold: 120,
       remainingBudget: 73,
       overflowRisk: true,
+      persistedCompactionEventRefs: [],
     });
     stateStore.recordContextPressureSnapshot.mockReset();
+    stateStore.appendAction.mockReset();
+    stateStore.appendArtifact.mockReset();
     hoisted.ensureContextEnginesInitializedMock.mockReset();
     hoisted.resolveContextEngineMock.mockReset();
     hoisted.loadSessionEntryMock.mockReset().mockReturnValue({
@@ -126,7 +135,14 @@ describe("SuperContextEngineCompactionManager", () => {
         compactionTarget: "threshold",
       }),
     );
-    expect(stateStore.recordContextPressureSnapshot).not.toHaveBeenCalled();
+    expect(stateStore.recordContextPressureSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: "agent:main:main",
+        runId: "session-1",
+        configuredContextLimit: 200,
+        reservedOutputTokens: 32,
+      }),
+    );
     expect(dispose).toHaveBeenCalledOnce();
   });
 
@@ -148,10 +164,13 @@ describe("SuperContextEngineCompactionManager", () => {
       configuredContextLimit: 200,
       reservedOutputTokens: 32,
       effectiveContextLimit: 168,
+      autocompactBufferTokens: 78,
+      blockingBufferTokens: 48,
       autocompactThreshold: 90,
       blockingThreshold: 120,
       remainingBudget: 28,
       overflowRisk: true,
+      persistedCompactionEventRefs: [],
     });
 
     const manager = new SuperContextEngineCompactionManager({
@@ -180,7 +199,7 @@ describe("SuperContextEngineCompactionManager", () => {
       stateStore: stateStore as never,
     });
 
-    await expect(manager.compact("agent:main:main")).resolves.toEqual({
+    await expect(manager.compact("agent:main:main")).resolves.toMatchObject({
       status: "unavailable",
       reason: "transcript-not-found",
     });
