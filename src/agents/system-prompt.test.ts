@@ -187,6 +187,22 @@ describe("buildAgentSystemPrompt", () => {
     );
   });
 
+  it("adds coordinator guidance for lead sessions", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      executionRole: "lead",
+      toolNames: ["sessions_spawn", "sessions_send", "subagents"],
+    });
+
+    expect(prompt).toContain("## Coordinator Mode");
+    expect(prompt).toContain(
+      "Worker results and <task-notification> envelopes are internal signals",
+    );
+    expect(prompt).toContain("Use `sessions_spawn` for new workers.");
+    expect(prompt).toContain("Use `sessions_send` to continue an existing worker");
+    expect(prompt).toContain("<status>queued|running|completed|failed|killed|refused</status>");
+  });
+
   it("omits skills in minimal prompt mode when skillsPrompt is absent", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",

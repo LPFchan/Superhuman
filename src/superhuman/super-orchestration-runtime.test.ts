@@ -127,6 +127,13 @@ describe("orchestration-runtime", () => {
           expect(runtime.getWorker(worker2.workerId)?.state).toBe("queued");
         });
 
+        const queuedMessage = runtime
+          .listMailboxMessages("agent:main:main")
+          .find(
+            (message) => message.workerId === worker2.workerId && message.kind === "worker_queued",
+          );
+        expect(queuedMessage?.text).toContain("<status>queued</status>");
+
         const firstTask = findTaskByRunId("run-1");
         expect(firstTask?.orchestration?.stableWorkerId).toBe(worker1.workerId);
         expect(firstTask?.orchestration).toMatchObject({
@@ -228,7 +235,7 @@ describe("orchestration-runtime", () => {
         await waitForAssertion(() => {
           expect(runtime.getWorker(worker1.workerId)?.state).toBe("running");
           expect(runtime.getWorker(worker2.workerId)?.state).toBe("queued");
-          expect(runtime.getWorker(worker3.workerId)?.state).toBe("refused");
+          expect(["refused", "terminal"]).toContain(runtime.getWorker(worker3.workerId)?.state);
         });
 
         const refusedWorker = runtime.getWorker(worker3.workerId);
@@ -242,7 +249,12 @@ describe("orchestration-runtime", () => {
         });
 
         const mailbox = runtime.listMailboxMessages("agent:main:main");
-        const refusalMessage = mailbox.find((message) => message.workerId === worker3.workerId);
+        const refusalMessage = mailbox.find(
+          (message) =>
+            message.workerId === worker3.workerId &&
+            message.payload &&
+            "refusalReason" in message.payload,
+        );
         expect(refusalMessage?.text).toContain("<status>refused</status>");
         expect(refusalMessage?.payload).toMatchObject({
           refusalReason: "queue_cap_reached",

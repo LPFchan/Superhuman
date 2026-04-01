@@ -145,6 +145,12 @@ function buildQueuedMessage(worker: OrchestrationWorkerRecord): string {
   return `Worker queued: ${label}.`;
 }
 
+function buildQueuedSummary(worker: OrchestrationWorkerRecord): string {
+  const position =
+    typeof worker.queuePosition === "number" ? ` (queue position ${worker.queuePosition})` : "";
+  return `${buildQueuedMessage(worker)}${position}`;
+}
+
 function buildApprovalText(params: {
   kind: "exec" | "plugin";
   action: "requested" | "resolved";
@@ -207,6 +213,9 @@ function buildTaskNotificationEnvelope(params: {
 }
 
 function mapTaskStatusToCoordinatorStatus(task: TaskRecord): CoordinatorNotificationStatus {
+  if (task.orchestration?.queueState === "refused" || task.orchestration?.refusalReason) {
+    return "refused";
+  }
   if (task.status === "succeeded") {
     return task.terminalOutcome === "blocked" ? "failed" : "completed";
   }
@@ -410,14 +419,21 @@ function hydrateWorkerFromTask(params: {
   worker: OrchestrationWorkerRecord;
   task: TaskRecord;
 }): OrchestrationWorkerRecord {
+  const queueState = params.task.orchestration?.queueState;
   return (
     params.store.patchWorker(params.worker.workerId, {
       taskId: params.task.taskId,
       childSessionKey: params.task.childSessionKey,
       runId: params.task.runId,
       taskStatus: params.task.status,
-      state: isTerminalTaskStatus(params.task.status) ? "terminal" : "running",
+      state:
+        queueState === "refused"
+          ? "refused"
+          : isTerminalTaskStatus(params.task.status)
+            ? "terminal"
+            : "running",
       updatedAt: Date.now(),
+      refusalReason: params.task.orchestration?.refusalReason,
     }) ?? params.worker
   );
 }
@@ -512,7 +528,7 @@ export function startSuperOrchestrationRuntime(params: {
         taskId: task.taskId,
         patch: {
           orchestration: {
-            queueState: "terminal",
+            queueState: task.orchestration?.queueState === "refused" ? "refused" : "terminal",
             budgetUsed:
               typeof task.startedAt === "number" && typeof task.endedAt === "number"
                 ? Math.max(0, task.endedAt - task.startedAt)
@@ -1117,6 +1133,10 @@ export function startSuperOrchestrationRuntime(params: {
           patch: {
             endedAt: now,
             lastEventAt: now,
+            orchestration: {
+              queueState: "refused",
+              refusalReason: "queue_cap_reached",
+            },
           },
         });
         queueMailboxMessage({
@@ -1143,6 +1163,34 @@ export function startSuperOrchestrationRuntime(params: {
           recipientSessionKey: saved.controllerSessionKey,
         });
         return saved;
+      }
+      if (activeWorkers.length >= queuePolicy.maxConcurrentWorkersPerLead) {
+        queueMailboxMessage({
+          store,
+          recipientSessionKey: saved.controllerSessionKey,
+          workerId: saved.workerId,
+          kind: "worker_queued",
+          text: buildTaskNotificationEnvelope({
+            worker: saved,
+            status: "queued",
+            summary: buildQueuedSummary(saved),
+            usage: {
+              queueDelayMs: 0,
+            },
+          }),
+          payload: {
+            queueState: "queued",
+            queuePosition: saved.queuePosition,
+            queueDrainPolicy: queuePolicy.queueDrainPolicy,
+            maxConcurrentWorkersPerLead: queuePolicy.maxConcurrentWorkersPerLead,
+            maxQueuedWorkersPerLead: queuePolicy.maxQueuedWorkersPerLead,
+            taskId: taskRecord.taskId,
+          },
+        });
+        drainMailboxForSession({
+          store,
+          recipientSessionKey: saved.controllerSessionKey,
+        });
       }
       void processQueue(saved.controllerSessionKey);
       return saved;

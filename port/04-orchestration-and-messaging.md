@@ -24,7 +24,7 @@ Implementation scope:
 
 1. Introduce explicit execution roles.
 
-- Add runtime role types: `lead`, `worker`, `subagent`, `remote_peer`.
+- Add runtime role types for this phase: `lead`, `worker`, `subagent`.
 - Store role and parent-child linkage in the state database.
 - Record per-worker budget inheritance and queue state in the durable task model, not only the live runtime.
 
@@ -93,6 +93,7 @@ Deliverables:
 - Durable mailbox transport with delivery-state handling.
 - Permission relay and worker task-state normalization.
 - Worker cap, queue, and budget accounting that survive restarts.
+- Phase contract matches runtime reality by deferring `remote_peer` until a real transport exists.
 
 Exit criteria:
 
@@ -106,4 +107,5 @@ Out of scope:
 
 - Proactive wake loops and scheduled automation.
 - Remote environment negotiation.
+- `remote_peer` runtime transport and negotiation.
 - Computer-use capability surfaces.

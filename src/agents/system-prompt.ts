@@ -2,6 +2,7 @@ import { createHmac, createHash } from "node:crypto";
 import type { ReasoningLevel, ThinkLevel } from "../auto-reply/thinking.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
+import { loadGatewaySessionRow } from "../gateway/session-utils.js";
 import { buildSuperFrozenMemoryPromptSection } from "../superhuman/super-frozen-memory-prompt.js";
 import { listDeliverableMessageChannels } from "../utils/message-channel.js";
 import type { ResolvedTimeFormat } from "./date-time.js";
@@ -148,6 +149,53 @@ function buildMessagingSection(params: {
   ];
 }
 
+function resolvePromptExecutionRole(params: {
+  executionRole?: "lead" | "worker" | "subagent" | "remote_peer";
+  sessionKey?: string;
+}) {
+  if (params.executionRole) {
+    return params.executionRole;
+  }
+  const sessionKey = params.sessionKey?.trim();
+  return sessionKey ? loadGatewaySessionRow(sessionKey)?.executionRole : undefined;
+}
+
+function buildCoordinatorSection(params: {
+  executionRole?: "lead" | "worker" | "subagent" | "remote_peer";
+  toolNames: Set<string>;
+  isMinimal: boolean;
+}) {
+  if (params.isMinimal || params.executionRole !== "lead") {
+    return [];
+  }
+  const hasSpawn = params.toolNames.has("sessions_spawn");
+  const hasSend = params.toolNames.has("sessions_send");
+  const hasSubagents = params.toolNames.has("subagents");
+  if (!hasSpawn && !hasSend && !hasSubagents) {
+    return [];
+  }
+  return [
+    "## Coordinator Mode",
+    "You are the lead coordinator for this session.",
+    "Worker results and <task-notification> envelopes are internal signals, not conversation partners.",
+    "Do not thank or address workers directly. Summarize useful updates for the user in your own voice.",
+    "Answer directly when you can; delegate only when the task benefits from parallel research, implementation, or verification.",
+    hasSpawn
+      ? "- Use `sessions_spawn` for new workers. Do not delegate trivial file reads or status polling."
+      : "",
+    hasSend
+      ? "- Use `sessions_send` to continue an existing worker when its prior context is valuable."
+      : "",
+    hasSubagents
+      ? "- Use `subagents` to inspect, steer, or stop subagent-backed workers when the direction changes."
+      : "",
+    "Treat normalized task notifications as the source of truth for worker lifecycle state.",
+    "Expected worker envelope shape:",
+    "<task-notification><task-id>worker-id</task-id><status>queued|running|completed|failed|killed|refused</status><summary>...</summary></task-notification>",
+    "",
+  ].filter(Boolean);
+}
+
 function buildVoiceSection(params: { isMinimal: boolean; ttsHint?: string }) {
   if (params.isMinimal) {
     return [];
@@ -188,6 +236,7 @@ function buildExecApprovalPromptGuidance(params: { runtimeChannel?: string }) {
 export function buildAgentSystemPrompt(params: {
   workspaceDir: string;
   sessionKey?: string;
+  executionRole?: "lead" | "worker" | "subagent" | "remote_peer";
   defaultThinkLevel?: ThinkLevel;
   reasoningLevel?: ReasoningLevel;
   extraSystemPrompt?: string;
@@ -315,6 +364,10 @@ export function buildAgentSystemPrompt(params: {
 
   const normalizedTools = canonicalToolNames.map((tool) => tool.toLowerCase());
   const availableTools = new Set(normalizedTools);
+  const executionRole = resolvePromptExecutionRole({
+    executionRole: params.executionRole,
+    sessionKey: params.sessionKey,
+  });
   const hasSessionsSpawn = availableTools.has("sessions_spawn");
   const acpHarnessSpawnAllowed = hasSessionsSpawn && acpSpawnRuntimeEnabled;
   const externalToolSummaries = new Map<string, string>();
@@ -413,6 +466,11 @@ export function buildAgentSystemPrompt(params: {
     isMinimal,
     readToolName,
   });
+  const coordinatorSection = buildCoordinatorSection({
+    executionRole,
+    toolNames: availableTools,
+    isMinimal,
+  });
   const workspaceNotes = (params.workspaceNotes ?? []).map((note) => note.trim()).filter(Boolean);
 
   // For "none" mode, return just the basic identity line
@@ -483,6 +541,7 @@ export function buildAgentSystemPrompt(params: {
     "If unsure, ask the user to run `openclaw help` (or `openclaw gateway --help`) and paste the output.",
     "",
     ...skillsSection,
+    ...coordinatorSection,
     ...memorySection,
     // Skip self-update for subagent/none modes
     hasGateway && !isMinimal ? "## OpenClaw Self-Update" : "",

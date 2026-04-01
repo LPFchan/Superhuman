@@ -6,12 +6,23 @@ import { resolveSuperhumanStateDir } from "./super-state-store.js";
 export type OrchestrationWorkerState = "queued" | "launching" | "running" | "terminal" | "refused";
 
 export type OrchestrationMailboxMessageKind =
+  | "worker_queued"
   | "worker_started"
   | "worker_terminal"
   | "approval_requested"
   | "approval_resolved";
 
-export type OrchestrationMailboxDeliveryStatus = "stored" | "session_queued";
+export type OrchestrationMailboxDeliveryStatus =
+  | "stored"
+  | "idle_delivered"
+  | "session_queued"
+  | "drained";
+
+export type OrchestrationApprovalHistoryEntry = {
+  status: "requested" | "approved" | "denied" | "expired";
+  at: number;
+  payload?: Record<string, unknown>;
+};
 
 export type OrchestrationWorkerRecord = {
   workerId: string;
@@ -29,6 +40,11 @@ export type OrchestrationWorkerRecord = {
   runId?: string;
   lastError?: string;
   taskStatus?: string;
+  refusalReason?: string;
+  queuePosition?: number;
+  queueEnteredAt?: number;
+  queueStartedAt?: number;
+  queueDrainPolicy?: "oldest_first";
   launchRequest: Record<string, unknown>;
 };
 
@@ -40,7 +56,9 @@ export type OrchestrationMailboxMessageRecord = {
   kind: OrchestrationMailboxMessageKind;
   createdAt: number;
   deliveryStatus: OrchestrationMailboxDeliveryStatus;
+  deliveryStateUpdatedAt?: number;
   deliveredAt?: number;
+  correlationId?: string;
   text: string;
   payload?: Record<string, unknown>;
 };
@@ -57,6 +75,7 @@ export type OrchestrationApprovalRecord = {
   status: "requested" | "approved" | "denied" | "expired";
   requestPayload?: Record<string, unknown>;
   resolutionPayload?: Record<string, unknown>;
+  history: OrchestrationApprovalHistoryEntry[];
 };
 
 type OrchestrationStoreSnapshot = {
@@ -85,6 +104,7 @@ function cloneMailbox(
 ): OrchestrationMailboxMessageRecord {
   return {
     ...record,
+    ...(record.correlationId ? { correlationId: record.correlationId } : {}),
     ...(record.payload ? { payload: { ...record.payload } } : {}),
   };
 }
@@ -94,6 +114,10 @@ function cloneApproval(record: OrchestrationApprovalRecord): OrchestrationApprov
     ...record,
     ...(record.requestPayload ? { requestPayload: { ...record.requestPayload } } : {}),
     ...(record.resolutionPayload ? { resolutionPayload: { ...record.resolutionPayload } } : {}),
+    history: (record.history ?? []).map((entry) => ({
+      ...entry,
+      ...(entry.payload ? { payload: { ...entry.payload } } : {}),
+    })),
   };
 }
 
@@ -151,6 +175,10 @@ export type OrchestrationStore = {
     patch: Partial<OrchestrationWorkerRecord>,
   ) => OrchestrationWorkerRecord | undefined;
   listMailbox: (recipientSessionKey?: string) => OrchestrationMailboxMessageRecord[];
+  patchMailbox: (
+    messageId: string,
+    patch: Partial<OrchestrationMailboxMessageRecord>,
+  ) => OrchestrationMailboxMessageRecord | undefined;
   appendMailbox: (
     record: Omit<OrchestrationMailboxMessageRecord, "messageId" | "createdAt"> & {
       messageId?: string;
@@ -230,6 +258,30 @@ export function createSuperOrchestrationStore(params: {
       return filtered.map((record) => cloneMailbox(record));
     },
 
+    patchMailbox: (messageId, patch) => {
+      const trimmed = messageId.trim();
+      const index = snapshot.mailbox.findIndex((record) => record.messageId === trimmed);
+      if (index < 0) {
+        return undefined;
+      }
+      const current = snapshot.mailbox[index];
+      const next: OrchestrationMailboxMessageRecord = {
+        ...current,
+        ...patch,
+        ...(patch.payload || current.payload
+          ? {
+              payload: {
+                ...current.payload,
+                ...patch.payload,
+              },
+            }
+          : {}),
+      };
+      snapshot.mailbox[index] = next;
+      save();
+      return cloneMailbox(next);
+    },
+
     appendMailbox: (record) => {
       const next: OrchestrationMailboxMessageRecord = {
         messageId: record.messageId?.trim() || crypto.randomUUID(),
@@ -239,7 +291,9 @@ export function createSuperOrchestrationStore(params: {
         kind: record.kind,
         createdAt: record.createdAt ?? Date.now(),
         deliveryStatus: record.deliveryStatus,
+        deliveryStateUpdatedAt: record.deliveryStateUpdatedAt,
         deliveredAt: record.deliveredAt,
+        correlationId: record.correlationId?.trim() || undefined,
         text: record.text,
         payload: record.payload ? { ...record.payload } : undefined,
       };
