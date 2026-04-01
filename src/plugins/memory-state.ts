@@ -9,6 +9,7 @@ import type {
 export type MemoryPromptSectionBuilder = (params: {
   availableTools: Set<string>;
   citationsMode?: MemoryCitationsMode;
+  sessionKey?: string;
 }) => string[];
 
 export type MemoryFlushPlan = {
@@ -82,6 +83,7 @@ export function registerMemoryPromptSection(builder: MemoryPromptSectionBuilder)
 export function buildMemoryPromptSection(params: {
   availableTools: Set<string>;
   citationsMode?: MemoryCitationsMode;
+  sessionKey?: string;
 }): string[] {
   return memoryPluginState.promptBuilder?.(params) ?? [];
 }

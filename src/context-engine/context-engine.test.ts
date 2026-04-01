@@ -8,6 +8,7 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 // ---------------------------------------------------------------------------
 import { delegateCompactionToRuntime } from "./delegate.js";
 import { LegacyContextEngine, registerLegacyContextEngine } from "./legacy.js";
+import { registerPhase3ContextEngine } from "./phase3.js";
 import {
   registerContextEngine,
   registerContextEngineForOwner,
@@ -465,6 +466,7 @@ describe("Registry tests", () => {
   });
 
   it("public registerContextEngine reserves the default legacy id", () => {
+    registerLegacyContextEngine();
     const legacyAttempt = (
       registerContextEngine as unknown as (
         id: string,
@@ -607,10 +609,11 @@ describe("Legacy sessionKey compatibility", () => {
 });
 
 describe("Default engine selection", () => {
-  // Ensure both legacy and a custom test engine are registered before these tests.
+  // Ensure built-in engines and a custom test engine are registered before these tests.
   beforeEach(() => {
     // Registration is idempotent (Map.set), so calling again is safe.
     registerLegacyContextEngine();
+    registerPhase3ContextEngine();
     // Register a lightweight custom stub so we don't need external resources.
     registerContextEngine("test-engine", () => {
       const engine: ContextEngine = {
@@ -629,12 +632,13 @@ describe("Default engine selection", () => {
     });
   });
 
-  it("resolveContextEngine() with no config returns the default ('legacy') engine", async () => {
+  it("resolveContextEngine() with no config returns the default ('phase3') engine", async () => {
     const engine = await resolveContextEngine();
-    expect(engine.info.id).toBe("legacy");
+    expect(engine.info.id).toBe("phase3");
   });
 
   it("resolveContextEngine() with config contextEngine='legacy' returns legacy engine", async () => {
+    registerLegacyContextEngine();
     const engine = await resolveContextEngine(configWithSlot("legacy"));
     expect(engine.info.id).toBe("legacy");
   });

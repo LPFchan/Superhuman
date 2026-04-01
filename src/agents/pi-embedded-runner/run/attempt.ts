@@ -48,6 +48,7 @@ import {
   resolveChannelMessageToolHints,
   resolveChannelReactionGuidance,
 } from "../../channel-tools.js";
+import { estimateMessagesTokens } from "../../compaction.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
@@ -642,6 +643,7 @@ export async function runEmbeddedAttempt(
 
     const appendPrompt = buildEmbeddedSystemPrompt({
       workspaceDir: effectiveWorkspace,
+      sessionKey: params.sessionKey,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
       extraSystemPrompt: params.extraSystemPrompt,
@@ -737,6 +739,11 @@ export async function runEmbeddedAttempt(
         allowedToolNames,
       });
       trackSessionManagerAccess(params.sessionFile);
+      const contextEngineRuntimeContext = buildAfterTurnRuntimeContext({
+        attempt: params,
+        workspaceDir: effectiveWorkspace,
+        agentDir,
+      });
 
       await runAttemptContextEngineBootstrap({
         hadSessionFile,
@@ -745,11 +752,7 @@ export async function runEmbeddedAttempt(
         sessionKey: params.sessionKey,
         sessionFile: params.sessionFile,
         sessionManager,
-        runtimeContext: buildAfterTurnRuntimeContext({
-          attempt: params,
-          workspaceDir: effectiveWorkspace,
-          agentDir,
-        }),
+        runtimeContext: contextEngineRuntimeContext,
         runMaintenance: async (contextParams) =>
           await runContextEngineMaintenance({
             contextEngine: contextParams.contextEngine as never,
@@ -1138,6 +1141,7 @@ export async function runEmbeddedAttempt(
               messages: activeSession.messages,
               tokenBudget: params.contextTokenBudget,
               modelId: params.modelId,
+              runtimeContext: contextEngineRuntimeContext,
               ...(params.prompt !== undefined ? { prompt: params.prompt } : {}),
             });
             if (!assembled) {
@@ -1155,6 +1159,59 @@ export async function runEmbeddedAttempt(
               log.debug(
                 `context engine: prepended system prompt addition (${assembled.systemPromptAddition.length} chars)`,
               );
+            }
+
+            if (
+              params.contextEngine.info.ownsCompaction === true &&
+              typeof params.contextTokenBudget === "number" &&
+              Number.isFinite(params.contextTokenBudget)
+            ) {
+              const estimatedTokens = estimateMessagesTokens(activeSession.messages);
+              const proactiveThreshold = Math.max(1, params.contextTokenBudget - 13_000);
+              if (estimatedTokens >= proactiveThreshold) {
+                const proactiveCompaction = await params.contextEngine.compact({
+                  sessionId: params.sessionId,
+                  sessionKey: params.sessionKey,
+                  sessionFile: params.sessionFile,
+                  tokenBudget: params.contextTokenBudget,
+                  currentTokenCount: estimatedTokens,
+                  compactionTarget: "threshold",
+                  runtimeContext: {
+                    ...contextEngineRuntimeContext,
+                    sessionFile: params.sessionFile,
+                  },
+                });
+                if (proactiveCompaction.ok && proactiveCompaction.compacted) {
+                  const reassembled = await assembleAttemptContextEngine({
+                    contextEngine: params.contextEngine,
+                    sessionId: params.sessionId,
+                    sessionKey: params.sessionKey,
+                    messages: activeSession.messages,
+                    tokenBudget: params.contextTokenBudget,
+                    modelId: params.modelId,
+                    runtimeContext: {
+                      ...contextEngineRuntimeContext,
+                      sessionFile: params.sessionFile,
+                    },
+                    ...(params.prompt !== undefined ? { prompt: params.prompt } : {}),
+                  });
+                  if (reassembled) {
+                    if (reassembled.messages !== activeSession.messages) {
+                      activeSession.agent.replaceMessages(reassembled.messages);
+                    }
+                    if (
+                      reassembled.systemPromptAddition &&
+                      !systemPromptText.startsWith(reassembled.systemPromptAddition)
+                    ) {
+                      systemPromptText = prependSystemPromptAddition({
+                        systemPrompt: systemPromptText,
+                        systemPromptAddition: reassembled.systemPromptAddition,
+                      });
+                      applySystemPromptOverrideToSession(activeSession, systemPromptText);
+                    }
+                  }
+                }
+              }
             }
           } catch (assembleErr) {
             log.warn(
@@ -1718,11 +1775,6 @@ export async function runEmbeddedAttempt(
 
         // Let the active context engine run its post-turn lifecycle.
         if (params.contextEngine) {
-          const afterTurnRuntimeContext = buildAfterTurnRuntimeContext({
-            attempt: params,
-            workspaceDir: effectiveWorkspace,
-            agentDir,
-          });
           await finalizeAttemptContextEngineTurn({
             contextEngine: params.contextEngine,
             promptError: Boolean(promptError),
@@ -1734,7 +1786,7 @@ export async function runEmbeddedAttempt(
             messagesSnapshot,
             prePromptMessageCount,
             tokenBudget: params.contextTokenBudget,
-            runtimeContext: afterTurnRuntimeContext,
+            runtimeContext: contextEngineRuntimeContext,
             runMaintenance: async (contextParams) =>
               await runContextEngineMaintenance({
                 contextEngine: contextParams.contextEngine as never,

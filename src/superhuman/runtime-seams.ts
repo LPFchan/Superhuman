@@ -21,11 +21,44 @@ export type ConversationWindow = {
 
 export type ContextPressureSnapshot = {
   sessionKey: string;
+  runId?: string;
+  createdAt?: number;
   estimatedInputTokens: number;
+  configuredContextLimit: number;
+  reservedOutputTokens: number;
   effectiveContextLimit: number;
+  autocompactThreshold: number;
+  blockingThreshold: number;
   remainingBudget: number;
   overflowRisk: boolean;
 };
+
+export type StateContextPressureSnapshotAppend = {
+  sessionKey: string;
+  runId?: string;
+  createdAt: number;
+  configuredContextLimit?: number;
+  reservedOutputTokens?: number;
+  autocompactBufferTokens?: number;
+  blockingBufferTokens?: number;
+};
+
+export type TeamMemorySyncDirection = "pull" | "push";
+
+export type TeamMemorySyncStatus = "success" | "blocked" | "failed" | "skipped";
+
+export type StateTeamMemorySyncEventAppend = {
+  eventId: string;
+  repoRoot: string;
+  direction: TeamMemorySyncDirection;
+  status: TeamMemorySyncStatus;
+  fileCount: number;
+  transferHash?: string;
+  details?: string;
+  createdAt: number;
+};
+
+export type StateTeamMemorySyncEventRecord = StateTeamMemorySyncEventAppend;
 
 export type StateSessionRecord = {
   sessionKey: string;
@@ -180,9 +213,24 @@ export interface StateStore {
   getIterationBudgets(runId: string): StateIterationBudgetRecord[];
   getAbortNodes(runId: string): StateAbortNodeRecord[];
   getConversationWindow(params: { sessionKey: string; limit?: number }): ConversationWindow;
+  recordContextPressureSnapshot(
+    params: StateContextPressureSnapshotAppend,
+  ): ContextPressureSnapshot;
+  listContextPressureSnapshots(params: {
+    sessionKey: string;
+    limit?: number;
+  }): ContextPressureSnapshot[];
+  appendTeamMemorySyncEvent(event: StateTeamMemorySyncEventAppend): void;
+  listTeamMemorySyncEvents(params?: {
+    repoRoot?: string;
+    limit?: number;
+  }): StateTeamMemorySyncEventRecord[];
   getContextPressureSnapshot(params: {
     sessionKey: string;
     effectiveContextLimit?: number;
+    reservedOutputTokens?: number;
+    autocompactBufferTokens?: number;
+    blockingBufferTokens?: number;
   }): ContextPressureSnapshot;
   close(): void;
 }

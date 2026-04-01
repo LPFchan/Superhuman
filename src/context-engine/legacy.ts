@@ -41,6 +41,7 @@ export class LegacyContextEngine implements ContextEngine {
     messages: AgentMessage[];
     tokenBudget?: number;
     model?: string;
+    runtimeContext?: ContextEngineRuntimeContext;
   }): Promise<AssembleResult> {
     // Pass-through: the existing sanitize -> validate -> limit -> repair pipeline
     // in attempt.ts handles context assembly for the legacy engine.

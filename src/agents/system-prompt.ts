@@ -2,7 +2,7 @@ import { createHmac, createHash } from "node:crypto";
 import type { ReasoningLevel, ThinkLevel } from "../auto-reply/thinking.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
-import { buildMemoryPromptSection } from "../plugins/memory-state.js";
+import { buildFrozenMemoryPromptSection } from "../superhuman/frozen-memory-prompt.js";
 import { listDeliverableMessageChannels } from "../utils/message-channel.js";
 import type { ResolvedTimeFormat } from "./date-time.js";
 import type { EmbeddedContextFile } from "./pi-embedded-helpers.js";
@@ -37,6 +37,8 @@ function buildSkillsSection(params: { skillsPrompt?: string; readToolName: strin
 }
 
 function buildMemorySection(params: {
+  workspaceDir: string;
+  sessionKey?: string;
   isMinimal: boolean;
   availableTools: Set<string>;
   citationsMode?: MemoryCitationsMode;
@@ -44,7 +46,9 @@ function buildMemorySection(params: {
   if (params.isMinimal) {
     return [];
   }
-  return buildMemoryPromptSection({
+  return buildFrozenMemoryPromptSection({
+    workspaceDir: params.workspaceDir,
+    sessionKey: params.sessionKey,
     availableTools: params.availableTools,
     citationsMode: params.citationsMode,
   });
@@ -183,6 +187,7 @@ function buildExecApprovalPromptGuidance(params: { runtimeChannel?: string }) {
 
 export function buildAgentSystemPrompt(params: {
   workspaceDir: string;
+  sessionKey?: string;
   defaultThinkLevel?: ThinkLevel;
   reasoningLevel?: ReasoningLevel;
   extraSystemPrompt?: string;
@@ -397,6 +402,8 @@ export function buildAgentSystemPrompt(params: {
     readToolName,
   });
   const memorySection = buildMemorySection({
+    workspaceDir: params.workspaceDir,
+    sessionKey: params.sessionKey,
     isMinimal,
     availableTools,
     citationsMode: params.memoryCitationsMode,

@@ -195,10 +195,10 @@ describe("applyExclusiveSlotSelection", () => {
   it("applies slot selection for each kind in a multi-kind array", () => {
     const config: OpenClawConfig = {
       plugins: {
-        slots: { memory: "memory-core", contextEngine: "legacy" },
+        slots: { memory: "memory-core", contextEngine: "phase3" },
         entries: {
           "memory-core": { enabled: true },
-          legacy: { enabled: true },
+          phase3: { enabled: true },
         },
       },
     };
@@ -244,12 +244,12 @@ describe("applyExclusiveSlotSelection", () => {
   });
 
   it("does not disable a dual-kind plugin that owns another slot via default", () => {
-    // contextEngine is NOT explicitly set — defaults to "legacy"
+    // contextEngine is NOT explicitly set — defaults to "phase3"
     const config: OpenClawConfig = {
       plugins: {
-        slots: { memory: "legacy" },
+        slots: { memory: "phase3" },
         entries: {
-          legacy: { enabled: true },
+          phase3: { enabled: true },
         },
       },
     };
@@ -258,14 +258,14 @@ describe("applyExclusiveSlotSelection", () => {
       selectedId: "new-memory",
       selectedKind: "memory",
       registry: buildSelectionRegistry([
-        { id: "legacy", kind: ["memory", "context-engine"] },
+        { id: "phase3", kind: ["memory", "context-engine"] },
         { id: "new-memory", kind: "memory" },
       ]),
     });
     expect(result.changed).toBe(true);
     expect(result.config.plugins?.slots?.memory).toBe("new-memory");
-    // legacy still owns contextEngine via default — must NOT be disabled
-    expect(result.config.plugins?.entries?.legacy?.enabled).not.toBe(false);
+    // phase3 still owns contextEngine via default — must NOT be disabled
+    expect(result.config.plugins?.entries?.phase3?.enabled).not.toBe(false);
   });
 });
 

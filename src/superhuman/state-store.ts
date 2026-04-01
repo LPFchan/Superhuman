@@ -1,8 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { loadGatewaySessionRow } from "../gateway/session-utils.js";
 import { requireNodeSqlite } from "../infra/node-sqlite.js";
+import { estimateStringChars, estimateTokensFromChars } from "../utils/cjk-chars.js";
+import {
+  buildContextPressureSnapshot,
+  resolveContextPressureOptionsForSession,
+} from "./context-pressure.js";
 import type {
   AbortNodeStatus,
   AgentRuntimeStage,
@@ -16,6 +20,7 @@ import type {
   StateAbortNodeRecord,
   StateAbortNodeUpsert,
   StateArtifactAppend,
+  StateContextPressureSnapshotAppend,
   StateIterationBudgetRecord,
   StateIterationBudgetUpsert,
   StateMessageAppend,
@@ -25,12 +30,15 @@ import type {
   StateSessionRecord,
   StateSessionUpsert,
   StateStore,
+  StateTeamMemorySyncEventAppend,
+  StateTeamMemorySyncEventRecord,
+  TeamMemorySyncDirection,
+  TeamMemorySyncStatus,
 } from "./runtime-seams.js";
 
 const STATE_DIR_MODE = 0o700;
 const STATE_FILE_MODE = 0o600;
 const SQLITE_SIDECAR_SUFFIXES = ["", "-shm", "-wal"] as const;
-const DEFAULT_CONTEXT_LIMIT = 200_000;
 
 type StateStoreStatements = {
   upsertSession: StatementSync;
@@ -51,6 +59,10 @@ type StateStoreStatements = {
   selectAbortNodes: StatementSync;
   selectConversationWindow: StatementSync;
   selectApproxTokens: StatementSync;
+  insertContextPressureSnapshot: StatementSync;
+  selectContextPressureSnapshots: StatementSync;
+  insertTeamMemorySyncEvent: StatementSync;
+  selectTeamMemorySyncEvents: StatementSync;
 };
 
 type StateDatabase = {
@@ -152,6 +164,31 @@ type AbortNodeRow = {
   reason: string | null;
 };
 
+type ContextPressureSnapshotRow = {
+  session_key: string;
+  run_id: string | null;
+  created_at: number;
+  estimated_input_tokens: number;
+  configured_context_limit: number;
+  reserved_output_tokens: number;
+  effective_context_limit: number;
+  autocompact_threshold: number;
+  blocking_threshold: number;
+  remaining_budget: number;
+  overflow_risk: number;
+};
+
+type TeamMemorySyncEventRow = {
+  event_id: string;
+  repo_root: string;
+  direction: TeamMemorySyncDirection;
+  status: TeamMemorySyncStatus;
+  file_count: number;
+  transfer_hash: string | null;
+  details: string | null;
+  created_at: number;
+};
+
 const openDatabases = new Map<string, StateDatabase>();
 
 function normalizePathForComparison(input: string): string {
@@ -169,7 +206,7 @@ function estimateTokens(text: string): number {
   if (!trimmed) {
     return 0;
   }
-  return Math.max(1, Math.ceil(trimmed.length / 4));
+  return Math.max(1, estimateTokensFromChars(estimateStringChars(trimmed)));
 }
 
 function ensureStatePermissions(dbPath: string): void {
@@ -331,6 +368,39 @@ function ensureSchema(db: DatabaseSync): void {
       ON iteration_budgets(run_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_abort_nodes_run_updated
       ON abort_nodes(run_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS context_pressure_snapshots (
+      rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_key TEXT NOT NULL,
+      run_id TEXT,
+      created_at INTEGER NOT NULL,
+      estimated_input_tokens INTEGER NOT NULL,
+      configured_context_limit INTEGER NOT NULL,
+      reserved_output_tokens INTEGER NOT NULL,
+      effective_context_limit INTEGER NOT NULL,
+      autocompact_threshold INTEGER NOT NULL,
+      blocking_threshold INTEGER NOT NULL,
+      remaining_budget INTEGER NOT NULL,
+      overflow_risk INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY(session_key) REFERENCES sessions(session_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_context_pressure_session_created
+      ON context_pressure_snapshots(session_key, created_at DESC, rowid DESC);
+
+    CREATE TABLE IF NOT EXISTS team_memory_sync_events (
+      event_id TEXT PRIMARY KEY,
+      repo_root TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      status TEXT NOT NULL,
+      file_count INTEGER NOT NULL,
+      transfer_hash TEXT,
+      details TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_team_memory_sync_repo_created
+      ON team_memory_sync_events(repo_root, created_at DESC, event_id DESC);
   `);
 }
 
@@ -641,6 +711,78 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
       FROM messages
       WHERE session_key = ?
     `),
+    insertContextPressureSnapshot: db.prepare(`
+      INSERT INTO context_pressure_snapshots (
+        session_key,
+        run_id,
+        created_at,
+        estimated_input_tokens,
+        configured_context_limit,
+        reserved_output_tokens,
+        effective_context_limit,
+        autocompact_threshold,
+        blocking_threshold,
+        remaining_budget,
+        overflow_risk
+      ) VALUES (
+        $sessionKey,
+        $runId,
+        $createdAt,
+        $estimatedInputTokens,
+        $configuredContextLimit,
+        $reservedOutputTokens,
+        $effectiveContextLimit,
+        $autocompactThreshold,
+        $blockingThreshold,
+        $remainingBudget,
+        $overflowRisk
+      )
+    `),
+    selectContextPressureSnapshots: db.prepare(`
+      SELECT
+        session_key,
+        run_id,
+        created_at,
+        estimated_input_tokens,
+        configured_context_limit,
+        reserved_output_tokens,
+        effective_context_limit,
+        autocompact_threshold,
+        blocking_threshold,
+        remaining_budget,
+        overflow_risk
+      FROM context_pressure_snapshots
+      WHERE session_key = ?
+      ORDER BY created_at DESC, rowid DESC
+      LIMIT ?
+    `),
+    insertTeamMemorySyncEvent: db.prepare(`
+      INSERT OR REPLACE INTO team_memory_sync_events (
+        event_id,
+        repo_root,
+        direction,
+        status,
+        file_count,
+        transfer_hash,
+        details,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `),
+    selectTeamMemorySyncEvents: db.prepare(`
+      SELECT
+        event_id,
+        repo_root,
+        direction,
+        status,
+        file_count,
+        transfer_hash,
+        details,
+        created_at
+      FROM team_memory_sync_events
+      WHERE (? IS NULL OR repo_root = ?)
+      ORDER BY created_at DESC, event_id DESC
+      LIMIT ?
+    `),
   };
 }
 
@@ -784,6 +926,35 @@ function mapAbortNodeRow(row: AbortNodeRow): StateAbortNodeRecord {
     abortedAt: row.aborted_at ?? undefined,
     completedAt: row.completed_at ?? undefined,
     reason: row.reason ?? undefined,
+  };
+}
+
+function mapContextPressureSnapshotRow(row: ContextPressureSnapshotRow): ContextPressureSnapshot {
+  return {
+    sessionKey: row.session_key,
+    runId: row.run_id ?? undefined,
+    createdAt: row.created_at,
+    estimatedInputTokens: row.estimated_input_tokens,
+    configuredContextLimit: row.configured_context_limit,
+    reservedOutputTokens: row.reserved_output_tokens,
+    effectiveContextLimit: row.effective_context_limit,
+    autocompactThreshold: row.autocompact_threshold,
+    blockingThreshold: row.blocking_threshold,
+    remainingBudget: row.remaining_budget,
+    overflowRisk: row.overflow_risk === 1,
+  };
+}
+
+function mapTeamMemorySyncEventRow(row: TeamMemorySyncEventRow): StateTeamMemorySyncEventRecord {
+  return {
+    eventId: row.event_id,
+    repoRoot: row.repo_root,
+    direction: row.direction,
+    status: row.status,
+    fileCount: row.file_count,
+    transferHash: row.transfer_hash ?? undefined,
+    details: row.details ?? undefined,
+    createdAt: row.created_at,
   };
 }
 
@@ -996,25 +1167,105 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       return mapConversationRows(paramsIn.sessionKey, rows, session ?? null);
     },
 
+    recordContextPressureSnapshot(
+      paramsIn: StateContextPressureSnapshotAppend,
+    ): ContextPressureSnapshot {
+      const totalRow = opened.statements.selectApproxTokens.get(paramsIn.sessionKey) as
+        | { total_tokens?: number }
+        | undefined;
+      const snapshot = buildContextPressureSnapshot({
+        estimatedInputTokens: Math.max(0, totalRow?.total_tokens ?? 0),
+        createdAt: paramsIn.createdAt,
+        runId: paramsIn.runId,
+        ...resolveContextPressureOptionsForSession({
+          sessionKey: paramsIn.sessionKey,
+          configuredContextLimit: paramsIn.configuredContextLimit,
+          reservedOutputTokens: paramsIn.reservedOutputTokens,
+          autocompactBufferTokens: paramsIn.autocompactBufferTokens,
+          blockingBufferTokens: paramsIn.blockingBufferTokens,
+        }),
+      });
+      opened.statements.insertContextPressureSnapshot.run({
+        sessionKey: snapshot.sessionKey,
+        runId: snapshot.runId ?? null,
+        createdAt: snapshot.createdAt ?? paramsIn.createdAt,
+        estimatedInputTokens: snapshot.estimatedInputTokens,
+        configuredContextLimit: snapshot.configuredContextLimit,
+        reservedOutputTokens: snapshot.reservedOutputTokens,
+        effectiveContextLimit: snapshot.effectiveContextLimit,
+        autocompactThreshold: snapshot.autocompactThreshold,
+        blockingThreshold: snapshot.blockingThreshold,
+        remainingBudget: snapshot.remainingBudget,
+        overflowRisk: snapshot.overflowRisk ? 1 : 0,
+      });
+      return snapshot;
+    },
+
+    listContextPressureSnapshots(paramsIn: {
+      sessionKey: string;
+      limit?: number;
+    }): ContextPressureSnapshot[] {
+      const limit =
+        typeof paramsIn.limit === "number" && Number.isFinite(paramsIn.limit)
+          ? Math.max(1, Math.floor(paramsIn.limit))
+          : 20;
+      const rows = opened.statements.selectContextPressureSnapshots.all(
+        paramsIn.sessionKey,
+        limit,
+      ) as ContextPressureSnapshotRow[];
+      return rows.map((row) => mapContextPressureSnapshotRow(row));
+    },
+
+    appendTeamMemorySyncEvent(event: StateTeamMemorySyncEventAppend): void {
+      opened.statements.insertTeamMemorySyncEvent.run(
+        event.eventId,
+        event.repoRoot,
+        event.direction,
+        event.status,
+        event.fileCount,
+        event.transferHash ?? null,
+        event.details ?? null,
+        event.createdAt,
+      );
+    },
+
+    listTeamMemorySyncEvents(paramsIn?: {
+      repoRoot?: string;
+      limit?: number;
+    }): StateTeamMemorySyncEventRecord[] {
+      const limit =
+        typeof paramsIn?.limit === "number" && Number.isFinite(paramsIn.limit)
+          ? Math.max(1, Math.floor(paramsIn.limit))
+          : 20;
+      const repoRoot = paramsIn?.repoRoot?.trim() || null;
+      const rows = opened.statements.selectTeamMemorySyncEvents.all(
+        repoRoot,
+        repoRoot,
+        limit,
+      ) as TeamMemorySyncEventRow[];
+      return rows.map((row) => mapTeamMemorySyncEventRow(row));
+    },
+
     getContextPressureSnapshot(paramsIn: {
       sessionKey: string;
       effectiveContextLimit?: number;
+      reservedOutputTokens?: number;
+      autocompactBufferTokens?: number;
+      blockingBufferTokens?: number;
     }): ContextPressureSnapshot {
       const totalRow = opened.statements.selectApproxTokens.get(paramsIn.sessionKey) as
         | { total_tokens?: number }
         | undefined;
-      const session = loadGatewaySessionRow(paramsIn.sessionKey);
-      const effectiveContextLimit =
-        paramsIn.effectiveContextLimit ?? session?.contextTokens ?? DEFAULT_CONTEXT_LIMIT;
-      const estimatedInputTokens = Math.max(0, totalRow?.total_tokens ?? 0);
-      const remainingBudget = Math.max(0, effectiveContextLimit - estimatedInputTokens);
-      return {
-        sessionKey: paramsIn.sessionKey,
-        estimatedInputTokens,
-        effectiveContextLimit,
-        remainingBudget,
-        overflowRisk: estimatedInputTokens >= Math.floor(effectiveContextLimit * 0.9),
-      };
+      return buildContextPressureSnapshot({
+        estimatedInputTokens: Math.max(0, totalRow?.total_tokens ?? 0),
+        ...resolveContextPressureOptionsForSession({
+          sessionKey: paramsIn.sessionKey,
+          configuredContextLimit: paramsIn.effectiveContextLimit,
+          reservedOutputTokens: paramsIn.reservedOutputTokens,
+          autocompactBufferTokens: paramsIn.autocompactBufferTokens,
+          blockingBufferTokens: paramsIn.blockingBufferTokens,
+        }),
+      });
     },
 
     close(): void {

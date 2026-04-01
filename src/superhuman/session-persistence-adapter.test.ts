@@ -67,6 +67,7 @@ describe("SessionPersistenceAdapter", () => {
 
     const session = stateStore.getSessionSnapshot("main");
     const window = stateStore.getConversationWindow({ sessionKey: "main" });
+    const pressureSnapshots = stateStore.listContextPressureSnapshots({ sessionKey: "main" });
 
     expect(session?.status).toBe("done");
     expect(session?.startedAt).toBe(100);
@@ -74,6 +75,13 @@ describe("SessionPersistenceAdapter", () => {
     expect(session?.messageCount).toBe(1);
     expect(window.messages).toHaveLength(1);
     expect(window.messages[0]?.contentText).toBe("hello from adapter");
+    expect(pressureSnapshots).toHaveLength(1);
+    expect(pressureSnapshots[0]).toMatchObject({
+      runId: "run-1",
+      createdAt: 120,
+    });
+    expect(pressureSnapshots[0]?.configuredContextLimit).toBeGreaterThan(0);
+    expect(pressureSnapshots[0]?.reservedOutputTokens).toBeGreaterThan(0);
     expect(stateStore.getArtifacts({ sessionKey: "main" })).toEqual([
       expect.objectContaining({
         sessionKey: "main",

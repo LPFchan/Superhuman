@@ -14,6 +14,10 @@ import {
   type SessionTranscriptUpdate,
   onSessionTranscriptUpdate,
 } from "../sessions/transcript-events.js";
+import {
+  resolveContextPressureOptionsFromConfig,
+  type ContextPressureSnapshotOptions,
+} from "./context-pressure.js";
 import type { StateStore, StateSessionUpsert } from "./runtime-seams.js";
 
 function normalizePathForComparison(input: string): string {
@@ -53,6 +57,18 @@ function resolveActionStatus(phase: "start" | "end" | "error"): string {
     return "failed";
   }
   return "completed";
+}
+
+function resolveLifecycleBoundaryTime(
+  event: AgentEventPayload,
+  phase: "start" | "end" | "error",
+): number {
+  if (phase === "start") {
+    const startedAt = event.data.startedAt;
+    return typeof startedAt === "number" && Number.isFinite(startedAt) ? startedAt : event.ts;
+  }
+  const endedAt = event.data.endedAt;
+  return typeof endedAt === "number" && Number.isFinite(endedAt) ? endedAt : event.ts;
 }
 
 function extractMessageText(message: unknown): string {
@@ -211,6 +227,16 @@ function resolveSessionSnapshotFromEntry(params: {
   };
 }
 
+function resolveTurnBoundaryContextPressureOptions(params: {
+  cfg: OpenClawConfig;
+  sessionKey: string;
+}): Omit<ContextPressureSnapshotOptions, "estimatedInputTokens"> {
+  return resolveContextPressureOptionsFromConfig({
+    cfg: params.cfg,
+    sessionKey: params.sessionKey,
+  });
+}
+
 export class SessionPersistenceAdapter {
   private readonly unsubscribers: Array<() => void> = [];
 
@@ -312,18 +338,13 @@ export class SessionPersistenceAdapter {
       return;
     }
     if (phase === "start") {
+      const startedAt = resolveLifecycleBoundaryTime(event, phase);
       snapshot.status = "running";
-      snapshot.startedAt =
-        typeof event.data.startedAt === "number" && Number.isFinite(event.data.startedAt)
-          ? event.data.startedAt
-          : event.ts;
-      snapshot.updatedAt = snapshot.startedAt;
+      snapshot.startedAt = startedAt;
+      snapshot.updatedAt = startedAt;
       snapshot.endedAt = undefined;
     } else {
-      const endedAt =
-        typeof event.data.endedAt === "number" && Number.isFinite(event.data.endedAt)
-          ? event.data.endedAt
-          : event.ts;
+      const endedAt = resolveLifecycleBoundaryTime(event, phase);
       snapshot.status = phase === "error" ? "failed" : "done";
       snapshot.endedAt = endedAt;
       snapshot.updatedAt = endedAt;
@@ -339,6 +360,16 @@ export class SessionPersistenceAdapter {
       createdAt: event.ts,
       completedAt: phase === "start" ? undefined : event.ts,
     });
+    if (phase === "end" || phase === "error") {
+      this.params.stateStore.recordContextPressureSnapshot({
+        runId: event.runId,
+        createdAt: resolveLifecycleBoundaryTime(event, phase),
+        ...resolveTurnBoundaryContextPressureOptions({
+          cfg: this.params.cfg,
+          sessionKey: event.sessionKey,
+        }),
+      });
+    }
   }
 
   private onTranscriptUpdate(update: SessionTranscriptUpdate): void {

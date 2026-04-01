@@ -58,6 +58,7 @@ export async function assembleAttemptContextEngine(params: {
   tokenBudget?: number;
   modelId: string;
   prompt?: string;
+  runtimeContext?: ContextEngineRuntimeContext;
 }) {
   if (!params.contextEngine) {
     return undefined;
@@ -69,6 +70,7 @@ export async function assembleAttemptContextEngine(params: {
     tokenBudget: params.tokenBudget,
     model: params.modelId,
     ...(params.prompt !== undefined ? { prompt: params.prompt } : {}),
+    runtimeContext: params.runtimeContext,
   });
 }
 
