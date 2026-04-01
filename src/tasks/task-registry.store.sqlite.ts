@@ -30,6 +30,7 @@ type TaskRegistryRow = {
   progress_summary: string | null;
   terminal_summary: string | null;
   terminal_outcome: TaskRecord["terminalOutcome"] | null;
+  orchestration_json: string | null;
 };
 
 type TaskDeliveryStateRow = {
@@ -116,6 +117,9 @@ function rowToTaskRecord(row: TaskRegistryRow): TaskRecord {
     ...(row.progress_summary ? { progressSummary: row.progress_summary } : {}),
     ...(row.terminal_summary ? { terminalSummary: row.terminal_summary } : {}),
     ...(row.terminal_outcome ? { terminalOutcome: row.terminal_outcome } : {}),
+    ...(parseJsonValue<TaskRecord["orchestration"]>(row.orchestration_json)
+      ? { orchestration: parseJsonValue<TaskRecord["orchestration"]>(row.orchestration_json) }
+      : {}),
   };
 }
 
@@ -154,6 +158,7 @@ function bindTaskRecord(record: TaskRecord) {
     progress_summary: record.progressSummary ?? null,
     terminal_summary: record.terminalSummary ?? null,
     terminal_outcome: record.terminalOutcome ?? null,
+    orchestration_json: serializeJson(record.orchestration),
   };
 }
 
@@ -191,7 +196,8 @@ function createStatements(db: DatabaseSync): TaskRegistryStatements {
         error,
         progress_summary,
         terminal_summary,
-        terminal_outcome
+        terminal_outcome,
+        orchestration_json
       FROM task_runs
       ORDER BY created_at ASC, task_id ASC
     `),
@@ -227,7 +233,8 @@ function createStatements(db: DatabaseSync): TaskRegistryStatements {
         error,
         progress_summary,
         terminal_summary,
-        terminal_outcome
+        terminal_outcome,
+        orchestration_json
       ) VALUES (
         @task_id,
         @runtime,
@@ -251,7 +258,8 @@ function createStatements(db: DatabaseSync): TaskRegistryStatements {
         @error,
         @progress_summary,
         @terminal_summary,
-        @terminal_outcome
+        @terminal_outcome,
+        @orchestration_json
       )
       ON CONFLICT(task_id) DO UPDATE SET
         runtime = excluded.runtime,
@@ -275,7 +283,8 @@ function createStatements(db: DatabaseSync): TaskRegistryStatements {
         error = excluded.error,
         progress_summary = excluded.progress_summary,
         terminal_summary = excluded.terminal_summary,
-        terminal_outcome = excluded.terminal_outcome
+        terminal_outcome = excluded.terminal_outcome,
+        orchestration_json = excluded.orchestration_json
     `),
     replaceDeliveryState: db.prepare(`
       INSERT OR REPLACE INTO task_delivery_state (
@@ -356,10 +365,14 @@ function ensureSchema(db: DatabaseSync) {
       error TEXT,
       progress_summary TEXT,
       terminal_summary TEXT,
-      terminal_outcome TEXT
+      terminal_outcome TEXT,
+      orchestration_json TEXT
     );
   `);
   migrateLegacyOwnerColumns(db);
+  if (!hasTaskRunsColumn(db, "orchestration_json")) {
+    db.exec(`ALTER TABLE task_runs ADD COLUMN orchestration_json TEXT;`);
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS task_delivery_state (
       task_id TEXT PRIMARY KEY,

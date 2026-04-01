@@ -79,6 +79,7 @@ type SessionRow = {
   session_id: string | null;
   agent_id: string;
   workspace_dir: string;
+  execution_role: "lead" | "worker" | "subagent" | "remote_peer" | null;
   status: string | null;
   started_at: number | null;
   ended_at: number | null;
@@ -270,6 +271,7 @@ function ensureSchema(db: DatabaseSync): void {
       session_id TEXT,
       agent_id TEXT NOT NULL,
       workspace_dir TEXT NOT NULL,
+      execution_role TEXT,
       status TEXT,
       started_at INTEGER,
       ended_at INTEGER,
@@ -449,6 +451,7 @@ function ensureSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_team_memory_sync_repo_created
       ON team_memory_sync_events(repo_root, created_at DESC, event_id DESC);
   `);
+  ensureColumn(db, "sessions", "execution_role", "TEXT");
   ensureColumn(db, "messages", "provenance_json", "TEXT");
   ensureColumn(db, "actions", "details_json", "TEXT");
   ensureColumn(db, "artifacts", "provenance_json", "TEXT");
@@ -465,6 +468,7 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         session_id,
         agent_id,
         workspace_dir,
+        execution_role,
         status,
         started_at,
         ended_at,
@@ -476,11 +480,12 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         last_user_turn_id,
         last_assistant_turn_id,
         message_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_key) DO UPDATE SET
         session_id = COALESCE(excluded.session_id, sessions.session_id),
         agent_id = excluded.agent_id,
         workspace_dir = excluded.workspace_dir,
+        execution_role = COALESCE(excluded.execution_role, sessions.execution_role),
         status = COALESCE(excluded.status, sessions.status),
         started_at = COALESCE(excluded.started_at, sessions.started_at),
         ended_at = COALESCE(excluded.ended_at, sessions.ended_at),
@@ -690,6 +695,7 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         session_id,
         agent_id,
         workspace_dir,
+        execution_role,
         status,
         started_at,
         ended_at,
@@ -904,6 +910,7 @@ function mapSessionRow(row: SessionRow): StateSessionRecord {
     sessionId: row.session_id ?? undefined,
     agentId: row.agent_id,
     workspaceDir: row.workspace_dir,
+    executionRole: row.execution_role ?? undefined,
     status: row.status ?? undefined,
     startedAt: row.started_at ?? undefined,
     endedAt: row.ended_at ?? undefined,
@@ -1071,6 +1078,7 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         session.sessionId ?? null,
         session.agentId,
         session.workspaceDir,
+        session.executionRole ?? null,
         session.status ?? null,
         session.startedAt ?? null,
         session.endedAt ?? null,

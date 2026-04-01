@@ -6,6 +6,7 @@ import { resolveAgentMainSessionKey } from "../config/sessions/main-session.js";
 import { runBootOnce, type BootRunResult } from "../gateway/boot.js";
 import { resolveSessionKeyForRun } from "../gateway/server-session-key.js";
 import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
+import { startOrchestrationRuntime, type OrchestrationRuntime } from "./orchestration-runtime.js";
 import {
   createPluginCapabilityRegistry,
   NoopCompactionManager,
@@ -21,6 +22,7 @@ import { createSuperhumanStateStore } from "./state-store.js";
 
 export type SuperhumanGatewayRuntime = {
   stateStore: StateStore;
+  orchestrationRuntime: OrchestrationRuntime;
   sessionRegistry: SessionRegistry;
   channelRegistry: ChannelRegistry;
   pluginRegistry: PluginRegistry;
@@ -96,9 +98,14 @@ export function startSuperhumanGatewayRuntime(params: {
     workspaceDir: params.workspaceDir,
     stateStore,
   });
+  const orchestrationRuntime = startOrchestrationRuntime({
+    cfg: params.cfg,
+    workspaceDir: params.workspaceDir,
+  });
   adapter.start();
   return {
     stateStore,
+    orchestrationRuntime,
     sessionRegistry: createSessionRegistry(params.cfg),
     channelRegistry: createChannelRegistry(),
     pluginRegistry: createPluginCapabilityRegistry(params.pluginRegistry),
@@ -111,6 +118,7 @@ export function startSuperhumanGatewayRuntime(params: {
       stateStore.getContextPressureSnapshot({ sessionKey }),
     ),
     stop: () => {
+      orchestrationRuntime.stop();
       adapter.stop();
       stateStore.close();
     },

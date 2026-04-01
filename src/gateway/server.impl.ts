@@ -79,6 +79,7 @@ import {
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import type { SuperhumanGatewayRuntime } from "../superhuman/gateway-runtime.js";
+import { getActiveOrchestrationRuntime } from "../superhuman/orchestration-runtime.js";
 import {
   getInspectableTaskRegistrySummary,
   startTaskRegistryMaintenance,
@@ -995,6 +996,7 @@ export async function startGatewayServer(
                 spawnedBy: sessionRow.spawnedBy,
                 spawnedWorkspaceDir: sessionRow.spawnedWorkspaceDir,
                 forkedFromParent: sessionRow.forkedFromParent,
+                executionRole: sessionRow.executionRole,
                 spawnDepth: sessionRow.spawnDepth,
                 subagentRole: sessionRow.subagentRole,
                 subagentControlScope: sessionRow.subagentControlScope,
@@ -1096,6 +1098,7 @@ export async function startGatewayServer(
                     spawnedBy: sessionRow.spawnedBy,
                     spawnedWorkspaceDir: sessionRow.spawnedWorkspaceDir,
                     forkedFromParent: sessionRow.forkedFromParent,
+                    executionRole: sessionRow.executionRole,
                     spawnDepth: sessionRow.spawnDepth,
                     subagentRole: sessionRow.subagentRole,
                     subagentControlScope: sessionRow.subagentControlScope,
@@ -1180,7 +1183,25 @@ export async function startGatewayServer(
     }
 
     const execApprovalManager = new ExecApprovalManager();
-    const execApprovalForwarder = createExecApprovalForwarder();
+    const execApprovalForwarder = createExecApprovalForwarder({
+      mirrorRequested: async (approval) => {
+        await getActiveOrchestrationRuntime()?.recordApprovalRequested({
+          kind: approval.kind,
+          requestId: approval.requestId,
+          sessionKey: approval.sessionKey,
+          payload: approval.payload,
+        });
+      },
+      mirrorResolved: async (approval) => {
+        await getActiveOrchestrationRuntime()?.recordApprovalResolved({
+          kind: approval.kind,
+          requestId: approval.requestId,
+          sessionKey: approval.sessionKey,
+          status: approval.status,
+          payload: approval.payload,
+        });
+      },
+    });
     const execApprovalHandlers = createExecApprovalHandlers(execApprovalManager, {
       forwarder: execApprovalForwarder,
     });

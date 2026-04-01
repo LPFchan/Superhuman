@@ -93,6 +93,7 @@ export type StateSessionRecord = {
   sessionId?: string;
   agentId: string;
   workspaceDir: string;
+  executionRole?: "lead" | "worker" | "subagent" | "remote_peer";
   status?: string;
   startedAt?: number;
   endedAt?: number;

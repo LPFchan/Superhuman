@@ -30,6 +30,7 @@ import type {
   TaskDeliveryStatus,
   TaskEventKind,
   TaskEventRecord,
+  TaskOrchestrationMetadata,
   TaskNotifyPolicy,
   TaskRecord,
   TaskRegistrySummary,
@@ -68,7 +69,10 @@ function assertTaskOwner(params: { ownerKey: string; scopeKind: TaskScopeKind })
 }
 
 function cloneTaskRecord(record: TaskRecord): TaskRecord {
-  return { ...record };
+  return {
+    ...record,
+    ...(record.orchestration ? { orchestration: { ...record.orchestration } } : {}),
+  };
 }
 
 function cloneTaskDeliveryState(state: TaskDeliveryState): TaskDeliveryState {
@@ -519,6 +523,7 @@ function mergeExistingTaskForCreate(
     preferMetadata?: boolean;
     deliveryStatus?: TaskDeliveryStatus;
     notifyPolicy?: TaskNotifyPolicy;
+    orchestration?: TaskOrchestrationMetadata;
   },
 ): TaskRecord {
   const patch: Partial<TaskRecord> = {};
@@ -554,6 +559,12 @@ function mergeExistingTaskForCreate(
   }
   if (params.deliveryStatus === "pending" && existing.deliveryStatus !== "delivered") {
     patch.deliveryStatus = "pending";
+  }
+  if (params.orchestration) {
+    patch.orchestration = {
+      ...existing.orchestration,
+      ...params.orchestration,
+    };
   }
   const notifyPolicy = ensureNotifyPolicy({
     notifyPolicy: params.notifyPolicy,
@@ -635,7 +646,18 @@ function updateTask(taskId: string, patch: Partial<TaskRecord>): TaskRecord | nu
   if (!current) {
     return null;
   }
-  const next = { ...current, ...patch };
+  const next = {
+    ...current,
+    ...patch,
+    ...(patch.orchestration
+      ? {
+          orchestration: {
+            ...current.orchestration,
+            ...patch.orchestration,
+          },
+        }
+      : {}),
+  };
   if (isTerminalTaskStatus(next.status) && typeof next.cleanupAfter !== "number") {
     const terminalAt = next.endedAt ?? next.lastEventAt ?? Date.now();
     next.cleanupAfter = terminalAt + DEFAULT_TASK_RETENTION_MS;
@@ -1122,6 +1144,7 @@ export function createTaskRecord(params: {
   progressSummary?: string | null;
   terminalSummary?: string | null;
   terminalOutcome?: TaskTerminalOutcome | null;
+  orchestration?: TaskOrchestrationMetadata;
 }): TaskRecord {
   ensureTaskRegistryReady();
   const requesterSessionKey = resolveTaskRequesterSessionKey(params);
@@ -1191,6 +1214,7 @@ export function createTaskRecord(params: {
       status,
       terminalOutcome: params.terminalOutcome,
     }),
+    orchestration: params.orchestration ? { ...params.orchestration } : undefined,
   };
   if (isTerminalTaskStatus(record.status) && typeof record.cleanupAfter !== "number") {
     record.cleanupAfter =
@@ -1398,6 +1422,14 @@ export function updateTaskNotifyPolicyById(params: {
     notifyPolicy: params.notifyPolicy,
     lastEventAt: Date.now(),
   });
+}
+
+export function patchTaskById(params: {
+  taskId: string;
+  patch: Partial<TaskRecord>;
+}): TaskRecord | null {
+  ensureTaskRegistryReady();
+  return updateTask(params.taskId, params.patch);
 }
 
 export async function cancelTaskById(params: {

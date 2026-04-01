@@ -8,7 +8,7 @@ import { loadGatewaySessionRow, loadSessionEntry } from "../gateway/session-util
 import { loadCombinedSessionStoreForGateway } from "../gateway/session-utils.js";
 import type { AgentEventPayload } from "../infra/agent-events.js";
 import { onAgentEvent } from "../infra/agent-events.js";
-import { normalizeInputProvenance, type InputProvenance } from "../sessions/input-provenance.js";
+import { normalizeInputProvenance } from "../sessions/input-provenance.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionStoreMutation } from "../sessions/session-store-events.js";
 import {
@@ -251,7 +251,7 @@ function resolveMessageProvenance(message: unknown): StateEvidenceProvenance | u
       typeof meta?.descriptor === "string"
         ? meta.descriptor
         : typeof inputProvenance?.originSessionId === "string"
-          ? (inputProvenance as InputProvenance).originSessionId
+          ? inputProvenance.originSessionId
           : undefined,
   };
 }
@@ -286,6 +286,7 @@ function resolveSessionSnapshot(params: {
     sessionId,
     agentId,
     workspaceDir,
+    executionRole: gatewayRow?.executionRole ?? loaded.entry?.executionRole,
     status: gatewayRow?.status ?? loaded.entry?.status,
     startedAt: gatewayRow?.startedAt ?? loaded.entry?.startedAt,
     endedAt: gatewayRow?.endedAt ?? loaded.entry?.endedAt,
@@ -302,6 +303,7 @@ function resolveSessionSnapshotFromEntry(params: {
   sessionKey: string;
   entry: {
     sessionId?: string;
+    executionRole?: "lead" | "worker" | "subagent" | "remote_peer";
     status?: string;
     startedAt?: number;
     endedAt?: number;
@@ -326,6 +328,7 @@ function resolveSessionSnapshotFromEntry(params: {
     sessionId: params.entry.sessionId,
     agentId,
     workspaceDir: effectiveWorkspaceDir,
+    executionRole: params.entry.executionRole,
     status: params.entry.status,
     startedAt: params.entry.startedAt,
     endedAt: params.entry.endedAt,

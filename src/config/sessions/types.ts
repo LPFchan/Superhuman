@@ -35,6 +35,8 @@ export type SessionAcpIdentity = {
   lastUpdatedAt: number;
 };
 
+export type SessionExecutionRole = "lead" | "worker" | "subagent" | "remote_peer";
+
 export type SessionAcpMeta = {
   backend: string;
   agent: string;
@@ -89,6 +91,8 @@ export type SessionEntry = {
   spawnedWorkspaceDir?: string;
   /** Explicit parent session linkage for dashboard-created child sessions. */
   parentSessionKey?: string;
+  /** Durable execution role used by the orchestration runtime. */
+  executionRole?: SessionExecutionRole;
   /** True after a thread/topic session has been forked from its parent transcript once. */
   forkedFromParent?: boolean;
   /** Subagent spawn depth (0 = main, 1 = sub-agent, 2 = sub-sub-agent). */

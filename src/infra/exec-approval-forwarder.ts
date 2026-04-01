@@ -84,6 +84,7 @@ type ApprovalStrategy<
   getRequestId: (request: TRequest) => string;
   getResolvedId: (resolved: TResolved) => string;
   getExpiresAtMs: (request: TRequest) => number;
+  getResolutionStatus?: (resolved: TResolved) => "approved" | "denied" | "expired";
   getRouteRequestFromRequest: (request: TRequest) => TRouteRequest;
   getRouteRequestFromResolved: (resolved: TResolved) => TRouteRequest | null;
   buildExpiredText: (request: TRequest) => string;
@@ -107,6 +108,19 @@ export type ExecApprovalForwarderDeps = {
   getConfig?: () => OpenClawConfig;
   deliver?: typeof deliverOutboundPayloads;
   nowMs?: () => number;
+  mirrorRequested?: (params: {
+    kind: "exec" | "plugin";
+    requestId: string;
+    sessionKey?: string | null;
+    payload: Record<string, unknown>;
+  }) => Promise<void>;
+  mirrorResolved?: (params: {
+    kind: "exec" | "plugin";
+    requestId: string;
+    sessionKey?: string | null;
+    status: "approved" | "denied" | "expired";
+    payload: Record<string, unknown>;
+  }) => Promise<void>;
   resolveSessionTarget?: (params: {
     cfg: OpenClawConfig;
     request: ExecApprovalRequest;
@@ -467,6 +481,8 @@ function createApprovalHandlers<
   getConfig: () => OpenClawConfig;
   deliver: typeof deliverOutboundPayloads;
   nowMs: () => number;
+  mirrorRequested?: ExecApprovalForwarderDeps["mirrorRequested"];
+  mirrorResolved?: ExecApprovalForwarderDeps["mirrorResolved"];
   resolveSessionTarget: (params: {
     cfg: OpenClawConfig;
     request: ExecApprovalRequest;
@@ -479,6 +495,12 @@ function createApprovalHandlers<
     const config = params.strategy.config(cfg);
     const requestId = params.strategy.getRequestId(request);
     const routeRequest = params.strategy.getRouteRequestFromRequest(request);
+    await params.mirrorRequested?.({
+      kind: params.strategy.kind,
+      requestId,
+      sessionKey: routeRequest.sessionKey,
+      payload: request as Record<string, unknown>,
+    });
     const filteredTargets = [
       ...(shouldForwardRoute({ config, routeRequest })
         ? resolveForwardTargets({
@@ -561,6 +583,14 @@ function createApprovalHandlers<
 
   const handleResolved = async (resolved: TResolved) => {
     const resolvedId = params.strategy.getResolvedId(resolved);
+    const resolvedRouteRequest = params.strategy.getRouteRequestFromResolved(resolved);
+    await params.mirrorResolved?.({
+      kind: params.strategy.kind,
+      requestId: resolvedId,
+      sessionKey: resolvedRouteRequest?.sessionKey,
+      status: params.strategy.getResolutionStatus?.(resolved) ?? "approved",
+      payload: resolved as Record<string, unknown>,
+    });
     const entry = pending.get(resolvedId);
     if (entry?.timeoutId) {
       clearTimeout(entry.timeoutId);
@@ -572,7 +602,7 @@ function createApprovalHandlers<
     const cfg = params.getConfig();
     let targets = entry?.targets;
     if (!targets) {
-      const routeRequest = params.strategy.getRouteRequestFromResolved(resolved);
+      const routeRequest = resolvedRouteRequest;
       if (routeRequest) {
         const config = params.strategy.config(cfg);
         targets = [
@@ -599,10 +629,7 @@ function createApprovalHandlers<
           cfg,
           resolved,
           target,
-          routeRequest:
-            entry?.routeRequest ??
-            params.strategy.getRouteRequestFromResolved(resolved) ??
-            ({} as TRouteRequest),
+          routeRequest: entry?.routeRequest ?? resolvedRouteRequest ?? ({} as TRouteRequest),
         }),
       deliver: params.deliver,
     });
@@ -626,6 +653,7 @@ const execApprovalStrategy: ApprovalStrategy<ExecApprovalRequest, ExecApprovalRe
   getRequestId: (request) => request.id,
   getResolvedId: (resolved) => resolved.id,
   getExpiresAtMs: (request) => request.expiresAtMs,
+  getResolutionStatus: (resolved) => (resolved.decision === "deny" ? "denied" : "approved"),
   getRouteRequestFromRequest: (request) => ({
     agentId: request.request.agentId ?? null,
     sessionKey: request.request.sessionKey ?? null,
@@ -667,6 +695,7 @@ const pluginApprovalStrategy: ApprovalStrategy<PluginApprovalRequest, PluginAppr
   getRequestId: (request) => request.id,
   getResolvedId: (resolved) => resolved.id,
   getExpiresAtMs: (request) => request.expiresAtMs,
+  getResolutionStatus: (resolved) => (resolved.decision === "deny" ? "denied" : "approved"),
   getRouteRequestFromRequest: (request) => ({
     agentId: request.request.agentId ?? null,
     sessionKey: request.request.sessionKey ?? null,
@@ -715,6 +744,8 @@ export function createExecApprovalForwarder(
     getConfig,
     deliver,
     nowMs,
+    mirrorRequested: deps.mirrorRequested,
+    mirrorResolved: deps.mirrorResolved,
     resolveSessionTarget,
   });
   const pluginHandlers = createApprovalHandlers({
@@ -722,6 +753,8 @@ export function createExecApprovalForwarder(
     getConfig,
     deliver,
     nowMs,
+    mirrorRequested: deps.mirrorRequested,
+    mirrorResolved: deps.mirrorResolved,
     resolveSessionTarget,
   });
 

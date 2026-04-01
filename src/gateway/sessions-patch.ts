@@ -77,6 +77,19 @@ function normalizeSubagentControlScope(raw: string): "children" | "none" | undef
   return undefined;
 }
 
+function normalizeExecutionRole(raw: string): SessionEntry["executionRole"] | undefined {
+  const normalized = raw.trim().toLowerCase();
+  if (
+    normalized === "lead" ||
+    normalized === "worker" ||
+    normalized === "subagent" ||
+    normalized === "remote_peer"
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
+
 export async function applySessionsPatchToStore(params: {
   cfg: OpenClawConfig;
   store: Record<string, SessionEntry>;
@@ -162,6 +175,31 @@ export async function applySessionsPatchToStore(params: {
         return invalid("spawnDepth cannot be changed once set");
       }
       next.spawnDepth = normalized;
+    }
+  }
+
+  if ("executionRole" in patch) {
+    const raw = patch.executionRole;
+    if (raw === null) {
+      if (existing?.executionRole) {
+        return invalid("executionRole cannot be cleared once set");
+      }
+    } else if (raw !== undefined) {
+      const normalized = normalizeExecutionRole(String(raw));
+      if (!normalized) {
+        return invalid(
+          'invalid executionRole (use "lead", "worker", "subagent", or "remote_peer")',
+        );
+      }
+      if (normalized !== "lead" && !supportsSpawnLineage(storeKey)) {
+        return invalid(
+          "executionRole is only supported for lead sessions or subagent:* / acp:* sessions",
+        );
+      }
+      if (existing?.executionRole && existing.executionRole !== normalized) {
+        return invalid("executionRole cannot be changed once set");
+      }
+      next.executionRole = normalized;
     }
   }
 

@@ -319,6 +319,25 @@ describe("gateway sessions patch", () => {
     expect(entry.spawnDepth).toBe(2);
   });
 
+  test("sets executionRole for lead sessions", async () => {
+    const entry = expectPatchOk(
+      await runPatch({
+        patch: { key: MAIN_SESSION_KEY, executionRole: "lead" },
+      }),
+    );
+    expect(entry.executionRole).toBe("lead");
+  });
+
+  test("sets executionRole for spawned worker sessions", async () => {
+    const entry = expectPatchOk(
+      await runPatch({
+        storeKey: "agent:main:acp:child",
+        patch: { key: "agent:main:acp:child", executionRole: "worker" },
+      }),
+    );
+    expect(entry.executionRole).toBe("worker");
+  });
+
   test("rejects spawnDepth on non-subagent sessions", async () => {
     const result = await runPatch({
       patch: { key: MAIN_SESSION_KEY, spawnDepth: 1 },

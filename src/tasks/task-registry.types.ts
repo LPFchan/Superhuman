@@ -23,6 +23,43 @@ export type TaskNotifyPolicy = "done_only" | "state_changes" | "silent";
 
 export type TaskTerminalOutcome = "succeeded" | "blocked";
 export type TaskScopeKind = "session" | "system";
+export type TaskExecutionRole = "lead" | "worker" | "subagent" | "remote_peer";
+export type TaskWorkerBackend = "in_process" | "out_of_process";
+export type TaskQueueState = "queued" | "launching" | "running" | "refused" | "terminal";
+export type TaskNotificationMode = "direct" | "mailbox";
+
+export type TaskLaunchRequest = {
+  backend: TaskWorkerBackend;
+  mode?: "run" | "session";
+  model?: string;
+  thinking?: string;
+  cleanup?: "delete" | "keep";
+  thread?: boolean;
+  sandbox?: "inherit" | "require";
+  streamTo?: "parent";
+  requesterAgentIdOverride?: string;
+  resumeSessionId?: string;
+  workspaceDir?: string;
+};
+
+export type TaskOrchestrationMetadata = {
+  executionRole?: TaskExecutionRole;
+  workerBackend?: TaskWorkerBackend;
+  controllerSessionKey?: string;
+  queueState?: TaskQueueState;
+  notificationMode?: TaskNotificationMode;
+  stableWorkerId?: string;
+  queueDelayMs?: number;
+  parentBudget?: number;
+  childBudget?: number;
+  budgetUsed?: number;
+  spawnCount?: number;
+  refusalReason?: string;
+  toolCount?: number;
+  lastHeartbeatAt?: number;
+  lastActivityAt?: number;
+  launchRequest?: TaskLaunchRequest;
+};
 
 export type TaskStatusCounts = Record<TaskStatus, number>;
 export type TaskRuntimeCounts = Record<TaskRuntime, number>;
@@ -75,6 +112,7 @@ export type TaskRecord = {
   progressSummary?: string;
   terminalSummary?: string;
   terminalOutcome?: TaskTerminalOutcome;
+  orchestration?: TaskOrchestrationMetadata;
 };
 
 export type TaskRegistrySnapshot = {

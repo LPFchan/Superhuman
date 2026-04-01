@@ -126,5 +126,28 @@ describe("task-executor-policy", () => {
         preferredTaskId: undefined,
       }),
     ).toBe(false);
+    expect(
+      shouldAutoDeliverTaskTerminalUpdate(
+        createTask({
+          status: "succeeded",
+          deliveryStatus: "pending",
+          orchestration: {
+            notificationMode: "mailbox",
+          },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldAutoDeliverTaskStateChange(
+        createTask({
+          status: "running",
+          notifyPolicy: "state_changes",
+          deliveryStatus: "pending",
+          orchestration: {
+            notificationMode: "mailbox",
+          },
+        }),
+      ),
+    ).toBe(false);
   });
 });

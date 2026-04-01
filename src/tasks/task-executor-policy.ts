@@ -82,6 +82,9 @@ export function shouldAutoDeliverTaskTerminalUpdate(task: TaskRecord): boolean {
   if (task.notifyPolicy === "silent") {
     return false;
   }
+  if (task.orchestration?.notificationMode === "mailbox") {
+    return false;
+  }
   if (task.runtime === "subagent" && task.status !== "cancelled") {
     return false;
   }
@@ -94,6 +97,7 @@ export function shouldAutoDeliverTaskTerminalUpdate(task: TaskRecord): boolean {
 export function shouldAutoDeliverTaskStateChange(task: TaskRecord): boolean {
   return (
     task.notifyPolicy === "state_changes" &&
+    task.orchestration?.notificationMode !== "mailbox" &&
     task.deliveryStatus === "pending" &&
     !isTerminalTaskStatus(task.status)
   );

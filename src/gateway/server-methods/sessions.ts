@@ -157,6 +157,7 @@ function emitSessionsChanged(
             spawnedBy: sessionRow.spawnedBy,
             spawnedWorkspaceDir: sessionRow.spawnedWorkspaceDir,
             forkedFromParent: sessionRow.forkedFromParent,
+            executionRole: sessionRow.executionRole,
             spawnDepth: sessionRow.spawnDepth,
             subagentRole: sessionRow.subagentRole,
             subagentControlScope: sessionRow.subagentControlScope,
