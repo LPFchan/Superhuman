@@ -508,10 +508,16 @@ export class SuperhumanAgentRuntimeTurn {
     if (this.activeStage) {
       this.exitStage(this.activeStage);
     }
-    const verificationOutcome = this.verificationTracker.ensureTerminalOutcome(status);
-    if (verificationOutcome) {
+    const verificationResolution = this.verificationTracker.ensureTerminalOutcome(status);
+    if (verificationResolution.outcome) {
       this.invocation.verificationRequired = true;
-      this.invocation.verificationOutcome = verificationOutcome;
+      this.invocation.verificationOutcome = verificationResolution.outcome;
+    }
+    if (verificationResolution.statusOverride) {
+      status = verificationResolution.statusOverride;
+    }
+    if (verificationResolution.latestError && !latestError) {
+      latestError = verificationResolution.latestError;
     }
     this.invocation.status = status;
     this.invocation.updatedAt = now;

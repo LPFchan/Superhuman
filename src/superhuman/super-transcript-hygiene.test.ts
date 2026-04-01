@@ -21,4 +21,45 @@ describe("transcript hygiene", () => {
     const result = sanitizeSuperReplayMessages(input);
     expect((result[0] as { content: Array<{ text: string }> }).content[0]?.text).toBe("hello");
   });
+
+  it("drops transient warning keys from structured tool-result payloads", () => {
+    const input = [
+      {
+        role: "tool",
+        content: JSON.stringify({
+          ok: true,
+          _budget_warning: "[runtime-warning: budget pressure]",
+        }),
+        details: {
+          status: "ok",
+          _budget_warning: "[runtime-warning: budget pressure]",
+          nested: {
+            runtimeWarning: "[tool-warning: omit]",
+            keep: "safe",
+          },
+          items: [
+            "keep",
+            "[transient-warning: omit]",
+            { toolWarning: "[tool-warning: omit]", still: "here" },
+          ],
+        },
+      },
+    ];
+
+    const result = sanitizeSuperReplayMessages(input) as Array<{
+      content: string;
+      details: {
+        status: string;
+        nested: { keep: string };
+        items: Array<unknown>;
+      };
+    }>;
+
+    expect(result[0]?.content).toBe('{"ok":true}');
+    expect(result[0]?.details).toEqual({
+      status: "ok",
+      nested: { keep: "safe" },
+      items: ["keep", { still: "here" }],
+    });
+  });
 });

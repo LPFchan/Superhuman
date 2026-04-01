@@ -158,7 +158,7 @@ describe("SuperhumanAgentRuntimeTurn", () => {
     stateStore.close();
   });
 
-  it("records an explicit verification pipeline when no verifier reports back", () => {
+  it("fails closed when code edits finish without verifier execution or declared exception", () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-verify-"));
     cleanupPaths.add(workspaceDir);
     const stateStore = createSuperhumanStateStore({ workspaceDir });
@@ -187,13 +187,14 @@ describe("SuperhumanAgentRuntimeTurn", () => {
 
     expect(stateStore.getRuntimeInvocation("run-verify")).toMatchObject({
       verificationRequired: true,
-      verificationOutcome: "not_verifiable",
+      verificationOutcome: "verification_failed",
+      status: "failed",
     });
     expect(stateStore.getActions({ runId: "run-verify" })).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           actionKind: "verification",
-          verificationStage: "skipped",
+          verificationStage: "failed",
           verifierKind: "runtime",
         }),
       ]),
@@ -205,6 +206,45 @@ describe("SuperhumanAgentRuntimeTurn", () => {
         expect.objectContaining({ stage: "verification_execution", boundary: "mark" }),
       ]),
     );
+
+    stateStore.close();
+  });
+
+  it("allows an explicit declared not-verifiable exception before terminal success", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-exception-"));
+    cleanupPaths.add(workspaceDir);
+    const stateStore = createSuperhumanStateStore({ workspaceDir });
+    const turn = new SuperhumanAgentRuntimeTurn({
+      workspaceDir,
+      runId: "run-exception",
+      sessionId: "session-exception",
+      sessionKey: "main",
+      mode: "interactive",
+      maxIterations: 1,
+      stateStore,
+    });
+
+    turn.handleAgentEvent({
+      runId: "run-exception",
+      seq: 1,
+      ts: 10,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "start",
+        name: "apply_patch",
+      },
+    });
+    turn.beginVerification("verification exception planning");
+    turn.executeVerification("verification exception execution");
+    turn.recordVerificationOutcome("not_verifiable", "manual exception: no deterministic verifier");
+    turn.finish("completed");
+
+    expect(stateStore.getRuntimeInvocation("run-exception")).toMatchObject({
+      verificationRequired: true,
+      verificationOutcome: "not_verifiable",
+      status: "completed",
+    });
 
     stateStore.close();
   });

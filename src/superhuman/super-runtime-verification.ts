@@ -6,6 +6,12 @@ import type {
   VerificationOutcome,
 } from "./super-runtime-seams.js";
 
+export type TerminalVerificationResolution = {
+  outcome?: VerificationOutcome;
+  statusOverride?: RuntimeInvocationStatus;
+  latestError?: string;
+};
+
 type VerificationStageHooks = {
   enterPlanning: (detail?: string) => void;
   enterExecution: (detail?: string) => void;
@@ -298,9 +304,9 @@ export class SuperRuntimeVerificationTracker {
     return outcome;
   }
 
-  ensureTerminalOutcome(status: RuntimeInvocationStatus): VerificationOutcome | undefined {
+  ensureTerminalOutcome(status: RuntimeInvocationStatus): TerminalVerificationResolution {
     if (!this.codeEditingOccurred || this.outcome) {
-      return this.outcome;
+      return { outcome: this.outcome };
     }
     const now = Date.now();
     const fallbackActionId = createId("verification");
@@ -323,8 +329,9 @@ export class SuperRuntimeVerificationTracker {
       verifierKind: "runtime",
     });
     this.params.hooks.enterExecution("verification pipeline completed without executable verifier");
-    this.outcome =
-      status === "failed" || status === "aborted" ? "verification_failed" : "not_verifiable";
+    const missingVerificationError =
+      "code-editing run completed without explicit verifier execution or declared verification exception";
+    this.outcome = "verification_failed";
     this.params.stateStore.appendAction({
       actionId: fallbackActionId,
       sessionKey: this.params.sessionKey,
@@ -332,24 +339,33 @@ export class SuperRuntimeVerificationTracker {
       actionType: "super.runtime.verification",
       actionKind: "verification",
       summary:
-        this.outcome === "verification_failed"
+        status === "failed" || status === "aborted"
           ? "Runtime ended before verification could complete"
-          : "Verification unavailable: no explicit verification command result recorded",
-      status: this.outcome === "verification_failed" ? "failed" : "completed",
+          : missingVerificationError,
+      status: "failed",
       createdAt: now,
       completedAt: now,
-      verificationStage: this.outcome === "verification_failed" ? "failed" : "skipped",
+      verificationStage: "failed",
       verifierKind: "runtime",
       details: {
         outcome: this.outcome,
+        terminalStatus: status,
       },
     });
     this.params.hooks.markExecution(
-      this.outcome === "verification_failed"
+      status === "failed" || status === "aborted"
         ? "runtime ended before verification could complete"
-        : "verification unavailable: no explicit verification command result recorded",
+        : missingVerificationError,
     );
-    return this.outcome;
+    return {
+      outcome: this.outcome,
+      ...(status === "completed"
+        ? {
+            statusOverride: "failed" as const,
+            latestError: missingVerificationError,
+          }
+        : {}),
+    };
   }
 
   noteManualPlanning(detail?: string): void {
