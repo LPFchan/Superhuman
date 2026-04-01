@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { AgentEventPayload } from "../infra/agent-events.js";
-import { classifyCommandRisk } from "./command-risk-classifier.js";
+import { classifySuperCommandRisk } from "./super-command-risk-classifier.js";
 import type {
   AgentRuntimeStage,
   RuntimeBudgetExhaustionReason,
@@ -11,8 +11,8 @@ import type {
   StateRuntimeInvocationRecord,
   StateStore,
   VerificationOutcome,
-} from "./runtime-seams.js";
-import { createSuperhumanStateStore } from "./state-store.js";
+} from "./super-runtime-seams.js";
+import { createSuperhumanStateStore } from "./super-state-store.js";
 
 type RuntimeBudgetState = StateIterationBudgetRecord;
 type RuntimeAbortNodeState = StateAbortNodeRecord;
@@ -68,7 +68,7 @@ function describeRiskFromEvent(event: AgentEventPayload): string | undefined {
   if (phase !== "start") {
     return undefined;
   }
-  const classification = classifyCommandRisk({
+  const classification = classifySuperCommandRisk({
     toolName: name,
     args: event.data.args,
   });
@@ -497,7 +497,7 @@ export class SuperhumanAgentRuntimeTurn {
   }
 }
 
-export function resolveRuntimeInvocationMode(params: {
+export function resolveSuperRuntimeInvocationMode(params: {
   trigger?: string;
   lane?: string;
 }): RuntimeInvocationMode {

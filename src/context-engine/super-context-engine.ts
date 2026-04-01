@@ -14,7 +14,7 @@ import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import {
   createSuperhumanStateStore,
   resolveSuperhumanStateDir,
-} from "../superhuman/state-store.js";
+} from "../superhuman/super-state-store.js";
 import { delegateCompactionToRuntime } from "./delegate.js";
 import { registerContextEngineForOwner } from "./registry.js";
 import type {

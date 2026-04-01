@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { updateSessionStore } from "../config/sessions/store.js";
 import { emitAgentEvent } from "../infra/agent-events.js";
 import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
-import { SessionPersistenceAdapter } from "./session-persistence-adapter.js";
-import { createSuperhumanStateStore } from "./state-store.js";
+import { SuperSessionPersistenceAdapter } from "./super-session-persistence-adapter.js";
+import { createSuperhumanStateStore } from "./super-state-store.js";
 
 const cleanupPaths = new Set<string>();
 
@@ -17,12 +17,12 @@ afterEach(() => {
   cleanupPaths.clear();
 });
 
-describe("SessionPersistenceAdapter", () => {
+describe("SuperSessionPersistenceAdapter", () => {
   it("projects lifecycle and transcript updates into the state store", () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-adapter-"));
     cleanupPaths.add(workspaceDir);
     const stateStore = createSuperhumanStateStore({ workspaceDir });
-    const adapter = new SessionPersistenceAdapter({
+    const adapter = new SuperSessionPersistenceAdapter({
       cfg: {
         agents: {
           defaults: {
@@ -106,7 +106,7 @@ describe("SessionPersistenceAdapter", () => {
       },
     };
     const stateStore = createSuperhumanStateStore({ workspaceDir });
-    const adapter = new SessionPersistenceAdapter({
+    const adapter = new SuperSessionPersistenceAdapter({
       cfg,
       workspaceDir,
       stateStore,
@@ -138,7 +138,7 @@ describe("SessionPersistenceAdapter", () => {
     });
     adapter.stop();
 
-    const restarted = new SessionPersistenceAdapter({
+    const restarted = new SuperSessionPersistenceAdapter({
       cfg,
       workspaceDir,
       stateStore,

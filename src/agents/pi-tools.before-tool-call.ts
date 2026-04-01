@@ -5,11 +5,11 @@ import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { copyPluginToolMeta } from "../plugins/tools.js";
 import { PluginApprovalResolutions, type PluginApprovalResolution } from "../plugins/types.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
-import { classifyCommandRisk } from "../superhuman/command-risk-classifier.js";
+import { classifySuperCommandRisk } from "../superhuman/super-command-risk-classifier.js";
 import {
-  copyRuntimeToolExecutionContext,
-  copyRuntimeToolSafetyMeta,
-} from "../superhuman/tool-runtime-policy.js";
+  copySuperRuntimeToolExecutionContext,
+  copySuperRuntimeToolSafetyMeta,
+} from "../superhuman/super-tool-runtime-policy.js";
 import { isPlainObject } from "../utils.js";
 import { copyChannelAgentToolMeta } from "./channel-tools.js";
 import { normalizeToolName } from "./tool-policy.js";
@@ -82,7 +82,7 @@ function shouldBlockCommandRisk(reason: string): boolean {
 }
 
 function resolveCommandRiskBlockReason(args: { toolName: string; params: unknown }): string | null {
-  const classification = classifyCommandRisk({
+  const classification = classifySuperCommandRisk({
     toolName: args.toolName,
     args: args.params,
   });
@@ -456,8 +456,8 @@ export function wrapToolWithBeforeToolCallHook(
   };
   copyPluginToolMeta(tool, wrappedTool);
   copyChannelAgentToolMeta(tool as never, wrappedTool as never);
-  copyRuntimeToolSafetyMeta(tool, wrappedTool);
-  copyRuntimeToolExecutionContext(tool, wrappedTool);
+  copySuperRuntimeToolSafetyMeta(tool, wrappedTool);
+  copySuperRuntimeToolExecutionContext(tool, wrappedTool);
   Object.defineProperty(wrappedTool, BEFORE_TOOL_CALL_WRAPPED, {
     value: true,
     enumerable: true,

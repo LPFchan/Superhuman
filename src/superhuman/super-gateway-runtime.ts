@@ -6,19 +6,22 @@ import { resolveAgentMainSessionKey } from "../config/sessions/main-session.js";
 import { runBootOnce, type BootRunResult } from "../gateway/boot.js";
 import { resolveSessionKeyForRun } from "../gateway/server-session-key.js";
 import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
-import { startOrchestrationRuntime, type OrchestrationRuntime } from "./orchestration-runtime.js";
+import { SuperContextEngineCompactionManager } from "./super-compaction-manager.js";
 import {
-  createPluginCapabilityRegistry,
-  NoopCompactionManager,
+  startSuperOrchestrationRuntime,
+  type OrchestrationRuntime,
+} from "./super-orchestration-runtime.js";
+import {
+  createSuperPluginCapabilityRegistry,
   type ChannelRegistry,
   type CompactionManager,
   type PluginRegistry,
   type SessionRegistry,
   type StateStore,
   type WorkspaceBootstrap,
-} from "./runtime-seams.js";
-import { SessionPersistenceAdapter } from "./session-persistence-adapter.js";
-import { createSuperhumanStateStore } from "./state-store.js";
+} from "./super-runtime-seams.js";
+import { SuperSessionPersistenceAdapter } from "./super-session-persistence-adapter.js";
+import { createSuperhumanStateStore } from "./super-state-store.js";
 
 export type SuperhumanGatewayRuntime = {
   stateStore: StateStore;
@@ -93,12 +96,12 @@ export function startSuperhumanGatewayRuntime(params: {
   pluginRegistry: OpenClawPluginRegistry;
 }): SuperhumanGatewayRuntime {
   const stateStore = createSuperhumanStateStore({ workspaceDir: params.workspaceDir });
-  const adapter = new SessionPersistenceAdapter({
+  const adapter = new SuperSessionPersistenceAdapter({
     cfg: params.cfg,
     workspaceDir: params.workspaceDir,
     stateStore,
   });
-  const orchestrationRuntime = startOrchestrationRuntime({
+  const orchestrationRuntime = startSuperOrchestrationRuntime({
     cfg: params.cfg,
     workspaceDir: params.workspaceDir,
   });
@@ -108,15 +111,17 @@ export function startSuperhumanGatewayRuntime(params: {
     orchestrationRuntime,
     sessionRegistry: createSessionRegistry(params.cfg),
     channelRegistry: createChannelRegistry(),
-    pluginRegistry: createPluginCapabilityRegistry(params.pluginRegistry),
+    pluginRegistry: createSuperPluginCapabilityRegistry(params.pluginRegistry),
     workspaceBootstrap: createWorkspaceBootstrap({
       cfg: params.cfg,
       deps: params.deps,
       workspaceDir: params.workspaceDir,
     }),
-    compactionManager: new NoopCompactionManager((sessionKey) =>
-      stateStore.getContextPressureSnapshot({ sessionKey }),
-    ),
+    compactionManager: new SuperContextEngineCompactionManager({
+      cfg: params.cfg,
+      workspaceDir: params.workspaceDir,
+      stateStore,
+    }),
     stop: () => {
       orchestrationRuntime.stop();
       adapter.stop();

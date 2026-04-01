@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { resolveSuperhumanStateDir } from "./state-store.js";
+import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
 export type OrchestrationWorkerState = "queued" | "launching" | "running" | "terminal" | "refused";
 
@@ -161,7 +161,9 @@ export type OrchestrationStore = {
   upsertApproval: (record: OrchestrationApprovalRecord) => OrchestrationApprovalRecord;
 };
 
-export function createOrchestrationStore(params: { workspaceDir: string }): OrchestrationStore {
+export function createSuperOrchestrationStore(params: {
+  workspaceDir: string;
+}): OrchestrationStore {
   const pathname = resolveOrchestrationStorePath(params.workspaceDir);
   let snapshot = loadSnapshot(pathname);
 

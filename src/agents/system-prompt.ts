@@ -2,7 +2,7 @@ import { createHmac, createHash } from "node:crypto";
 import type { ReasoningLevel, ThinkLevel } from "../auto-reply/thinking.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
-import { buildFrozenMemoryPromptSection } from "../superhuman/frozen-memory-prompt.js";
+import { buildSuperFrozenMemoryPromptSection } from "../superhuman/super-frozen-memory-prompt.js";
 import { listDeliverableMessageChannels } from "../utils/message-channel.js";
 import type { ResolvedTimeFormat } from "./date-time.js";
 import type { EmbeddedContextFile } from "./pi-embedded-helpers.js";
@@ -46,7 +46,7 @@ function buildMemorySection(params: {
   if (params.isMinimal) {
     return [];
   }
-  return buildFrozenMemoryPromptSection({
+  return buildSuperFrozenMemoryPromptSection({
     workspaceDir: params.workspaceDir,
     sessionKey: params.sessionKey,
     availableTools: params.availableTools,

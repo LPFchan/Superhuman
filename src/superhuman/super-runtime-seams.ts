@@ -305,31 +305,51 @@ export interface WorkspaceBootstrap {
 export interface CompactionManager {
   getSnapshot(sessionKey: string): ContextPressureSnapshot;
   shouldCompact(sessionKey: string): boolean;
-  compact(sessionKey: string): Promise<{ status: "skipped" }>;
-  recoverFromOverflow(sessionKey: string): Promise<{ status: "unavailable" }>;
+  compact(sessionKey: string): Promise<CompactionActionResult>;
+  recoverFromOverflow(sessionKey: string): Promise<CompactionActionResult>;
 }
 
-export class NoopCompactionManager implements CompactionManager {
-  constructor(private readonly resolveSnapshot: (sessionKey: string) => ContextPressureSnapshot) {}
+export type CompactionActionResult =
+  | {
+      status: "compacted";
+      result?: {
+        summary?: string;
+        firstKeptEntryId?: string;
+        tokensBefore: number;
+        tokensAfter?: number;
+        details?: unknown;
+      };
+    }
+  | {
+      status: "skipped";
+      reason?: string;
+      result?: {
+        summary?: string;
+        firstKeptEntryId?: string;
+        tokensBefore: number;
+        tokensAfter?: number;
+        details?: unknown;
+      };
+    }
+  | {
+      status: "failed";
+      reason: string;
+      result?: {
+        summary?: string;
+        firstKeptEntryId?: string;
+        tokensBefore: number;
+        tokensAfter?: number;
+        details?: unknown;
+      };
+    }
+  | {
+      status: "unavailable";
+      reason?: string;
+    };
 
-  getSnapshot(sessionKey: string): ContextPressureSnapshot {
-    return this.resolveSnapshot(sessionKey);
-  }
-
-  shouldCompact(_sessionKey: string): boolean {
-    return false;
-  }
-
-  async compact(_sessionKey: string): Promise<{ status: "skipped" }> {
-    return { status: "skipped" };
-  }
-
-  async recoverFromOverflow(_sessionKey: string): Promise<{ status: "unavailable" }> {
-    return { status: "unavailable" };
-  }
-}
-
-export function createPluginCapabilityRegistry(registry: OpenClawPluginRegistry): PluginRegistry {
+export function createSuperPluginCapabilityRegistry(
+  registry: OpenClawPluginRegistry,
+): PluginRegistry {
   return {
     listLoadedPlugins: () => registry.plugins.map((entry) => entry.id),
     hasPlugin: (pluginId) => registry.plugins.some((entry) => entry.id === pluginId),

@@ -5,7 +5,7 @@ import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js
 import { stopGmailWatcher } from "../hooks/gmail-watcher.js";
 import type { HeartbeatRunner } from "../infra/heartbeat-runner.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
-import type { SuperhumanGatewayRuntime } from "../superhuman/gateway-runtime.js";
+import type { SuperhumanGatewayRuntime } from "../superhuman/super-gateway-runtime.js";
 
 export function createGatewayCloseHandler(params: {
   bonjourStop: (() => Promise<void>) | null;

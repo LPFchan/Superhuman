@@ -24,7 +24,7 @@ import {
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import { resolveToolCallArgumentsEncoding } from "../../../plugins/provider-model-compat.js";
 import { isSubagentSessionKey } from "../../../routing/session-key.js";
-import { sanitizeReplayMessages } from "../../../superhuman/transcript-hygiene.js";
+import { sanitizeSuperReplayMessages } from "../../../superhuman/super-transcript-hygiene.js";
 import { buildTtsSystemPromptHint } from "../../../tts/tts.js";
 import { resolveUserPath } from "../../../utils.js";
 import { normalizeMessageChannel } from "../../../utils/message-channel.js";
@@ -1107,7 +1107,7 @@ export async function runEmbeddedAttempt(
           sessionId: params.sessionId,
           policy: transcriptPolicy,
         });
-        const replaySafePrior = sanitizeReplayMessages(prior);
+        const replaySafePrior = sanitizeSuperReplayMessages(prior);
         cacheTrace?.recordStage("session:sanitized", { messages: replaySafePrior });
         const validatedGemini = transcriptPolicy.validateGeminiTurns
           ? validateGeminiTurns(replaySafePrior)

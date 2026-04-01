@@ -1,8 +1,8 @@
 import { copyPluginToolMeta } from "../plugins/tools.js";
 import {
-  copyRuntimeToolExecutionContext,
-  copyRuntimeToolSafetyMeta,
-} from "../superhuman/tool-runtime-policy.js";
+  copySuperRuntimeToolExecutionContext,
+  copySuperRuntimeToolSafetyMeta,
+} from "../superhuman/super-tool-runtime-policy.js";
 import { bindAbortRelay } from "../utils/fetch-timeout.js";
 import { copyChannelAgentToolMeta } from "./channel-tools.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
@@ -72,7 +72,7 @@ export function wrapToolWithAbortSignal(
   };
   copyPluginToolMeta(tool, wrappedTool);
   copyChannelAgentToolMeta(tool as never, wrappedTool as never);
-  copyRuntimeToolSafetyMeta(tool, wrappedTool);
-  copyRuntimeToolExecutionContext(tool, wrappedTool);
+  copySuperRuntimeToolSafetyMeta(tool, wrappedTool);
+  copySuperRuntimeToolExecutionContext(tool, wrappedTool);
   return wrappedTool;
 }

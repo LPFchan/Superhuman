@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createSuperhumanStateStore, resolveSuperhumanStateDbPath } from "./state-store.js";
+import { createSuperhumanStateStore, resolveSuperhumanStateDbPath } from "./super-state-store.js";
 
 const cleanupPaths = new Set<string>();
 

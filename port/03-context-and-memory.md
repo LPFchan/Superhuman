@@ -69,6 +69,7 @@ Implementation notes:
 - Memory stability is a release blocker for later proactive features.
 - Replay must remain provenance-aware: original, imported, collapsed, restored, partial, and preview-derived states must remain distinguishable in stored history.
 - Compatibility caveat: if the OpenClaw ecosystem needs new context or memory behavior, add it through typed context-engine or runtime capability seams rather than private reach-ins around plugin runtime or registry ownership.
+- Nomenclature policy: Superhuman-owned context, memory, compaction, and collapse modules introduced here should use explicit `super-*` / `Super*` names, while shared context-engine or plugin-contract seams keep their generic naming.
 - Slot policy caveat: `super-context` should remain the default slot target, with `legacy` preserved as an opt-in compatibility path while shared runtime callers still rely on it.
 
 Source extraction map:

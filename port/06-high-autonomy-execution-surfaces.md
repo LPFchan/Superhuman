@@ -58,6 +58,7 @@ Implementation notes:
 - Computer-use support should remain optional and explicitly gated.
 - Remote execution must not silently downgrade rename, refactor, verification, or provenance-sensitive tasks when the remote environment lacks the required capabilities.
 - Compatibility caveat: new remote or high-autonomy behavior should be negotiated through typed capabilities and documented contracts, not by bypassing plugin runtime, registry ownership, or channel/provider seams with private integrations.
+- Nomenclature policy: Superhuman-owned remote, scheduled-remote, and high-autonomy execution surfaces introduced here should use explicit `super-*` / `Super*` naming, while environment, provider, and plugin-facing contracts keep generic names when they are intentionally shared.
 - Slot policy caveat: remote and cross-plane execution should continue to tolerate explicit `legacy` selection for compatibility even while `super-context` remains the default context-engine slot target.
 
 Source extraction map:

@@ -15,12 +15,12 @@ import {
 } from "../tasks/task-registry.store.js";
 import type { TaskRecord } from "../tasks/task-registry.types.js";
 import {
-  createOrchestrationStore,
+  createSuperOrchestrationStore,
   type OrchestrationApprovalRecord,
   type OrchestrationMailboxMessageKind,
   type OrchestrationStore,
   type OrchestrationWorkerRecord,
-} from "./orchestration-store.js";
+} from "./super-orchestration-store.js";
 
 const log = createSubsystemLogger("superhuman/orchestration");
 
@@ -196,15 +196,15 @@ function hydrateWorkerFromTask(params: {
   );
 }
 
-export function getActiveOrchestrationRuntime(): OrchestrationRuntime | null {
+export function getActiveSuperOrchestrationRuntime(): OrchestrationRuntime | null {
   return activeRuntime;
 }
 
-export function startOrchestrationRuntime(params: {
+export function startSuperOrchestrationRuntime(params: {
   cfg: OpenClawConfig;
   workspaceDir: string;
 }): OrchestrationRuntime {
-  const store = createOrchestrationStore({ workspaceDir: params.workspaceDir });
+  const store = createSuperOrchestrationStore({ workspaceDir: params.workspaceDir });
   const previousHooks = getTaskRegistryHooks();
   let stopped = false;
   const launchPromises = new Map<string, Promise<void>>();

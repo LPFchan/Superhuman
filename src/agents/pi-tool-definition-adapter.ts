@@ -7,10 +7,10 @@ import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { logDebug, logError } from "../logger.js";
 import { redactToolDetail } from "../logging/redact.js";
 import {
-  createToolExecutionScheduler,
-  getRuntimeToolExecutionContext,
-  getRuntimeToolSafetyMeta,
-} from "../superhuman/tool-runtime-policy.js";
+  createSuperToolExecutionScheduler,
+  getSuperRuntimeToolExecutionContext,
+  getSuperRuntimeToolSafetyMeta,
+} from "../superhuman/super-tool-runtime-policy.js";
 import { isPlainObject } from "../utils.js";
 import { sanitizeForConsole } from "./console-sanitize.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";
@@ -175,13 +175,13 @@ function splitToolExecuteArgs(args: ToolExecuteArgsAny): {
 }
 
 export function toToolDefinitions(tools: AnyAgentTool[]): ToolDefinition[] {
-  const scheduler = createToolExecutionScheduler();
+  const scheduler = createSuperToolExecutionScheduler();
   return tools.map((tool) => {
     const name = tool.name || "tool";
     const normalizedName = normalizeToolName(name);
     const beforeHookWrapped = isToolWrappedWithBeforeToolCallHook(tool);
-    const runtimeSafety = getRuntimeToolSafetyMeta(tool);
-    const runtimeExecutionContext = getRuntimeToolExecutionContext(tool);
+    const runtimeSafety = getSuperRuntimeToolSafetyMeta(tool);
+    const runtimeExecutionContext = getSuperRuntimeToolExecutionContext(tool);
     return {
       name,
       label: tool.label ?? name,

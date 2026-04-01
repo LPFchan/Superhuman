@@ -4,9 +4,9 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { requireNodeSqlite } from "../infra/node-sqlite.js";
 import { estimateStringChars, estimateTokensFromChars } from "../utils/cjk-chars.js";
 import {
-  buildContextPressureSnapshot,
-  resolveContextPressureOptionsForSession,
-} from "./context-pressure.js";
+  buildSuperContextPressureSnapshot,
+  resolveSuperContextPressureOptionsForSession,
+} from "./super-context-pressure.js";
 import type {
   AbortNodeStatus,
   AgentRuntimeStage,
@@ -37,7 +37,7 @@ import type {
   TeamMemorySyncDirection,
   TeamMemorySyncStatus,
   VerificationOutcome,
-} from "./runtime-seams.js";
+} from "./super-runtime-seams.js";
 
 const STATE_DIR_MODE = 0o700;
 const STATE_FILE_MODE = 0o600;
@@ -1281,11 +1281,11 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       const totalRow = opened.statements.selectApproxTokens.get(paramsIn.sessionKey) as
         | { total_tokens?: number }
         | undefined;
-      const snapshot = buildContextPressureSnapshot({
+      const snapshot = buildSuperContextPressureSnapshot({
         estimatedInputTokens: Math.max(0, totalRow?.total_tokens ?? 0),
         createdAt: paramsIn.createdAt,
         runId: paramsIn.runId,
-        ...resolveContextPressureOptionsForSession({
+        ...resolveSuperContextPressureOptionsForSession({
           sessionKey: paramsIn.sessionKey,
           configuredContextLimit: paramsIn.configuredContextLimit,
           reservedOutputTokens: paramsIn.reservedOutputTokens,
@@ -1364,9 +1364,9 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
       const totalRow = opened.statements.selectApproxTokens.get(paramsIn.sessionKey) as
         | { total_tokens?: number }
         | undefined;
-      return buildContextPressureSnapshot({
+      return buildSuperContextPressureSnapshot({
         estimatedInputTokens: Math.max(0, totalRow?.total_tokens ?? 0),
-        ...resolveContextPressureOptionsForSession({
+        ...resolveSuperContextPressureOptionsForSession({
           sessionKey: paramsIn.sessionKey,
           configuredContextLimit: paramsIn.effectiveContextLimit,
           reservedOutputTokens: paramsIn.reservedOutputTokens,

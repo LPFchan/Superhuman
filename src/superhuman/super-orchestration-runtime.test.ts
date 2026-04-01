@@ -6,7 +6,7 @@ import {
   resetTaskRegistryForTests,
 } from "../tasks/task-registry.js";
 import { withTempDir } from "../test-helpers/temp-dir.js";
-import { startOrchestrationRuntime } from "./orchestration-runtime.js";
+import { startSuperOrchestrationRuntime } from "./super-orchestration-runtime.js";
 
 const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
 
@@ -94,7 +94,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
-      const runtime = startOrchestrationRuntime({
+      const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
             defaults: {

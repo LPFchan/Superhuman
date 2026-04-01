@@ -1,10 +1,10 @@
 import type { AnyAgentTool } from "../agents/tools/common.js";
-import type { SuperhumanAgentRuntimeTurn } from "./agent-runtime.js";
+import type { SuperhumanAgentRuntimeTurn } from "./super-agent-runtime.js";
 import {
-  planToolBatch,
+  planSuperToolBatch,
   type ToolBatchItem,
   type ToolCapabilityClass,
-} from "./tool-batch-planner.js";
+} from "./super-tool-batch-planner.js";
 
 export type RuntimeToolSafetyMeta = {
   neverParallel?: boolean;
@@ -149,42 +149,50 @@ function resolveCapabilityClass(toolName: string): ToolCapabilityClass | undefin
   return undefined;
 }
 
-export function setRuntimeToolSafetyMeta(tool: AnyAgentTool, meta: RuntimeToolSafetyMeta): void {
+export function setSuperRuntimeToolSafetyMeta(
+  tool: AnyAgentTool,
+  meta: RuntimeToolSafetyMeta,
+): void {
   runtimeToolSafetyMeta.set(tool, meta);
 }
 
-export function getRuntimeToolSafetyMeta(tool: AnyAgentTool): RuntimeToolSafetyMeta | undefined {
+export function getSuperRuntimeToolSafetyMeta(
+  tool: AnyAgentTool,
+): RuntimeToolSafetyMeta | undefined {
   return runtimeToolSafetyMeta.get(tool);
 }
 
-export function copyRuntimeToolSafetyMeta(source: AnyAgentTool, target: AnyAgentTool): void {
+export function copySuperRuntimeToolSafetyMeta(source: AnyAgentTool, target: AnyAgentTool): void {
   const meta = runtimeToolSafetyMeta.get(source);
   if (meta) {
     runtimeToolSafetyMeta.set(target, meta);
   }
 }
 
-export function setRuntimeToolExecutionContext(
+export function setSuperRuntimeToolExecutionContext(
   tool: AnyAgentTool,
   context: RuntimeToolExecutionContext,
 ): void {
   runtimeToolExecutionContext.set(tool, context);
 }
 
-export function getRuntimeToolExecutionContext(
+export function getSuperRuntimeToolExecutionContext(
   tool: AnyAgentTool,
 ): RuntimeToolExecutionContext | undefined {
   return runtimeToolExecutionContext.get(tool);
 }
 
-export function copyRuntimeToolExecutionContext(source: AnyAgentTool, target: AnyAgentTool): void {
+export function copySuperRuntimeToolExecutionContext(
+  source: AnyAgentTool,
+  target: AnyAgentTool,
+): void {
   const context = runtimeToolExecutionContext.get(source);
   if (context) {
     runtimeToolExecutionContext.set(target, context);
   }
 }
 
-export function applyDefaultRuntimeToolSafety(params: {
+export function applyDefaultSuperRuntimeToolSafety(params: {
   tools: AnyAgentTool[];
   scopeKey?: string;
 }): void {
@@ -192,7 +200,7 @@ export function applyDefaultRuntimeToolSafety(params: {
     const toolName = tool.name.trim().toLowerCase();
     const capabilityClass = resolveCapabilityClass(toolName);
     if (toolName === "bash" || toolName === "exec") {
-      setRuntimeToolSafetyMeta(tool, {
+      setSuperRuntimeToolSafetyMeta(tool, {
         neverParallel: true,
         destructivePossible: true,
         capabilityClass,
@@ -201,7 +209,7 @@ export function applyDefaultRuntimeToolSafety(params: {
       continue;
     }
     if (toolName === "process") {
-      setRuntimeToolSafetyMeta(tool, {
+      setSuperRuntimeToolSafetyMeta(tool, {
         neverParallel: true,
         capabilityClass,
         scopeKey: params.scopeKey,
@@ -209,7 +217,7 @@ export function applyDefaultRuntimeToolSafety(params: {
       continue;
     }
     if (toolName === "vscode_renamesymbol" || toolName === "symbol_rename") {
-      setRuntimeToolSafetyMeta(tool, {
+      setSuperRuntimeToolSafetyMeta(tool, {
         neverParallel: true,
         pathScoped: true,
         destructivePossible: true,
@@ -224,7 +232,7 @@ export function applyDefaultRuntimeToolSafety(params: {
       toolName === "apply_patch" ||
       toolName === "read"
     ) {
-      setRuntimeToolSafetyMeta(tool, {
+      setSuperRuntimeToolSafetyMeta(tool, {
         pathScoped: true,
         parallelSafe: toolName === "read",
         capabilityClass,
@@ -233,7 +241,7 @@ export function applyDefaultRuntimeToolSafety(params: {
       continue;
     }
     if (capabilityClass) {
-      setRuntimeToolSafetyMeta(tool, {
+      setSuperRuntimeToolSafetyMeta(tool, {
         parallelSafe: capabilityClass !== "symbol_rename",
         capabilityClass,
         scopeKey: params.scopeKey,
@@ -242,16 +250,16 @@ export function applyDefaultRuntimeToolSafety(params: {
   }
 }
 
-export function applyRuntimeToolExecutionContext(params: {
+export function applySuperRuntimeToolExecutionContext(params: {
   tools: AnyAgentTool[];
   context: RuntimeToolExecutionContext;
 }): void {
   for (const tool of params.tools) {
-    setRuntimeToolExecutionContext(tool, params.context);
+    setSuperRuntimeToolExecutionContext(tool, params.context);
   }
 }
 
-export function createToolExecutionScheduler() {
+export function createSuperToolExecutionScheduler() {
   const queue: PendingToolExecutionAny[] = [];
   let draining = false;
 
@@ -279,7 +287,7 @@ export function createToolExecutionScheduler() {
               safety: next.safety,
               args: next.params,
             });
-            const plan = planToolBatch([...batchItems, nextItem]);
+            const plan = planSuperToolBatch([...batchItems, nextItem]);
             if (plan.mode !== "parallel") {
               break;
             }

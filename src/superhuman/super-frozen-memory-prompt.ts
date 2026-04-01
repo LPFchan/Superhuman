@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
 import { buildMemoryPromptSection } from "../plugins/memory-state.js";
-import { resolveSuperhumanStateDir } from "./state-store.js";
+import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
 type FrozenMemoryPromptSnapshot = {
   sessionKey: string;
@@ -52,7 +52,7 @@ function persistSnapshot(snapshotPath: string, snapshot: FrozenMemoryPromptSnaps
   });
 }
 
-export function buildFrozenMemoryPromptSection(params: {
+export function buildSuperFrozenMemoryPromptSection(params: {
   workspaceDir: string;
   sessionKey?: string;
   availableTools: Set<string>;

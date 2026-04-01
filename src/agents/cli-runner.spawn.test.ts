@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
-import { createSuperhumanStateStore } from "../superhuman/state-store.js";
+import { createSuperhumanStateStore } from "../superhuman/super-state-store.js";
 import {
   createManagedRun,
   mockSuccessfulCliRun,

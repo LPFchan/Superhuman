@@ -78,8 +78,8 @@ import {
 } from "../secrets/runtime.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
-import type { SuperhumanGatewayRuntime } from "../superhuman/gateway-runtime.js";
-import { getActiveOrchestrationRuntime } from "../superhuman/orchestration-runtime.js";
+import type { SuperhumanGatewayRuntime } from "../superhuman/super-gateway-runtime.js";
+import { getActiveSuperOrchestrationRuntime } from "../superhuman/super-orchestration-runtime.js";
 import {
   getInspectableTaskRegistrySummary,
   startTaskRegistryMaintenance,
@@ -1185,7 +1185,7 @@ export async function startGatewayServer(
     const execApprovalManager = new ExecApprovalManager();
     const execApprovalForwarder = createExecApprovalForwarder({
       mirrorRequested: async (approval) => {
-        await getActiveOrchestrationRuntime()?.recordApprovalRequested({
+        await getActiveSuperOrchestrationRuntime()?.recordApprovalRequested({
           kind: approval.kind,
           requestId: approval.requestId,
           sessionKey: approval.sessionKey,
@@ -1193,7 +1193,7 @@ export async function startGatewayServer(
         });
       },
       mirrorResolved: async (approval) => {
-        await getActiveOrchestrationRuntime()?.recordApprovalResolved({
+        await getActiveSuperOrchestrationRuntime()?.recordApprovalResolved({
           kind: approval.kind,
           requestId: approval.requestId,
           sessionKey: approval.sessionKey,

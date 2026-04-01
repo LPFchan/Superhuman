@@ -4,7 +4,7 @@ import { DEFAULT_CONTEXT_TOKENS } from "../agents/defaults.js";
 import { resolveCompactionReserveTokensFloor } from "../agents/pi-settings.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { loadGatewaySessionRow, resolveSessionModelRef } from "../gateway/session-utils.js";
-import type { ContextPressureSnapshot } from "./runtime-seams.js";
+import type { ContextPressureSnapshot } from "./super-runtime-seams.js";
 
 export const DEFAULT_RESERVED_OUTPUT_TOKENS = 4_096;
 export const DEFAULT_AUTOCOMPACT_BUFFER_TOKENS = 13_000;
@@ -35,7 +35,7 @@ function toPositiveInt(value: unknown): number | undefined {
   return Math.floor(value);
 }
 
-export function buildContextPressureSnapshot(
+export function buildSuperContextPressureSnapshot(
   params: ContextPressureSnapshotOptions,
 ): ContextPressureSnapshot {
   const configuredContextLimit = Math.max(
@@ -81,7 +81,7 @@ export function buildContextPressureSnapshot(
   };
 }
 
-export function resolveContextPressureOptionsForSession(params: {
+export function resolveSuperContextPressureOptionsForSession(params: {
   sessionKey: string;
   configuredContextLimit?: number;
   reservedOutputTokens?: number;
@@ -110,7 +110,7 @@ export function resolveContextPressureOptionsForSession(params: {
   };
 }
 
-export function resolveContextPressureOptionsFromConfig(params: {
+export function resolveSuperContextPressureOptionsFromConfig(params: {
   cfg: OpenClawConfig;
   sessionKey: string;
 }): Omit<ContextPressureSnapshotOptions, "estimatedInputTokens"> {

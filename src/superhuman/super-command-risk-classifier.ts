@@ -131,7 +131,7 @@ function classifyExecLikeArgs(args: ExecLikeArgs): CommandRiskClassification {
   };
 }
 
-export function classifyCommandRisk(params: {
+export function classifySuperCommandRisk(params: {
   toolName: string;
   args: unknown;
 }): CommandRiskClassification {

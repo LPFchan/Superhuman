@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyCommandRisk } from "./command-risk-classifier.js";
+import { classifySuperCommandRisk } from "./super-command-risk-classifier.js";
 
-describe("classifyCommandRisk", () => {
+describe("classifySuperCommandRisk", () => {
   it("flags destructive shell patterns as high risk", () => {
-    const result = classifyCommandRisk({
+    const result = classifySuperCommandRisk({
       toolName: "bash",
       args: { command: "git reset --hard HEAD" },
     });
@@ -14,7 +14,7 @@ describe("classifyCommandRisk", () => {
   });
 
   it("flags interpreter inline eval and dangerous env overrides", () => {
-    const result = classifyCommandRisk({
+    const result = classifySuperCommandRisk({
       toolName: "exec",
       args: {
         argv: ["python3", "-c", "print('hi')"],

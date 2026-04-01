@@ -60,7 +60,7 @@ function haveOverlappingScopes(items: ToolBatchItem[]): boolean {
   return false;
 }
 
-export function planToolBatch(items: ToolBatchItem[]): ToolBatchPlan {
+export function planSuperToolBatch(items: ToolBatchItem[]): ToolBatchPlan {
   if (items.length <= 1) {
     return { mode: "sequential", reason: "single tool call" };
   }

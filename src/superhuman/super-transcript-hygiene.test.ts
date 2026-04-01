@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeReplayMessages, sanitizeReplayText } from "./transcript-hygiene.js";
+import {
+  sanitizeSuperReplayMessages,
+  sanitizeSuperReplayText,
+} from "./super-transcript-hygiene.js";
 
 describe("transcript hygiene", () => {
   it("drops transient runtime warnings and normalizes lone surrogates", () => {
-    expect(sanitizeReplayText("ok\n[runtime-warning: noisy]\n\uD800bad")).toBe(
+    expect(sanitizeSuperReplayText("ok\n[runtime-warning: noisy]\n\uD800bad")).toBe(
       "ok\nReplacedbad".replace("Replaced", "\uFFFD"),
     );
   });
@@ -15,7 +18,7 @@ describe("transcript hygiene", () => {
         content: [{ type: "text", text: "hello\n[tool-warning: omit]" }],
       },
     ];
-    const result = sanitizeReplayMessages(input);
+    const result = sanitizeSuperReplayMessages(input);
     expect((result[0] as { content: Array<{ text: string }> }).content[0]?.text).toBe("hello");
   });
 });

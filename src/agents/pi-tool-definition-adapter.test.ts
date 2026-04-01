@@ -4,12 +4,12 @@ import path from "node:path";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it } from "vitest";
-import { SuperhumanAgentRuntimeTurn } from "../superhuman/agent-runtime.js";
-import { createSuperhumanStateStore } from "../superhuman/state-store.js";
+import { SuperhumanAgentRuntimeTurn } from "../superhuman/super-agent-runtime.js";
+import { createSuperhumanStateStore } from "../superhuman/super-state-store.js";
 import {
-  setRuntimeToolExecutionContext,
-  setRuntimeToolSafetyMeta,
-} from "../superhuman/tool-runtime-policy.js";
+  setSuperRuntimeToolExecutionContext,
+  setSuperRuntimeToolSafetyMeta,
+} from "../superhuman/super-tool-runtime-policy.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";
 import { toClientToolDefinitions, toToolDefinitions } from "./pi-tool-definition-adapter.js";
 
@@ -132,7 +132,7 @@ describe("pi tool definition adapter", () => {
         return { content: [], details: { ok: true } };
       }) as AgentTool["execute"],
     } satisfies AgentTool;
-    setRuntimeToolSafetyMeta(tool, { neverParallel: true });
+    setSuperRuntimeToolSafetyMeta(tool, { neverParallel: true });
 
     const [def] = toToolDefinitions([tool]);
     if (!def) {
@@ -164,7 +164,7 @@ describe("pi tool definition adapter", () => {
           return { content: [], details: { ok: true } };
         }) as AgentTool["execute"],
       } satisfies AgentTool;
-      setRuntimeToolSafetyMeta(tool, { parallelSafe: true, pathScoped: true });
+      setSuperRuntimeToolSafetyMeta(tool, { parallelSafe: true, pathScoped: true });
       return tool;
     };
 
@@ -202,8 +202,8 @@ describe("pi tool definition adapter", () => {
       parameters: Type.Object({ path: Type.String() }),
       execute: (async () => ({ content: [], details: { ok: true } })) as AgentTool["execute"],
     } satisfies AgentTool;
-    setRuntimeToolSafetyMeta(tool, { pathScoped: true, parallelSafe: true });
-    setRuntimeToolExecutionContext(tool, { runtimeTurn });
+    setSuperRuntimeToolSafetyMeta(tool, { pathScoped: true, parallelSafe: true });
+    setSuperRuntimeToolExecutionContext(tool, { runtimeTurn });
 
     const [def] = toToolDefinitions([tool]);
     if (!def) {

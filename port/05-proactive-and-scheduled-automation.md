@@ -70,6 +70,7 @@ Implementation notes:
 - Every autonomous action must leave enough evidence for a human to reconstruct why it happened.
 - Automation may depend on earlier phases, but it must not weaken them. Scheduled or proactive runs do not get looser verification or provenance rules than interactive runs.
 - Compatibility caveat: automation features that need new host behavior should land as typed capabilities or documented core seams, not private reach-ins around plugin runtime, registry ownership, or channel/provider integration boundaries.
+- Nomenclature policy: Superhuman-specific proactive, scheduling, and notification services added in this phase should use explicit `super-*` / `Super*` naming, while generic names remain reserved for shared scheduler, gateway, or plugin-facing contracts.
 - Slot policy caveat: automation should assume `super-context` by default and treat `legacy` only as a compatibility fallback, not as dead code to strip opportunistically.
 
 Source extraction map:

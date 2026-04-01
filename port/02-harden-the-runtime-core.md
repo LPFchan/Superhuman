@@ -69,6 +69,7 @@ Implementation notes:
 - Completion reporting is part of the runtime contract, not a style preference. If the runtime cannot verify edited code, that fact must be persisted and exposed in the terminal state.
 - Partial tool evidence must never be silently upgraded into complete evidence for summaries, verification, or final completion reports.
 - Compatibility caveat: when runtime behavior is missing, add it as a typed capability or documented core seam instead of bypassing plugin runtime, registry ownership, or channel/provider boundaries with private reach-ins.
+- Nomenclature policy: runtime-core code that is Superhuman-specific should use explicit `super-*` / `Super*` naming for files and local APIs. Preserve generic names only where the surface is intentionally shared with OpenClaw or exposed as a stable public contract.
 - Slot policy caveat: runtime evolution should assume `super-context` is the default engine and `legacy` remains an explicit compatibility fallback, not a removed pathway.
 
 Source extraction map:

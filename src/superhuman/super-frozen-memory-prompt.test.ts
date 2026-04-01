@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { registerMemoryPromptSection, clearMemoryPluginState } from "../plugins/memory-state.js";
-import { buildFrozenMemoryPromptSection } from "./frozen-memory-prompt.js";
+import { buildSuperFrozenMemoryPromptSection } from "./super-frozen-memory-prompt.js";
 
 const cleanupPaths = new Set<string>();
 
@@ -15,20 +15,20 @@ afterEach(() => {
   cleanupPaths.clear();
 });
 
-describe("buildFrozenMemoryPromptSection", () => {
+describe("buildSuperFrozenMemoryPromptSection", () => {
   it("reuses the first snapshot for a session even if the builder changes", () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-memory-prompt-"));
     cleanupPaths.add(workspaceDir);
 
     registerMemoryPromptSection(() => ["first snapshot"]);
-    const first = buildFrozenMemoryPromptSection({
+    const first = buildSuperFrozenMemoryPromptSection({
       workspaceDir,
       sessionKey: "main",
       availableTools: new Set(["memory_search"]),
     });
 
     registerMemoryPromptSection(() => ["second snapshot"]);
-    const second = buildFrozenMemoryPromptSection({
+    const second = buildSuperFrozenMemoryPromptSection({
       workspaceDir,
       sessionKey: "main",
       availableTools: new Set(["memory_search"]),

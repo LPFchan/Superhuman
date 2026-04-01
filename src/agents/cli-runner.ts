@@ -2,9 +2,9 @@ import type { ImageContent } from "@mariozechner/pi-ai";
 import type { ThinkLevel } from "../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../config/config.js";
 import {
-  resolveRuntimeInvocationMode,
+  resolveSuperRuntimeInvocationMode,
   SuperhumanAgentRuntimeTurn,
-} from "../superhuman/agent-runtime.js";
+} from "../superhuman/super-agent-runtime.js";
 import { executePreparedCliRun } from "./cli-runner/execute.js";
 import { prepareCliRunContext } from "./cli-runner/prepare.js";
 import type { RunCliAgentParams } from "./cli-runner/types.js";
@@ -19,7 +19,7 @@ export async function runCliAgent(params: RunCliAgentParams): Promise<EmbeddedPi
     runId: params.runId,
     sessionId: params.sessionId,
     sessionKey: params.sessionKey,
-    mode: resolveRuntimeInvocationMode({
+    mode: resolveSuperRuntimeInvocationMode({
       trigger: params.trigger,
       lane: params.lane,
     }),

@@ -40,13 +40,13 @@ function stripTransientRuntimeWarningsFromText(text: string): string {
   return filtered.join("\n");
 }
 
-export function sanitizeReplayText(text: string): string {
+export function sanitizeSuperReplayText(text: string): string {
   return stripTransientRuntimeWarningsFromText(toWellFormedText(text)).normalize("NFC");
 }
 
 function sanitizeUnknown(value: unknown): unknown {
   if (typeof value === "string") {
-    return sanitizeReplayText(value);
+    return sanitizeSuperReplayText(value);
   }
   if (!Array.isArray(value) && (!value || typeof value !== "object")) {
     return value;
@@ -62,7 +62,7 @@ function sanitizeUnknown(value: unknown): unknown {
   return next;
 }
 
-export function sanitizeReplayMessages<T>(messages: T[]): T[] {
+export function sanitizeSuperReplayMessages<T>(messages: T[]): T[] {
   let changed = false;
   const next = messages.map((message) => {
     const sanitized = sanitizeUnknown(message) as T;

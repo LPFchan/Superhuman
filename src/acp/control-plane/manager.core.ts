@@ -3,7 +3,7 @@ import { resolveStateDir, type OpenClawConfig } from "../../config/config.js";
 import { logVerbose } from "../../globals.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
 import { isAcpSessionKey } from "../../sessions/session-key-utils.js";
-import { SuperhumanAgentRuntimeTurn } from "../../superhuman/agent-runtime.js";
+import { SuperhumanAgentRuntimeTurn } from "../../superhuman/super-agent-runtime.js";
 import {
   createRunningTaskRun,
   completeTaskRunByRunId,

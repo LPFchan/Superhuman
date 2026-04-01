@@ -9,9 +9,9 @@ import { sleepWithAbort } from "../../infra/backoff.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { enqueueCommandInLane } from "../../process/command-queue.js";
 import {
-  resolveRuntimeInvocationMode,
+  resolveSuperRuntimeInvocationMode,
   SuperhumanAgentRuntimeTurn,
-} from "../../superhuman/agent-runtime.js";
+} from "../../superhuman/super-agent-runtime.js";
 import { sanitizeForLog } from "../../terminal/ansi.js";
 import { isMarkdownCapableMessageChannel } from "../../utils/message-channel.js";
 import { resolveOpenClawAgentDir } from "../agent-paths.js";
@@ -144,7 +144,7 @@ export async function runEmbeddedPiAgent(
         runId: params.runId,
         sessionId: params.sessionId,
         sessionKey: params.sessionKey,
-        mode: resolveRuntimeInvocationMode({
+        mode: resolveSuperRuntimeInvocationMode({
           trigger: params.trigger,
           lane: params.lane,
         }),

@@ -16,15 +16,15 @@ import {
   onSessionTranscriptUpdate,
 } from "../sessions/transcript-events.js";
 import {
-  resolveContextPressureOptionsFromConfig,
+  resolveSuperContextPressureOptionsFromConfig,
   type ContextPressureSnapshotOptions,
-} from "./context-pressure.js";
+} from "./super-context-pressure.js";
 import type {
   StateEvidenceProvenance,
   StateStore,
   StateStructuredDetails,
   StateSessionUpsert,
-} from "./runtime-seams.js";
+} from "./super-runtime-seams.js";
 
 function normalizePathForComparison(input: string): string {
   const resolved = path.resolve(input);
@@ -343,13 +343,13 @@ function resolveTurnBoundaryContextPressureOptions(params: {
   cfg: OpenClawConfig;
   sessionKey: string;
 }): Omit<ContextPressureSnapshotOptions, "estimatedInputTokens"> {
-  return resolveContextPressureOptionsFromConfig({
+  return resolveSuperContextPressureOptionsFromConfig({
     cfg: params.cfg,
     sessionKey: params.sessionKey,
   });
 }
 
-export class SessionPersistenceAdapter {
+export class SuperSessionPersistenceAdapter {
   private readonly unsubscribers: Array<() => void> = [];
 
   constructor(

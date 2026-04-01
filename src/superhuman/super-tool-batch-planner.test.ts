@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { planToolBatch } from "./tool-batch-planner.js";
+import { planSuperToolBatch } from "./super-tool-batch-planner.js";
 
-describe("planToolBatch", () => {
+describe("planSuperToolBatch", () => {
   it("runs explicit parallel-safe batches in parallel", () => {
     expect(
-      planToolBatch([
+      planSuperToolBatch([
         { toolName: "read", safety: { parallelSafe: true } },
         { toolName: "grep", safety: { parallelSafe: true } },
       ]),
@@ -13,7 +13,7 @@ describe("planToolBatch", () => {
 
   it("serializes overlapping path-scoped batches", () => {
     expect(
-      planToolBatch([
+      planSuperToolBatch([
         {
           toolName: "edit-a",
           safety: { pathScoped: true, scopePaths: ["src/app"] },
@@ -28,7 +28,7 @@ describe("planToolBatch", () => {
 
   it("runs read-only capability classes in parallel", () => {
     expect(
-      planToolBatch([
+      planSuperToolBatch([
         { toolName: "grep_search", safety: { capabilityClass: "text_search" } },
         { toolName: "read", safety: { capabilityClass: "partial_reading" } },
         { toolName: "list_dir", safety: { capabilityClass: "workspace_navigation" } },
@@ -38,7 +38,7 @@ describe("planToolBatch", () => {
 
   it("serializes symbol renames even when other batch items are read-only", () => {
     expect(
-      planToolBatch([
+      planSuperToolBatch([
         { toolName: "vscode_renameSymbol", safety: { capabilityClass: "symbol_rename" } },
         { toolName: "vscode_listCodeUsages", safety: { capabilityClass: "symbol_reference" } },
       ]),
