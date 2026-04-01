@@ -413,6 +413,70 @@ describe("createPluginApprovalHandlers", () => {
       );
     });
 
+    it("allows declared params overrides and returns them to waiters", async () => {
+      const handlers = createPluginApprovalHandlers(manager);
+      const record = manager.create(
+        {
+          title: "T",
+          description: "D",
+          allowedParamOverrideKeys: ["path"],
+        },
+        60_000,
+      );
+      const decisionPromise = manager.register(record, 60_000);
+
+      const opts = createMockOptions("plugin.approval.resolve", {
+        id: record.id,
+        decision: "allow-once",
+        paramsOverride: { path: "/tmp/safe" },
+        feedback: "Use the sandbox path instead.",
+      });
+      await handlers["plugin.approval.resolve"](opts);
+
+      await expect(decisionPromise).resolves.toBe("allow-once");
+      expect(manager.getSnapshot(record.id)?.resolutionPayload).toEqual({
+        paramsOverride: { path: "/tmp/safe" },
+        feedback: "Use the sandbox path instead.",
+      });
+      expect(opts.context.broadcast).toHaveBeenCalledWith(
+        "plugin.approval.resolved",
+        expect.objectContaining({
+          id: record.id,
+          decision: "allow-once",
+          paramsOverride: { path: "/tmp/safe" },
+          feedback: "Use the sandbox path instead.",
+        }),
+        { dropIfSlow: true },
+      );
+    });
+
+    it("rejects params overrides for undeclared keys", async () => {
+      const handlers = createPluginApprovalHandlers(manager);
+      const record = manager.create(
+        {
+          title: "T",
+          description: "D",
+          allowedParamOverrideKeys: ["path"],
+        },
+        60_000,
+      );
+      void manager.register(record, 60_000);
+
+      const opts = createMockOptions("plugin.approval.resolve", {
+        id: record.id,
+        decision: "allow-once",
+        paramsOverride: { command: "rm -rf /" },
+      });
+      await handlers["plugin.approval.resolve"](opts);
+      expect(opts.respond).toHaveBeenCalledWith(
+        false,
+        undefined,
+        expect.objectContaining({
+          message: "paramsOverride key is not allowed for this approval request: command",
+        }),
+      );
+    });
+
     it("rejects unknown approval id", async () => {
       const handlers = createPluginApprovalHandlers(manager);
       const opts = createMockOptions("plugin.approval.resolve", {

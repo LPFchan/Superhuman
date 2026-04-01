@@ -21,6 +21,7 @@ export type ExecApprovalRecord<TPayload = ExecApprovalRequestPayload> = {
   resolvedAtMs?: number;
   decision?: ExecApprovalDecision;
   resolvedBy?: string | null;
+  resolutionPayload?: Record<string, unknown> | null;
 };
 
 type PendingEntry<TPayload = ExecApprovalRequestPayload> = {
@@ -100,7 +101,12 @@ export class ExecApprovalManager<TPayload = ExecApprovalRequestPayload> {
     return this.register(record, timeoutMs);
   }
 
-  resolve(recordId: string, decision: ExecApprovalDecision, resolvedBy?: string | null): boolean {
+  resolve(
+    recordId: string,
+    decision: ExecApprovalDecision,
+    resolvedBy?: string | null,
+    resolutionPayload?: Record<string, unknown> | null,
+  ): boolean {
     const pending = this.pending.get(recordId);
     if (!pending) {
       return false;
@@ -113,6 +119,7 @@ export class ExecApprovalManager<TPayload = ExecApprovalRequestPayload> {
     pending.record.resolvedAtMs = Date.now();
     pending.record.decision = decision;
     pending.record.resolvedBy = resolvedBy ?? null;
+    pending.record.resolutionPayload = resolutionPayload ?? null;
     // Resolve the promise first, then delete after a grace period.
     // This allows in-flight awaitDecision calls to find the resolved entry.
     pending.resolve(decision);

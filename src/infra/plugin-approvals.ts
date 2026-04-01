@@ -13,6 +13,8 @@ export type PluginApprovalRequestPayload = {
   turnSourceTo?: string | null;
   turnSourceAccountId?: string | null;
   turnSourceThreadId?: string | number | null;
+  proposedParams?: Record<string, unknown> | null;
+  allowedParamOverrideKeys?: string[] | null;
 };
 
 export type PluginApprovalRequest = {
@@ -28,6 +30,8 @@ export type PluginApprovalResolved = {
   resolvedBy?: string | null;
   ts: number;
   request?: PluginApprovalRequestPayload;
+  paramsOverride?: Record<string, unknown> | null;
+  feedback?: string | null;
 };
 
 export const DEFAULT_PLUGIN_APPROVAL_TIMEOUT_MS = 120_000;

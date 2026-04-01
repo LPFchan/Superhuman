@@ -2179,6 +2179,11 @@ export type PluginHookBeforeToolCallResult = {
     severity?: "info" | "warning" | "critical";
     timeoutMs?: number;
     timeoutBehavior?: "allow" | "deny";
+    /**
+     * Optional allowlist of top-level param keys that an approver may override before execution.
+     * When omitted, approvals may decide allow/deny only.
+     */
+    allowedParamOverrideKeys?: string[];
     /** Set automatically by the hook runner - plugins should not set this. */
     pluginId?: string;
     /**

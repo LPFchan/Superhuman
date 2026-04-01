@@ -509,4 +509,108 @@ describe("orchestration-runtime", () => {
       }
     });
   });
+
+  it("routes plugin approval overrides through orchestration", async () => {
+    await withTempDir({ prefix: "openclaw-orchestration-runtime-" }, async (root) => {
+      process.env.OPENCLAW_STATE_DIR = root;
+      hoisted.subagentSpawnMock.mockImplementation(
+        async (
+          params: { task: string },
+          ctx: {
+            agentSessionKey?: string;
+          },
+        ) => {
+          createTaskRecord({
+            runtime: "subagent",
+            ownerKey: ctx.agentSessionKey ?? "agent:main:main",
+            requesterSessionKey: ctx.agentSessionKey,
+            scopeKind: "session",
+            childSessionKey: "agent:main:subagent:child-plugin",
+            runId: "run-plugin-1",
+            task: params.task,
+            status: "running",
+            startedAt: Date.now(),
+          });
+          return {
+            status: "accepted",
+            childSessionKey: "agent:main:subagent:child-plugin",
+            runId: "run-plugin-1",
+            mode: "run",
+          };
+        },
+      );
+
+      const runtime = startSuperOrchestrationRuntime({
+        cfg: {
+          agents: {
+            defaults: {
+              subagents: {
+                maxChildrenPerAgent: 1,
+              },
+            },
+          },
+        } as never,
+        workspaceDir: root,
+      });
+
+      try {
+        const worker = await runtime.launchWorker({
+          runtime: "subagent",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          task: "Plugin approval delegated task",
+        });
+
+        await waitForAssertion(() => {
+          expect(runtime.getWorker(worker.workerId)?.state).toBe("running");
+        });
+
+        await runtime.recordApprovalRequested({
+          kind: "plugin",
+          requestId: "plugin:req-1",
+          sessionKey: "agent:main:subagent:child-plugin",
+          payload: {
+            title: "Write file",
+            proposedParams: { path: "/etc/passwd", contents: "hello" },
+            allowedParamOverrideKeys: ["path"],
+          },
+        });
+
+        hoisted.callGatewayMock.mockClear();
+        expect(
+          await runtime.resolveApproval({
+            approvalId: "plugin:plugin:req-1",
+            decision: "allow-once",
+            resolvedBySessionKey: "agent:main:main",
+            paramsOverride: { path: "/tmp/safe" },
+            feedback: "Use the sandbox path instead.",
+          }),
+        ).toBe(true);
+
+        expect(hoisted.callGatewayMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            method: "plugin.approval.resolve",
+            params: {
+              id: "plugin:req-1",
+              decision: "allow-once",
+              paramsOverride: { path: "/tmp/safe" },
+              feedback: "Use the sandbox path instead.",
+            },
+          }),
+        );
+
+        const decisionAudit = runtime
+          .listMailboxMessages("agent:main:main")
+          .find((message) => message.kind === "approval_decision");
+        expect(decisionAudit?.payload).toMatchObject({
+          approvalId: "plugin:plugin:req-1",
+          decision: "allow-once",
+          paramsOverride: { path: "/tmp/safe" },
+          feedback: "Use the sandbox path instead.",
+        });
+      } finally {
+        runtime.stop();
+      }
+    });
+  });
 });

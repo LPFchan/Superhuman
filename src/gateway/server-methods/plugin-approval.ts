@@ -53,6 +53,8 @@ export function createPluginApprovalHandlers(
         turnSourceTo?: string | null;
         turnSourceAccountId?: string | null;
         turnSourceThreadId?: string | number | null;
+        proposedParams?: Record<string, unknown> | null;
+        allowedParamOverrideKeys?: string[] | null;
         timeoutMs?: number;
         twoPhase?: boolean;
       };
@@ -78,6 +80,11 @@ export function createPluginApprovalHandlers(
         turnSourceTo: normalizeTrimmedString(p.turnSourceTo),
         turnSourceAccountId: normalizeTrimmedString(p.turnSourceAccountId),
         turnSourceThreadId: p.turnSourceThreadId ?? null,
+        proposedParams:
+          p.proposedParams && typeof p.proposedParams === "object" ? p.proposedParams : null,
+        allowedParamOverrideKeys: Array.isArray(p.allowedParamOverrideKeys)
+          ? p.allowedParamOverrideKeys
+          : null,
       };
 
       // Always server-generate the ID — never accept plugin-provided IDs.
@@ -185,13 +192,15 @@ export function createPluginApprovalHandlers(
       }
       const snapshot = manager.getSnapshot(id);
       const decision = await decisionPromise;
+      const resolvedSnapshot = manager.getSnapshot(id) ?? snapshot;
       respond(
         true,
         {
           id,
           decision,
-          createdAtMs: snapshot?.createdAtMs,
-          expiresAtMs: snapshot?.expiresAtMs,
+          createdAtMs: resolvedSnapshot?.createdAtMs,
+          expiresAtMs: resolvedSnapshot?.expiresAtMs,
+          ...resolvedSnapshot?.resolutionPayload,
         },
         undefined,
       );
@@ -211,7 +220,12 @@ export function createPluginApprovalHandlers(
         );
         return;
       }
-      const p = params as { id: string; decision: string };
+      const p = params as {
+        id: string;
+        decision: string;
+        paramsOverride?: Record<string, unknown>;
+        feedback?: string;
+      };
       const decision = p.decision as ExecApprovalDecision;
       if (decision !== "allow-once" && decision !== "allow-always" && decision !== "deny") {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "invalid decision"));
@@ -240,8 +254,41 @@ export function createPluginApprovalHandlers(
         );
         return;
       }
+      const allowedOverrideKeys = new Set(snapshot.request.allowedParamOverrideKeys ?? []);
+      const requestedOverrideKeys = Object.keys(p.paramsOverride ?? {});
+      if (requestedOverrideKeys.length > 0 && allowedOverrideKeys.size === 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            "paramsOverride is not allowed for this approval request",
+          ),
+        );
+        return;
+      }
+      for (const key of requestedOverrideKeys) {
+        if (!allowedOverrideKeys.has(key)) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.INVALID_REQUEST,
+              `paramsOverride key is not allowed for this approval request: ${key}`,
+            ),
+          );
+          return;
+        }
+      }
+      const resolutionPayload =
+        requestedOverrideKeys.length > 0 || typeof p.feedback === "string"
+          ? {
+              ...(requestedOverrideKeys.length > 0 ? { paramsOverride: p.paramsOverride } : {}),
+              ...(typeof p.feedback === "string" ? { feedback: p.feedback } : {}),
+            }
+          : null;
       const resolvedBy = client?.connect?.client?.displayName ?? client?.connect?.client?.id;
-      const ok = manager.resolve(approvalId, decision, resolvedBy ?? null);
+      const ok = manager.resolve(approvalId, decision, resolvedBy ?? null, resolutionPayload);
       if (!ok) {
         respond(
           false,
@@ -254,7 +301,14 @@ export function createPluginApprovalHandlers(
       }
       context.broadcast(
         "plugin.approval.resolved",
-        { id: approvalId, decision, resolvedBy, ts: Date.now(), request: snapshot?.request },
+        {
+          id: approvalId,
+          decision,
+          resolvedBy,
+          ts: Date.now(),
+          request: snapshot?.request,
+          ...resolutionPayload,
+        },
         { dropIfSlow: true },
       );
       void opts?.forwarder
@@ -264,6 +318,7 @@ export function createPluginApprovalHandlers(
           resolvedBy,
           ts: Date.now(),
           request: snapshot?.request,
+          ...resolutionPayload,
         })
         .catch((err) => {
           context.logGateway?.error?.(`plugin approvals: forward resolve failed: ${String(err)}`);

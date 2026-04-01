@@ -20,6 +20,8 @@ export const PluginApprovalRequestParamsSchema = Type.Object(
     turnSourceTo: Type.Optional(Type.String()),
     turnSourceAccountId: Type.Optional(Type.String()),
     turnSourceThreadId: Type.Optional(Type.Union([Type.String(), Type.Number()])),
+    proposedParams: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    allowedParamOverrideKeys: Type.Optional(Type.Array(NonEmptyString)),
     timeoutMs: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PLUGIN_APPROVAL_TIMEOUT_MS })),
     twoPhase: Type.Optional(Type.Boolean()),
   },
@@ -30,6 +32,8 @@ export const PluginApprovalResolveParamsSchema = Type.Object(
   {
     id: NonEmptyString,
     decision: NonEmptyString,
+    paramsOverride: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    feedback: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );

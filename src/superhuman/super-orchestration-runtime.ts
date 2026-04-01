@@ -125,6 +125,8 @@ export type OrchestrationRuntime = {
     decision: Extract<ExecApprovalDecision, "allow-once" | "allow-always" | "deny">;
     resolvedBySessionKey?: string | null;
     note?: string;
+    paramsOverride?: Record<string, unknown>;
+    feedback?: string;
   }) => Promise<boolean>;
   recordApprovalRequested: (params: ApprovalMirrorRequestedParams) => Promise<void>;
   recordApprovalResolved: (params: ApprovalMirrorResolvedParams) => Promise<void>;
@@ -1587,6 +1589,12 @@ export function startSuperOrchestrationRuntime(params: {
         params: {
           id: approval.requestId,
           decision: resolveParams.decision,
+          ...(approval.kind === "plugin" && resolveParams.paramsOverride
+            ? { paramsOverride: resolveParams.paramsOverride }
+            : {}),
+          ...(approval.kind === "plugin" && typeof resolveParams.feedback === "string"
+            ? { feedback: resolveParams.feedback }
+            : {}),
         },
         timeoutMs: 10_000,
       });
@@ -1608,6 +1616,10 @@ export function startSuperOrchestrationRuntime(params: {
           status: mapApprovalDecisionStatus(resolveParams.decision),
           resolvedBySessionKey: resolveParams.resolvedBySessionKey ?? approval.controllerSessionKey,
           note: resolveParams.note,
+          ...(resolveParams.paramsOverride ? { paramsOverride: resolveParams.paramsOverride } : {}),
+          ...(typeof resolveParams.feedback === "string"
+            ? { feedback: resolveParams.feedback }
+            : {}),
         },
       });
       return true;

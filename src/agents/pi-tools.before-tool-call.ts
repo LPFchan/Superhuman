@@ -273,6 +273,8 @@ export async function runBeforeToolCallHook(args: {
           id?: string;
           status?: string;
           decision?: string | null;
+          paramsOverride?: Record<string, unknown>;
+          feedback?: string;
         }>(
           "plugin.approval.request",
           // Buffer beyond the approval timeout so the gateway can clean up
@@ -287,6 +289,8 @@ export async function runBeforeToolCallHook(args: {
             toolCallId: args.toolCallId,
             agentId: args.ctx?.agentId,
             sessionKey: args.ctx?.sessionKey,
+            proposedParams: isPlainObject(params) ? params : undefined,
+            allowedParamOverrideKeys: approval.allowedParamOverrideKeys,
             timeoutMs: approval.timeoutMs ?? 120_000,
             twoPhase: true,
           },
@@ -305,8 +309,17 @@ export async function runBeforeToolCallHook(args: {
           "decision",
         );
         let decision: string | null | undefined;
+        let decisionResult:
+          | {
+              id?: string;
+              decision?: string | null;
+              paramsOverride?: Record<string, unknown>;
+              feedback?: string;
+            }
+          | undefined;
         if (hasImmediateDecision) {
           decision = requestResult?.decision;
+          decisionResult = requestResult;
           if (decision === null) {
             safeOnResolution(PluginApprovalResolutions.CANCELLED);
             return {
@@ -320,6 +333,8 @@ export async function runBeforeToolCallHook(args: {
           const waitPromise = callGatewayTool<{
             id?: string;
             decision?: string | null;
+            paramsOverride?: Record<string, unknown>;
+            feedback?: string;
           }>(
             "plugin.approval.waitDecision",
             // Buffer beyond the approval timeout so the gateway can clean up
@@ -327,7 +342,14 @@ export async function runBeforeToolCallHook(args: {
             { timeoutMs: (approval.timeoutMs ?? 120_000) + 10_000 },
             { id },
           );
-          let waitResult: { id?: string; decision?: string | null } | undefined;
+          let waitResult:
+            | {
+                id?: string;
+                decision?: string | null;
+                paramsOverride?: Record<string, unknown>;
+                feedback?: string;
+              }
+            | undefined;
           if (args.signal) {
             let onAbort: (() => void) | undefined;
             const abortPromise = new Promise<never>((_, reject) => {
@@ -348,6 +370,7 @@ export async function runBeforeToolCallHook(args: {
           } else {
             waitResult = await waitPromise;
           }
+          decisionResult = waitResult;
           decision = waitResult?.decision;
         }
         const resolution: PluginApprovalResolution =
@@ -361,10 +384,20 @@ export async function runBeforeToolCallHook(args: {
           decision === PluginApprovalResolutions.ALLOW_ONCE ||
           decision === PluginApprovalResolutions.ALLOW_ALWAYS
         ) {
-          return allowWithRiskCheck(mergeParamsWithApprovalOverrides(params, hookResult.params));
+          const approvedParams = mergeParamsWithApprovalOverrides(
+            mergeParamsWithApprovalOverrides(params, hookResult.params),
+            decisionResult?.paramsOverride,
+          );
+          return allowWithRiskCheck(approvedParams);
         }
         if (decision === PluginApprovalResolutions.DENY) {
-          return { blocked: true, reason: "Denied by user" };
+          return {
+            blocked: true,
+            reason:
+              typeof decisionResult?.feedback === "string" && decisionResult.feedback.trim()
+                ? decisionResult.feedback.trim()
+                : "Denied by user",
+          };
         }
         const timeoutBehavior = approval.timeoutBehavior ?? "deny";
         if (timeoutBehavior === "allow") {

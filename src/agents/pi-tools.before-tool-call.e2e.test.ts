@@ -384,8 +384,8 @@ describe("before_tool_call requireApproval handling", () => {
     });
 
     const result = await runBeforeToolCallHook({
-      toolName: "bash",
-      params: { command: "rm -rf" },
+      toolName: "write_file",
+      params: { path: "/tmp/demo.txt", contents: "ok" },
       ctx: { agentId: "main", sessionKey: "main" },
     });
 
@@ -412,8 +412,8 @@ describe("before_tool_call requireApproval handling", () => {
     mockCallGateway.mockResolvedValueOnce({ id: "server-id-1", decision: "allow-once" });
 
     const result = await runBeforeToolCallHook({
-      toolName: "bash",
-      params: { command: "rm -rf" },
+      toolName: "write_file",
+      params: { path: "/tmp/demo.txt", contents: "ok" },
       ctx: { agentId: "main", sessionKey: "main" },
     });
 
@@ -429,6 +429,46 @@ describe("before_tool_call requireApproval handling", () => {
       "plugin.approval.waitDecision",
       expect.any(Object),
       { id: "server-id-1" },
+    );
+  });
+
+  it("applies approved plugin params overrides before execution", async () => {
+    const { callGatewayTool } = await import("./tools/gateway.js");
+    const mockCallGateway = vi.mocked(callGatewayTool);
+
+    hookRunner.runBeforeToolCall.mockResolvedValue({
+      requireApproval: {
+        title: "Sensitive",
+        description: "Sensitive op",
+        allowedParamOverrideKeys: ["path"],
+      },
+    });
+
+    mockCallGateway.mockResolvedValueOnce({ id: "server-id-override", status: "accepted" });
+    mockCallGateway.mockResolvedValueOnce({
+      id: "server-id-override",
+      decision: "allow-once",
+      paramsOverride: { path: "/tmp/safe" },
+    });
+
+    const result = await runBeforeToolCallHook({
+      toolName: "write_file",
+      params: { path: "/etc/passwd", contents: "hello" },
+      ctx: { agentId: "main", sessionKey: "main" },
+    });
+
+    expect(result).toEqual({
+      blocked: false,
+      params: { path: "/tmp/safe", contents: "hello" },
+    });
+    expect(mockCallGateway).toHaveBeenCalledWith(
+      "plugin.approval.request",
+      expect.any(Object),
+      expect.objectContaining({
+        proposedParams: { path: "/etc/passwd", contents: "hello" },
+        allowedParamOverrideKeys: ["path"],
+      }),
+      { expectFinal: false },
     );
   });
 
@@ -454,6 +494,37 @@ describe("before_tool_call requireApproval handling", () => {
 
     expect(result.blocked).toBe(true);
     expect(result).toHaveProperty("reason", "Denied by user");
+  });
+
+  it("uses coordinator feedback as the deny reason when provided", async () => {
+    const { callGatewayTool } = await import("./tools/gateway.js");
+    const mockCallGateway = vi.mocked(callGatewayTool);
+
+    hookRunner.runBeforeToolCall.mockResolvedValue({
+      requireApproval: {
+        title: "Dangerous",
+        description: "Dangerous op",
+        allowedParamOverrideKeys: ["path"],
+      },
+    });
+
+    mockCallGateway.mockResolvedValueOnce({ id: "server-id-feedback", status: "accepted" });
+    mockCallGateway.mockResolvedValueOnce({
+      id: "server-id-feedback",
+      decision: "deny",
+      feedback: "Use a workspace-local path instead of a system file.",
+    });
+
+    const result = await runBeforeToolCallHook({
+      toolName: "write_file",
+      params: { path: "/etc/passwd" },
+      ctx: { agentId: "main", sessionKey: "main" },
+    });
+
+    expect(result).toEqual({
+      blocked: true,
+      reason: "Use a workspace-local path instead of a system file.",
+    });
   });
 
   it("blocks on timeout with default deny behavior", async () => {
