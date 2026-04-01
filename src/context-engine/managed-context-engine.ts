@@ -26,7 +26,7 @@ import type {
   IngestResult,
 } from "./types.js";
 
-const log = createSubsystemLogger("context-engine/phase3");
+const log = createSubsystemLogger("context-engine/managed-context-engine");
 
 const ENGINE_STATE_DIR = "context-engine";
 const KEEP_RECENT_MESSAGES = 12;
@@ -103,6 +103,8 @@ const pendingExtractions = new Set<string>();
 const pendingConsolidations = new Set<string>();
 const pendingTeamSyncs = new Set<string>();
 
+type VisibleContextState = "original_content" | "collapsed_content" | "restored_files" | "mixed";
+
 function normalizeTextContent(content: unknown): string {
   if (typeof content === "string") {
     return content.trim();
@@ -159,6 +161,40 @@ function buildCollapseSystemMessage(
   index: number,
 ): AgentMessage {
   return asTextMessage(`[collapse ${index + 1}]\n${collapse.summary}`, collapse.committedAt);
+}
+
+function resolveVisibleContextState(params: {
+  committedCollapseCount: number;
+  projectedMessageCount: number;
+  restoredArtifacts?: string[];
+}): VisibleContextState {
+  const restoredArtifacts = params.restoredArtifacts ?? [];
+  if (restoredArtifacts.length > 0 && params.committedCollapseCount > 0) {
+    return "mixed";
+  }
+  if (restoredArtifacts.length > 0) {
+    return "restored_files";
+  }
+  if (params.committedCollapseCount === 0) {
+    return "original_content";
+  }
+  if (params.projectedMessageCount <= params.committedCollapseCount) {
+    return "collapsed_content";
+  }
+  return "mixed";
+}
+
+function describeVisibleContextState(state: VisibleContextState): string {
+  switch (state) {
+    case "collapsed_content":
+      return "collapsed content only";
+    case "restored_files":
+      return "restored files";
+    case "mixed":
+      return "a mixed state of collapsed content and original live turns";
+    default:
+      return "original content";
+  }
 }
 
 function resolveWorkspaceDir(runtimeContext?: ContextEngineRuntimeContext): string | undefined {
@@ -387,13 +423,13 @@ async function runMemoryExtraction(params: {
         allowGatewaySubagentBinding: true,
         silentExpected: true,
         extraSystemPrompt:
-          "You are a memory extraction worker. Stay within approved memory roots, keep edits append-only and concise, and never change unrelated notes.",
+          "You are a memory extraction worker. Stay within approved memory roots, keep edits append-only and concise, and never change unrelated notes. Treat imported-history, collapsed summaries, partial reads, and persisted previews as provisional evidence unless the underlying source was fully read and verified.",
       });
       params.state.extraction.lastFingerprint = fingerprint;
       params.state.extraction.lastRunAt = Date.now();
       await saveState(params.statePath, params.state);
     } catch (error) {
-      log.warn(`phase3 memory extraction failed: ${String(error)}`);
+      log.warn(`managed-context memory extraction failed: ${String(error)}`);
     } finally {
       pendingExtractions.delete(extractionKey);
     }
@@ -451,6 +487,7 @@ async function runMemoryConsolidation(params: {
         "Consolidate durable memory from recently touched sessions.",
         `Read only what you need from session transcripts and existing memory. Write only to ${memoryPlan.relativePath}.`,
         "Do not mutate unrelated files. Prefer compact bullet updates and dedupe aggressively.",
+        "Do not treat imported-history, collapsed summaries, partial reads, or persisted previews as authoritative memory unless the original source was fully read.",
         `Touched sessions: ${touchedSessions.map(([sessionKey]) => sessionKey).join(", ")}`,
       ].join("\n");
       await runEmbeddedPiAgent({
@@ -468,7 +505,7 @@ async function runMemoryConsolidation(params: {
         allowGatewaySubagentBinding: true,
         silentExpected: true,
         extraSystemPrompt:
-          "You are a memory consolidation worker. You may read session transcripts and memory roots, but you may only write inside the approved memory path.",
+          "You are a memory consolidation worker. You may read session transcripts and memory roots, but you may only write inside the approved memory path. Imported-history, collapsed summaries, partial reads, and persisted previews must remain marked as provisional unless a full source read confirms them.",
       });
       params.state.consolidation.lastRunAt = Date.now();
       params.state.consolidation.touchedSessions = {};
@@ -483,7 +520,7 @@ async function runMemoryConsolidation(params: {
         config: params.config,
       });
     } catch (error) {
-      log.warn(`phase3 memory consolidation failed: ${String(error)}`);
+      log.warn(`managed-context memory consolidation failed: ${String(error)}`);
     } finally {
       pendingConsolidations.delete(consolidationKey);
     }
@@ -665,16 +702,16 @@ async function runTeamMemorySyncIfEnabled(params: {
     } finally {
       store.close();
     }
-    log.warn(`phase3 team memory sync failed: ${String(error)}`);
+    log.warn(`managed-context team memory sync failed: ${String(error)}`);
   } finally {
     pendingTeamSyncs.delete(syncKey);
   }
 }
 
-export class Phase3ContextEngine implements ContextEngine {
+export class ManagedContextEngine implements ContextEngine {
   readonly info: ContextEngineInfo = {
-    id: "phase3",
-    name: "Phase 3 Context Engine",
+    id: "managed-context",
+    name: "Managed Context Engine",
     version: "1.0.0",
     ownsCompaction: true,
   };
@@ -718,12 +755,16 @@ export class Phase3ContextEngine implements ContextEngine {
     }
     const branchMessages = listBranchMessages(SessionManager.open(sessionFile));
     const projected = projectMessages(branchMessages, state);
+    const visibleContextState = resolveVisibleContextState({
+      committedCollapseCount: state.committed.length,
+      projectedMessageCount: projected.length,
+    });
     return {
       messages: projected,
       estimatedTokens: estimateMessagesTokens(projected),
       systemPromptAddition:
         state.committed.length > 0
-          ? `Context collapse active: ${state.committed.length} committed summary span${state.committed.length === 1 ? "" : "s"} are projected into the visible conversation view.`
+          ? `Context collapse active: ${state.committed.length} committed summary span${state.committed.length === 1 ? "" : "s"} are projected into the visible conversation view. Visible context source state: ${describeVisibleContextState(visibleContextState)}.`
           : undefined,
     };
   }
@@ -845,6 +886,10 @@ export class Phase3ContextEngine implements ContextEngine {
       await saveState(statePath, state);
       const projectedAfter = projectMessages(branchMessages, state);
       const tokensAfter = estimateMessagesTokens(projectedAfter);
+      const visibleContextState = resolveVisibleContextState({
+        committedCollapseCount: state.committed.length,
+        projectedMessageCount: projectedAfter.length,
+      });
       const latestFirstKeptEntryId = state.committed.at(-1)?.firstKeptEntryId;
       if (!latestFirstKeptEntryId) {
         return {
@@ -859,7 +904,7 @@ export class Phase3ContextEngine implements ContextEngine {
         latestFirstKeptEntryId,
         tokensBefore,
         {
-          kind: "phase3-collapse",
+          kind: "managed-context-collapse",
           committedCollapseIds: committedNow.map((entry) => entry.id),
           committedCount: compactedCount,
         },
@@ -874,13 +919,29 @@ export class Phase3ContextEngine implements ContextEngine {
           firstKeptEntryId: state.committed.at(-1)?.firstKeptEntryId,
           tokensBefore,
           tokensAfter,
-          details: { committedCount: compactedCount, projectedMessages: projectedAfter.length },
+          details: {
+            committedCount: compactedCount,
+            projectedMessages: projectedAfter.length,
+            recoveryMode: "collapse",
+            visibleContextState,
+            visibleContextDescription: describeVisibleContextState(visibleContextState),
+            droppedSpans: committedNow.map((entry) => ({
+              collapseId: entry.id,
+              sourceStartEntryId: entry.sourceStartEntryId,
+              sourceEndEntryId: entry.sourceEndEntryId,
+            })),
+            restoredArtifacts: [],
+          },
         },
       };
     }
 
     try {
       const fallback = await delegateCompactionToRuntime(params);
+      const fallbackVisibleContextState = resolveVisibleContextState({
+        committedCollapseCount: 0,
+        projectedMessageCount: branchMessages.length,
+      });
       if (fallback.ok && fallback.compacted) {
         state.committed = [];
         state.staged = [];
@@ -893,6 +954,18 @@ export class Phase3ContextEngine implements ContextEngine {
           lastFailureReason: fallback.reason ?? "fallback-no-progress",
         };
         await saveState(statePath, state);
+      }
+      if (fallback.result) {
+        fallback.result.details = {
+          ...(fallback.result.details && typeof fallback.result.details === "object"
+            ? (fallback.result.details as Record<string, unknown>)
+            : {}),
+          recoveryMode: "runtime_fallback",
+          visibleContextState: fallbackVisibleContextState,
+          visibleContextDescription: describeVisibleContextState(fallbackVisibleContextState),
+          droppedSpans: [],
+          restoredArtifacts: [],
+        };
       }
       return fallback;
     } catch (error) {
@@ -914,8 +987,8 @@ export class Phase3ContextEngine implements ContextEngine {
   async dispose(): Promise<void> {}
 }
 
-export function registerPhase3ContextEngine(): void {
-  registerContextEngineForOwner("phase3", () => new Phase3ContextEngine(), "core", {
+export function registerManagedContextEngine(): void {
+  registerContextEngineForOwner("managed-context", () => new ManagedContextEngine(), "core", {
     allowSameOwnerRefresh: true,
   });
 }

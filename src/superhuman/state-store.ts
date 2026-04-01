@@ -21,6 +21,7 @@ import type {
   StateAbortNodeUpsert,
   StateArtifactAppend,
   StateContextPressureSnapshotAppend,
+  StateEvidenceProvenance,
   StateIterationBudgetRecord,
   StateIterationBudgetUpsert,
   StateMessageAppend,
@@ -29,11 +30,13 @@ import type {
   StateRuntimeStageEventAppend,
   StateSessionRecord,
   StateSessionUpsert,
+  StateStructuredDetails,
   StateStore,
   StateTeamMemorySyncEventAppend,
   StateTeamMemorySyncEventRecord,
   TeamMemorySyncDirection,
   TeamMemorySyncStatus,
+  VerificationOutcome,
 } from "./runtime-seams.js";
 
 const STATE_DIR_MODE = 0o700;
@@ -97,6 +100,7 @@ type MessageRow = {
   approx_tokens: number;
   transcript_message_id: string | null;
   sequence: number | null;
+  provenance_json: string | null;
 };
 
 type ArtifactRow = {
@@ -107,6 +111,8 @@ type ArtifactRow = {
   label: string | null;
   location: string | null;
   created_at: number;
+  provenance_json: string | null;
+  metadata_json: string | null;
 };
 
 type RuntimeInvocationRow = {
@@ -125,6 +131,8 @@ type RuntimeInvocationRow = {
   root_budget_id: string;
   root_abort_node_id: string;
   latest_error: string | null;
+  verification_outcome: VerificationOutcome | null;
+  verification_required: number;
 };
 
 type RuntimeStageEventRow = {
@@ -222,6 +230,39 @@ function ensureStatePermissions(dbPath: string): void {
   }
 }
 
+function ensureColumn(
+  db: DatabaseSync,
+  tableName: string,
+  columnName: string,
+  definition: string,
+): void {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name?: string }>;
+  if (columns.some((column) => column.name === columnName)) {
+    return;
+  }
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition};`);
+}
+
+function stringifyJson(
+  value: StateStructuredDetails | StateEvidenceProvenance | undefined,
+): string | null {
+  if (!value) {
+    return null;
+  }
+  return JSON.stringify(value);
+}
+
+function parseJsonValue<T>(value: string | null | undefined): T | undefined {
+  if (!value) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 function ensureSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -253,6 +294,7 @@ function ensureSchema(db: DatabaseSync): void {
       transcript_message_id TEXT,
       run_id TEXT,
       sequence INTEGER,
+      provenance_json TEXT,
       FOREIGN KEY(session_key) REFERENCES sessions(session_key)
     );
 
@@ -264,7 +306,8 @@ function ensureSchema(db: DatabaseSync): void {
       summary TEXT NOT NULL,
       status TEXT,
       created_at INTEGER NOT NULL,
-      completed_at INTEGER
+      completed_at INTEGER,
+      details_json TEXT
     );
 
     CREATE TABLE IF NOT EXISTS artifacts (
@@ -274,7 +317,9 @@ function ensureSchema(db: DatabaseSync): void {
       kind TEXT NOT NULL,
       label TEXT,
       location TEXT,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      provenance_json TEXT,
+      metadata_json TEXT
     );
 
     CREATE TABLE IF NOT EXISTS runtime_invocations (
@@ -292,7 +337,9 @@ function ensureSchema(db: DatabaseSync): void {
       parent_run_id TEXT,
       root_budget_id TEXT NOT NULL,
       root_abort_node_id TEXT NOT NULL,
-      latest_error TEXT
+      latest_error TEXT,
+      verification_outcome TEXT,
+      verification_required INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS runtime_stage_events (
@@ -402,6 +449,12 @@ function ensureSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_team_memory_sync_repo_created
       ON team_memory_sync_events(repo_root, created_at DESC, event_id DESC);
   `);
+  ensureColumn(db, "messages", "provenance_json", "TEXT");
+  ensureColumn(db, "actions", "details_json", "TEXT");
+  ensureColumn(db, "artifacts", "provenance_json", "TEXT");
+  ensureColumn(db, "artifacts", "metadata_json", "TEXT");
+  ensureColumn(db, "runtime_invocations", "verification_outcome", "TEXT");
+  ensureColumn(db, "runtime_invocations", "verification_required", "INTEGER NOT NULL DEFAULT 0");
 }
 
 function createStatements(db: DatabaseSync): StateStoreStatements {
@@ -466,8 +519,9 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         approx_tokens,
         transcript_message_id,
         run_id,
-        sequence
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sequence,
+        provenance_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     touchSessionAfterMessage: db.prepare(`
       UPDATE sessions SET
@@ -490,8 +544,9 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         summary,
         status,
         created_at,
-        completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        completed_at,
+        details_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(action_id) DO UPDATE SET
         session_key = COALESCE(excluded.session_key, actions.session_key),
         run_id = COALESCE(excluded.run_id, actions.run_id),
@@ -499,7 +554,8 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         summary = excluded.summary,
         status = COALESCE(excluded.status, actions.status),
         created_at = excluded.created_at,
-        completed_at = COALESCE(excluded.completed_at, actions.completed_at)
+        completed_at = COALESCE(excluded.completed_at, actions.completed_at),
+        details_json = COALESCE(excluded.details_json, actions.details_json)
     `),
     upsertArtifact: db.prepare(`
       INSERT INTO artifacts (
@@ -509,15 +565,19 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         kind,
         label,
         location,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        created_at,
+        provenance_json,
+        metadata_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(artifact_id) DO UPDATE SET
         session_key = COALESCE(excluded.session_key, artifacts.session_key),
         message_id = COALESCE(excluded.message_id, artifacts.message_id),
         kind = excluded.kind,
         label = COALESCE(excluded.label, artifacts.label),
         location = COALESCE(excluded.location, artifacts.location),
-        created_at = excluded.created_at
+        created_at = excluded.created_at,
+        provenance_json = COALESCE(excluded.provenance_json, artifacts.provenance_json),
+        metadata_json = COALESCE(excluded.metadata_json, artifacts.metadata_json)
     `),
     upsertRuntimeInvocation: db.prepare(`
       INSERT INTO runtime_invocations (
@@ -535,8 +595,10 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         parent_run_id,
         root_budget_id,
         root_abort_node_id,
-        latest_error
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        latest_error,
+        verification_outcome,
+        verification_required
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(run_id) DO UPDATE SET
         session_key = COALESCE(excluded.session_key, runtime_invocations.session_key),
         session_id = excluded.session_id,
@@ -551,7 +613,15 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         parent_run_id = COALESCE(excluded.parent_run_id, runtime_invocations.parent_run_id),
         root_budget_id = excluded.root_budget_id,
         root_abort_node_id = excluded.root_abort_node_id,
-        latest_error = COALESCE(excluded.latest_error, runtime_invocations.latest_error)
+        latest_error = COALESCE(excluded.latest_error, runtime_invocations.latest_error),
+        verification_outcome = COALESCE(
+          excluded.verification_outcome,
+          runtime_invocations.verification_outcome
+        ),
+        verification_required = MAX(
+          runtime_invocations.verification_required,
+          excluded.verification_required
+        )
     `),
     insertRuntimeStageEvent: db.prepare(`
       INSERT OR IGNORE INTO runtime_stage_events (
@@ -635,7 +705,16 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
       WHERE session_key = ?
     `),
     selectArtifacts: db.prepare(`
-      SELECT artifact_id, session_key, message_id, kind, label, location, created_at
+      SELECT
+        artifact_id,
+        session_key,
+        message_id,
+        kind,
+        label,
+        location,
+        created_at,
+        provenance_json,
+        metadata_json
       FROM artifacts
       WHERE (? IS NULL OR session_key = ?)
       ORDER BY created_at ASC, artifact_id ASC
@@ -656,7 +735,9 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
         parent_run_id,
         root_budget_id,
         root_abort_node_id,
-        latest_error
+        latest_error,
+        verification_outcome,
+        verification_required
       FROM runtime_invocations
       WHERE run_id = ?
     `),
@@ -700,7 +781,15 @@ function createStatements(db: DatabaseSync): StateStoreStatements {
       ORDER BY created_at ASC, abort_node_id ASC
     `),
     selectConversationWindow: db.prepare(`
-      SELECT message_id, role, content_text, created_at, approx_tokens, transcript_message_id, sequence
+      SELECT
+        message_id,
+        role,
+        content_text,
+        created_at,
+        approx_tokens,
+        transcript_message_id,
+        sequence,
+        provenance_json
       FROM messages
       WHERE session_key = ?
       ORDER BY created_at DESC, rowid DESC
@@ -843,6 +932,7 @@ function mapConversationRows(
       approxTokens: row.approx_tokens,
       transcriptMessageId: row.transcript_message_id ?? undefined,
       sequence: row.sequence ?? undefined,
+      provenance: parseJsonValue<StateEvidenceProvenance>(row.provenance_json),
     }),
   );
   return {
@@ -863,6 +953,8 @@ function mapArtifactRow(row: ArtifactRow): StateArtifactAppend {
     label: row.label ?? undefined,
     location: row.location ?? undefined,
     createdAt: row.created_at,
+    provenance: parseJsonValue<StateEvidenceProvenance>(row.provenance_json),
+    metadata: parseJsonValue<StateStructuredDetails>(row.metadata_json),
   };
 }
 
@@ -883,6 +975,8 @@ function mapRuntimeInvocationRow(row: RuntimeInvocationRow): StateRuntimeInvocat
     rootBudgetId: row.root_budget_id,
     rootAbortNodeId: row.root_abort_node_id,
     latestError: row.latest_error ?? undefined,
+    verificationOutcome: row.verification_outcome ?? undefined,
+    verificationRequired: row.verification_required === 1,
   };
 }
 
@@ -1012,6 +1106,7 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         message.transcriptMessageId ?? null,
         message.runId ?? null,
         message.sequence ?? null,
+        stringifyJson(message.provenance),
       ) as { changes?: number };
       if ((result.changes ?? 0) === 0) {
         return;
@@ -1041,6 +1136,7 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         action.status ?? null,
         action.createdAt,
         action.completedAt ?? null,
+        stringifyJson(action.details),
       );
     },
 
@@ -1053,6 +1149,8 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         artifact.label ?? null,
         artifact.location ?? null,
         artifact.createdAt,
+        stringifyJson(artifact.provenance),
+        stringifyJson(artifact.metadata),
       );
     },
 
@@ -1073,6 +1171,8 @@ export function createSuperhumanStateStore(params: { workspaceDir: string }): St
         invocation.rootBudgetId,
         invocation.rootAbortNodeId,
         invocation.latestError ?? null,
+        invocation.verificationOutcome ?? null,
+        invocation.verificationRequired ? 1 : 0,
       );
     },
 

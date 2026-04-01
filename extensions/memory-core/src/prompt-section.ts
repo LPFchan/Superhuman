@@ -33,6 +33,9 @@ export const buildPromptSection: MemoryPromptSectionBuilder = ({
       "Citations: include Source: <path#line> when it helps the user verify memory snippets.",
     );
   }
+  lines.push(
+    "Memory safety: imported-history, collapsed summaries, partial reads, and persisted previews are provisional evidence. Do not restate them as authoritative memory unless the underlying source was fully read and verified.",
+  );
   lines.push("");
   return lines;
 };

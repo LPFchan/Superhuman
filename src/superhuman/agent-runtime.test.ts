@@ -57,11 +57,29 @@ describe("SuperhumanAgentRuntimeTurn", () => {
         name: "bash",
       },
     });
+    turn.handleAgentEvent({
+      runId: "run-1",
+      seq: 3,
+      ts: 12,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "start",
+        name: "apply_patch",
+      },
+    });
+    turn.beginVerification("plan test verification");
+    turn.executeVerification("run test verification");
+    turn.recordVerificationOutcome("verified", "pnpm test passed");
     turn.updateChildBudget(childBudgetId, { usedIterations: 1 });
     turn.markAbortNodeCompleted(childAbortNodeId);
     turn.finish("completed");
 
     expect(stateStore.getRuntimeInvocation("run-1")?.status).toBe("completed");
+    expect(stateStore.getRuntimeInvocation("run-1")).toMatchObject({
+      verificationRequired: true,
+      verificationOutcome: "verified",
+    });
     expect(stateStore.getIterationBudgets("run-1")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: "root", usedIterations: 1 }),
@@ -78,6 +96,8 @@ describe("SuperhumanAgentRuntimeTurn", () => {
       expect.arrayContaining([
         expect.objectContaining({ stage: "prompt_assembly", boundary: "enter" }),
         expect.objectContaining({ stage: "tool_execution", boundary: "mark" }),
+        expect.objectContaining({ stage: "verification_planning", boundary: "enter" }),
+        expect.objectContaining({ stage: "verification_execution", boundary: "mark" }),
       ]),
     );
 
@@ -114,6 +134,41 @@ describe("SuperhumanAgentRuntimeTurn", () => {
         expect.objectContaining({ label: "attempt-1", status: "aborted", reason: "cancelled" }),
       ]),
     );
+
+    stateStore.close();
+  });
+
+  it("defaults code-editing runs to not-verifiable when no verifier reports back", () => {
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "superhuman-runtime-verify-"));
+    cleanupPaths.add(workspaceDir);
+    const stateStore = createSuperhumanStateStore({ workspaceDir });
+    const turn = new SuperhumanAgentRuntimeTurn({
+      workspaceDir,
+      runId: "run-verify",
+      sessionId: "session-verify",
+      sessionKey: "main",
+      mode: "interactive",
+      maxIterations: 1,
+      stateStore,
+    });
+
+    turn.handleAgentEvent({
+      runId: "run-verify",
+      seq: 1,
+      ts: 10,
+      sessionKey: "main",
+      stream: "tool",
+      data: {
+        phase: "start",
+        name: "apply_patch",
+      },
+    });
+    turn.finish("completed");
+
+    expect(stateStore.getRuntimeInvocation("run-verify")).toMatchObject({
+      verificationRequired: true,
+      verificationOutcome: "not_verifiable",
+    });
 
     stateStore.close();
   });

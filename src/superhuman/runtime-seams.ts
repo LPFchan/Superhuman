@@ -9,6 +9,7 @@ export type ConversationWindowMessage = {
   approxTokens: number;
   transcriptMessageId?: string;
   sequence?: number;
+  provenance?: StateEvidenceProvenance;
 };
 
 export type ConversationWindow = {
@@ -32,6 +33,33 @@ export type ContextPressureSnapshot = {
   remainingBudget: number;
   overflowRisk: boolean;
 };
+
+export type StateEvidenceSource =
+  | "original"
+  | "imported_history"
+  | "collapsed"
+  | "partial_read"
+  | "persisted_preview"
+  | "restored"
+  | "mixed";
+
+export type StateEvidenceProvenance = {
+  source: StateEvidenceSource;
+  importedFrom?: string;
+  externalId?: string;
+  sourceTool?: string;
+  sourceSessionKey?: string;
+  descriptor?: string;
+  partialRead?: boolean;
+  persistedPreview?: boolean;
+  importedHistory?: boolean;
+  collapsed?: boolean;
+  restored?: boolean;
+};
+
+export type StateStructuredDetails = Record<string, unknown>;
+
+export type VerificationOutcome = "verified" | "not_verifiable" | "verification_failed";
 
 export type StateContextPressureSnapshotAppend = {
   sessionKey: string;
@@ -92,6 +120,7 @@ export type StateMessageAppend = {
   transcriptMessageId?: string;
   runId?: string;
   sequence?: number;
+  provenance?: StateEvidenceProvenance;
 };
 
 export type StateActionAppend = {
@@ -103,6 +132,7 @@ export type StateActionAppend = {
   status?: string;
   createdAt: number;
   completedAt?: number;
+  details?: StateStructuredDetails;
 };
 
 export type StateArtifactAppend = {
@@ -113,6 +143,8 @@ export type StateArtifactAppend = {
   label?: string;
   location?: string;
   createdAt: number;
+  provenance?: StateEvidenceProvenance;
+  metadata?: StateStructuredDetails;
 };
 
 export type AgentRuntimeStage =
@@ -120,6 +152,8 @@ export type AgentRuntimeStage =
   | "model_call"
   | "tool_planning"
   | "tool_execution"
+  | "verification_planning"
+  | "verification_execution"
   | "post_tool_continuation"
   | "terminal_response";
 
@@ -152,6 +186,8 @@ export type StateRuntimeInvocationRecord = {
   rootBudgetId: string;
   rootAbortNodeId: string;
   latestError?: string;
+  verificationOutcome?: VerificationOutcome;
+  verificationRequired?: boolean;
 };
 
 export type StateRuntimeInvocationUpsert = StateRuntimeInvocationRecord;

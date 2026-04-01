@@ -10,6 +10,7 @@ import type {
   StateIterationBudgetRecord,
   StateRuntimeInvocationRecord,
   StateStore,
+  VerificationOutcome,
 } from "./runtime-seams.js";
 import { createSuperhumanStateStore } from "./state-store.js";
 
@@ -77,6 +78,17 @@ function describeRiskFromEvent(event: AgentEventPayload): string | undefined {
   return `${classification.risk}: ${classification.reasons.join(", ")}`;
 }
 
+function isCodeEditingToolName(toolName: string): boolean {
+  const normalized = toolName.trim().toLowerCase();
+  return (
+    normalized === "write" ||
+    normalized === "edit" ||
+    normalized === "apply_patch" ||
+    normalized === "vscode_renamesymbol" ||
+    normalized === "symbol_rename"
+  );
+}
+
 export class SuperhumanAgentRuntimeTurn {
   private readonly stateStore: StateStore;
   private readonly invocation: StateRuntimeInvocationRecord;
@@ -84,6 +96,7 @@ export class SuperhumanAgentRuntimeTurn {
   private readonly abortNodes = new Map<string, RuntimeAbortNodeState>();
   private activeStage?: AgentRuntimeStage;
   private awaitingPostToolContinuation = false;
+  private codeEditingOccurred = false;
 
   constructor(params: {
     workspaceDir: string;
@@ -196,6 +209,24 @@ export class SuperhumanAgentRuntimeTurn {
     });
   }
 
+  beginVerification(detail?: string): void {
+    this.enterStage("verification_planning", detail);
+  }
+
+  executeVerification(detail?: string): void {
+    this.enterStage("verification_execution", detail);
+  }
+
+  recordVerificationOutcome(outcome: VerificationOutcome, detail?: string): void {
+    this.invocation.verificationRequired = true;
+    this.invocation.verificationOutcome = outcome;
+    this.invocation.updatedAt = Date.now();
+    this.stateStore.upsertRuntimeInvocation(this.invocation);
+    if (detail) {
+      this.markStage("verification_execution", detail);
+    }
+  }
+
   consumeIteration(detail?: string): void {
     const budget = this.budgets.get(this.rootBudgetId);
     if (!budget) {
@@ -219,6 +250,23 @@ export class SuperhumanAgentRuntimeTurn {
     this.stateStore.upsertIterationBudget(budget);
     if (detail) {
       this.markStage("model_call", detail);
+    }
+  }
+
+  refundChildBudgetIterations(params: {
+    budgetId: string;
+    refundedIterations: number;
+    detail?: string;
+  }): void {
+    const budget = this.budgets.get(params.budgetId);
+    if (!budget) {
+      return;
+    }
+    budget.refundedIterations = Math.max(0, budget.refundedIterations + params.refundedIterations);
+    budget.updatedAt = Date.now();
+    this.stateStore.upsertIterationBudget(budget);
+    if (params.detail) {
+      this.markStage("tool_execution", params.detail);
     }
   }
 
@@ -394,6 +442,12 @@ export class SuperhumanAgentRuntimeTurn {
       const phase = typeof event.data.phase === "string" ? event.data.phase : "";
       const toolName = typeof event.data.name === "string" ? event.data.name : "tool";
       if (phase === "start") {
+        if (isCodeEditingToolName(toolName)) {
+          this.codeEditingOccurred = true;
+          this.invocation.verificationRequired = true;
+          this.invocation.updatedAt = Date.now();
+          this.stateStore.upsertRuntimeInvocation(this.invocation);
+        }
         this.enterStage("tool_planning", toolName);
         this.markStage("tool_planning", `start ${toolName}`);
         this.enterStage("tool_execution", toolName);
@@ -421,6 +475,11 @@ export class SuperhumanAgentRuntimeTurn {
     const now = Date.now();
     if (this.activeStage) {
       this.exitStage(this.activeStage);
+    }
+    if (this.codeEditingOccurred && !this.invocation.verificationOutcome) {
+      this.invocation.verificationOutcome =
+        status === "failed" ? "verification_failed" : "not_verifiable";
+      this.invocation.verificationRequired = true;
     }
     this.invocation.status = status;
     this.invocation.updatedAt = now;

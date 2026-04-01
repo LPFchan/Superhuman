@@ -8,6 +8,7 @@ import { loadGatewaySessionRow, loadSessionEntry } from "../gateway/session-util
 import { loadCombinedSessionStoreForGateway } from "../gateway/session-utils.js";
 import type { AgentEventPayload } from "../infra/agent-events.js";
 import { onAgentEvent } from "../infra/agent-events.js";
+import { normalizeInputProvenance, type InputProvenance } from "../sessions/input-provenance.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionStoreMutation } from "../sessions/session-store-events.js";
 import {
@@ -18,7 +19,12 @@ import {
   resolveContextPressureOptionsFromConfig,
   type ContextPressureSnapshotOptions,
 } from "./context-pressure.js";
-import type { StateStore, StateSessionUpsert } from "./runtime-seams.js";
+import type {
+  StateEvidenceProvenance,
+  StateStore,
+  StateStructuredDetails,
+  StateSessionUpsert,
+} from "./runtime-seams.js";
 
 function normalizePathForComparison(input: string): string {
   const resolved = path.resolve(input);
@@ -154,6 +160,109 @@ function resolveMessageId(params: {
   hash.update("\n");
   hash.update(params.contentText);
   return `${params.sessionKey}:msg:${hash.digest("hex")}`;
+}
+
+function resolveOpenClawMeta(message: unknown): Record<string, unknown> | undefined {
+  if (!message || typeof message !== "object") {
+    return undefined;
+  }
+  const meta = (message as { __openclaw?: unknown }).__openclaw;
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? (meta as Record<string, unknown>)
+    : undefined;
+}
+
+function resolveMessageProvenance(message: unknown): StateEvidenceProvenance | undefined {
+  if (!message || typeof message !== "object") {
+    return undefined;
+  }
+  const meta = resolveOpenClawMeta(message);
+  const inputProvenance = normalizeInputProvenance(
+    (message as { provenance?: unknown }).provenance,
+  );
+
+  const importedFrom = typeof meta?.importedFrom === "string" ? meta.importedFrom : undefined;
+  const externalId = typeof meta?.externalId === "string" ? meta.externalId : undefined;
+  const sourceTool =
+    typeof inputProvenance?.sourceTool === "string"
+      ? inputProvenance.sourceTool
+      : typeof meta?.sourceTool === "string"
+        ? meta.sourceTool
+        : undefined;
+  const sourceSessionKey =
+    typeof inputProvenance?.sourceSessionKey === "string"
+      ? inputProvenance.sourceSessionKey
+      : typeof meta?.sourceSessionKey === "string"
+        ? meta.sourceSessionKey
+        : undefined;
+  const partialRead =
+    meta?.truncated === true || meta?.partialRead === true || meta?.partial_read === true;
+  const persistedPreview =
+    meta?.persistedPreview === true ||
+    meta?.persisted_preview === true ||
+    meta?.previewDerived === true;
+  const collapsed = meta?.kind === "compaction" || meta?.collapsed === true;
+  const restored = meta?.restored === true || Array.isArray(meta?.restoredArtifacts);
+  const importedHistory = Boolean(importedFrom);
+
+  const sources = [
+    importedHistory ? "imported_history" : undefined,
+    collapsed ? "collapsed" : undefined,
+    partialRead ? "partial_read" : undefined,
+    persistedPreview ? "persisted_preview" : undefined,
+    restored ? "restored" : undefined,
+  ].filter((value): value is NonNullable<StateEvidenceProvenance["source"]> => Boolean(value));
+
+  let source: StateEvidenceProvenance["source"] = "original";
+  if (sources.length === 1) {
+    source = sources[0];
+  } else if (sources.length > 1) {
+    source = "mixed";
+  } else if (inputProvenance?.kind === "inter_session") {
+    source = "imported_history";
+  }
+
+  if (
+    source === "original" &&
+    !importedFrom &&
+    !externalId &&
+    !sourceTool &&
+    !sourceSessionKey &&
+    !partialRead &&
+    !persistedPreview &&
+    !collapsed &&
+    !restored
+  ) {
+    return undefined;
+  }
+
+  return {
+    source,
+    importedFrom,
+    externalId,
+    sourceTool,
+    sourceSessionKey,
+    partialRead,
+    persistedPreview,
+    importedHistory,
+    collapsed,
+    restored,
+    descriptor:
+      typeof meta?.descriptor === "string"
+        ? meta.descriptor
+        : typeof inputProvenance?.originSessionId === "string"
+          ? (inputProvenance as InputProvenance).originSessionId
+          : undefined,
+  };
+}
+
+function buildTranscriptArtifactMetadata(update: SessionTranscriptUpdate): StateStructuredDetails {
+  const meta = resolveOpenClawMeta(update.message);
+  return {
+    transcriptMessageId: resolveTranscriptMessageId(update),
+    sequence: resolveTranscriptSequence(update),
+    sourceKind: typeof meta?.kind === "string" ? meta.kind : undefined,
+  };
 }
 
 function resolveSessionSnapshot(params: {
@@ -416,6 +525,7 @@ export class SessionPersistenceAdapter {
       createdAt,
       transcriptMessageId: resolveTranscriptMessageId(update),
       sequence,
+      provenance: resolveMessageProvenance(update.message),
     });
     this.params.stateStore.appendArtifact({
       artifactId: `transcript:${sessionKey}:${update.sessionFile}`,
@@ -424,6 +534,8 @@ export class SessionPersistenceAdapter {
       label: "Session transcript",
       location: update.sessionFile,
       createdAt,
+      provenance: resolveMessageProvenance(update.message),
+      metadata: buildTranscriptArtifactMetadata(update),
     });
   }
 }

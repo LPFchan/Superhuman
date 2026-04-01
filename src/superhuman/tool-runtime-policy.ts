@@ -1,6 +1,10 @@
 import type { AnyAgentTool } from "../agents/tools/common.js";
 import type { SuperhumanAgentRuntimeTurn } from "./agent-runtime.js";
-import { planToolBatch, type ToolBatchItem } from "./tool-batch-planner.js";
+import {
+  planToolBatch,
+  type ToolBatchItem,
+  type ToolCapabilityClass,
+} from "./tool-batch-planner.js";
 
 export type RuntimeToolSafetyMeta = {
   neverParallel?: boolean;
@@ -8,6 +12,7 @@ export type RuntimeToolSafetyMeta = {
   pathScoped?: boolean;
   interactiveOnly?: boolean;
   destructivePossible?: boolean;
+  capabilityClass?: ToolCapabilityClass;
   scopeKey?: string;
 };
 
@@ -106,9 +111,42 @@ function toToolBatchItem(params: {
       pathScoped: params.safety?.pathScoped,
       interactiveOnly: params.safety?.interactiveOnly,
       destructivePossible: params.safety?.destructivePossible,
+      capabilityClass: params.safety?.capabilityClass,
       scopePaths,
     },
   };
+}
+
+function resolveCapabilityClass(toolName: string): ToolCapabilityClass | undefined {
+  const normalized = toolName.trim().toLowerCase();
+  if (
+    normalized === "grep_search" ||
+    normalized === "semantic_search" ||
+    normalized === "memory_search" ||
+    normalized === "text_search"
+  ) {
+    return "text_search";
+  }
+  if (normalized === "vscode_listcodeusages" || normalized === "symbol_reference") {
+    return "symbol_reference";
+  }
+  if (normalized === "vscode_renamesymbol" || normalized === "symbol_rename") {
+    return "symbol_rename";
+  }
+  if (
+    normalized === "list_dir" ||
+    normalized === "file_search" ||
+    normalized === "workspace_navigation"
+  ) {
+    return "workspace_navigation";
+  }
+  if (normalized === "read" || normalized === "partial_reading") {
+    return "partial_reading";
+  }
+  if (normalized.includes("preview") || normalized === "view_image") {
+    return "persisted_preview";
+  }
+  return undefined;
 }
 
 export function setRuntimeToolSafetyMeta(tool: AnyAgentTool, meta: RuntimeToolSafetyMeta): void {
@@ -152,10 +190,12 @@ export function applyDefaultRuntimeToolSafety(params: {
 }): void {
   for (const tool of params.tools) {
     const toolName = tool.name.trim().toLowerCase();
+    const capabilityClass = resolveCapabilityClass(toolName);
     if (toolName === "bash" || toolName === "exec") {
       setRuntimeToolSafetyMeta(tool, {
         neverParallel: true,
         destructivePossible: true,
+        capabilityClass,
         scopeKey: params.scopeKey,
       });
       continue;
@@ -163,6 +203,17 @@ export function applyDefaultRuntimeToolSafety(params: {
     if (toolName === "process") {
       setRuntimeToolSafetyMeta(tool, {
         neverParallel: true,
+        capabilityClass,
+        scopeKey: params.scopeKey,
+      });
+      continue;
+    }
+    if (toolName === "vscode_renamesymbol" || toolName === "symbol_rename") {
+      setRuntimeToolSafetyMeta(tool, {
+        neverParallel: true,
+        pathScoped: true,
+        destructivePossible: true,
+        capabilityClass: "symbol_rename",
         scopeKey: params.scopeKey,
       });
       continue;
@@ -176,6 +227,15 @@ export function applyDefaultRuntimeToolSafety(params: {
       setRuntimeToolSafetyMeta(tool, {
         pathScoped: true,
         parallelSafe: toolName === "read",
+        capabilityClass,
+        scopeKey: params.scopeKey,
+      });
+      continue;
+    }
+    if (capabilityClass) {
+      setRuntimeToolSafetyMeta(tool, {
+        parallelSafe: capabilityClass !== "symbol_rename",
+        capabilityClass,
         scopeKey: params.scopeKey,
       });
     }

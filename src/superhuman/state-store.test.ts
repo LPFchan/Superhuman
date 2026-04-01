@@ -51,6 +51,11 @@ describe("createSuperhumanStateStore", () => {
       createdAt: 20,
       transcriptMessageId: "m2",
       sequence: 2,
+      provenance: {
+        source: "partial_read",
+        partialRead: true,
+        sourceTool: "read",
+      },
     });
 
     const snapshot = store.getSessionSnapshot("main");
@@ -67,6 +72,10 @@ describe("createSuperhumanStateStore", () => {
     expect(snapshot?.lastUserTurnId).toBe("main:m1");
     expect(snapshot?.lastAssistantTurnId).toBe("main:m2");
     expect(window.messages.map((message) => message.messageId)).toEqual(["main:m1", "main:m2"]);
+    expect(window.messages[1]?.provenance).toMatchObject({
+      source: "partial_read",
+      partialRead: true,
+    });
     expect(window.approximateTokenCount).toBeGreaterThan(0);
     expect(pressure.estimatedInputTokens).toBeGreaterThan(0);
     expect(pressure.configuredContextLimit).toBe(100);
@@ -145,6 +154,8 @@ describe("createSuperhumanStateStore", () => {
       updatedAt: 15,
       rootBudgetId: "budget:root",
       rootAbortNodeId: "abort:root",
+      verificationRequired: true,
+      verificationOutcome: "verified",
     });
     store.appendRuntimeStageEvent({
       eventId: "evt-1",
@@ -179,6 +190,8 @@ describe("createSuperhumanStateStore", () => {
       sessionKey: "main",
       currentStage: "model_call",
       rootBudgetId: "budget:root",
+      verificationRequired: true,
+      verificationOutcome: "verified",
     });
     expect(store.getRuntimeStageEvents("run-1")).toEqual([
       expect.objectContaining({

@@ -2,6 +2,19 @@ import { stripInboundMetadata } from "../auto-reply/reply/strip-inbound-meta.js"
 
 const DEDUPE_TIMESTAMP_WINDOW_MS = 5 * 60 * 1000;
 
+type HistoryMessageMeta = Record<string, unknown>;
+
+type HistoryProvenance = {
+  source:
+    | "original"
+    | "imported_history"
+    | "collapsed"
+    | "partial_read"
+    | "persisted_preview"
+    | "mixed";
+  importedFrom?: string;
+};
+
 function extractComparableText(message: unknown): string | undefined {
   if (!message || typeof message !== "object") {
     return undefined;
@@ -66,6 +79,54 @@ function resolveImportedExternalId(message: unknown): string | undefined {
   return typeof externalId === "string" && externalId.trim() ? externalId : undefined;
 }
 
+function resolveOpenClawMeta(message: unknown): HistoryMessageMeta | undefined {
+  if (!message || typeof message !== "object") {
+    return undefined;
+  }
+  const meta = (message as { __openclaw?: unknown }).__openclaw;
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? (meta as HistoryMessageMeta)
+    : undefined;
+}
+
+function resolveHistoryProvenance(message: unknown): HistoryProvenance {
+  const meta = resolveOpenClawMeta(message);
+  const importedFrom = typeof meta?.importedFrom === "string" ? meta.importedFrom : undefined;
+  const partialRead = meta?.truncated === true || meta?.partialRead === true;
+  const preview = meta?.persistedPreview === true || meta?.persisted_preview === true;
+  const collapsed = meta?.kind === "compaction" || meta?.collapsed === true;
+
+  const sources = [
+    importedFrom ? "imported_history" : undefined,
+    collapsed ? "collapsed" : undefined,
+    partialRead ? "partial_read" : undefined,
+    preview ? "persisted_preview" : undefined,
+  ].filter((value): value is NonNullable<HistoryProvenance["source"]> => Boolean(value));
+
+  if (sources.length === 0) {
+    return { source: "original" };
+  }
+  if (sources.length === 1) {
+    return { source: sources[0], importedFrom };
+  }
+  return { source: "mixed", importedFrom };
+}
+
+function withHistoryProvenance(message: unknown): unknown {
+  if (!message || typeof message !== "object") {
+    return message;
+  }
+  const record = message as Record<string, unknown>;
+  const meta = resolveOpenClawMeta(message) ?? {};
+  return {
+    ...record,
+    __openclaw: {
+      ...meta,
+      historyProvenance: resolveHistoryProvenance(message),
+    },
+  };
+}
+
 function isEquivalentImportedMessage(existing: unknown, imported: unknown): boolean {
   const importedExternalId = resolveImportedExternalId(imported);
   if (importedExternalId && resolveImportedExternalId(existing) === importedExternalId) {
@@ -116,15 +177,18 @@ export function mergeImportedChatHistoryMessages(params: {
   importedMessages: unknown[];
 }): unknown[] {
   if (params.importedMessages.length === 0) {
-    return params.localMessages;
+    return params.localMessages.map((message) => withHistoryProvenance(message));
   }
-  const merged = params.localMessages.map((message, index) => ({ message, order: index }));
+  const merged = params.localMessages.map((message, index) => ({
+    message: withHistoryProvenance(message),
+    order: index,
+  }));
   let nextOrder = merged.length;
   for (const imported of params.importedMessages) {
     if (merged.some((existing) => isEquivalentImportedMessage(existing.message, imported))) {
       continue;
     }
-    merged.push({ message: imported, order: nextOrder });
+    merged.push({ message: withHistoryProvenance(imported), order: nextOrder });
     nextOrder += 1;
   }
   merged.sort(compareHistoryMessages);

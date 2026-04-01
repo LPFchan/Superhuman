@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
-import { Phase3ContextEngine } from "./phase3.js";
+import { ManagedContextEngine } from "./managed-context-engine.js";
 
 const cleanupPaths = new Set<string>();
 
@@ -14,9 +14,9 @@ afterEach(() => {
   cleanupPaths.clear();
 });
 
-describe("Phase3ContextEngine", () => {
+describe("ManagedContextEngine", () => {
   it("projects committed collapse summaries at read time", async () => {
-    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "phase3-context-engine-"));
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "managed-context-engine-"));
     cleanupPaths.add(workspaceDir);
     const sessionFile = path.join(workspaceDir, "session.jsonl");
     const sessionManager = SessionManager.open(sessionFile);
@@ -55,7 +55,7 @@ describe("Phase3ContextEngine", () => {
       }
     }
 
-    const engine = new Phase3ContextEngine();
+    const engine = new ManagedContextEngine();
     const branchMessages = sessionManager
       .getBranch()
       .filter((entry) => entry.type === "message")
@@ -80,6 +80,11 @@ describe("Phase3ContextEngine", () => {
     });
     expect(compacted.ok).toBe(true);
     expect(compacted.compacted).toBe(true);
+    expect(compacted.result?.details).toMatchObject({
+      recoveryMode: "collapse",
+      visibleContextState: "mixed",
+      droppedSpans: expect.any(Array),
+    });
 
     const assembled = await engine.assemble({
       sessionId: "session-1",
@@ -90,5 +95,6 @@ describe("Phase3ContextEngine", () => {
 
     expect(assembled.messages.length).toBeLessThan(branchMessages.length);
     expect(JSON.stringify(assembled.messages[0])).toContain("Collapsed conversation summary");
+    expect(assembled.systemPromptAddition).toContain("Visible context source state:");
   });
 });

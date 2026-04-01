@@ -8,7 +8,7 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 // ---------------------------------------------------------------------------
 import { delegateCompactionToRuntime } from "./delegate.js";
 import { LegacyContextEngine, registerLegacyContextEngine } from "./legacy.js";
-import { registerPhase3ContextEngine } from "./phase3.js";
+import { registerManagedContextEngine } from "./managed-context-engine.js";
 import {
   registerContextEngine,
   registerContextEngineForOwner,
@@ -613,7 +613,7 @@ describe("Default engine selection", () => {
   beforeEach(() => {
     // Registration is idempotent (Map.set), so calling again is safe.
     registerLegacyContextEngine();
-    registerPhase3ContextEngine();
+    registerManagedContextEngine();
     // Register a lightweight custom stub so we don't need external resources.
     registerContextEngine("test-engine", () => {
       const engine: ContextEngine = {
@@ -632,9 +632,9 @@ describe("Default engine selection", () => {
     });
   });
 
-  it("resolveContextEngine() with no config returns the default ('phase3') engine", async () => {
+  it("resolveContextEngine() with no config returns the default ('managed-context') engine", async () => {
     const engine = await resolveContextEngine();
-    expect(engine.info.id).toBe("phase3");
+    expect(engine.info.id).toBe("managed-context");
   });
 
   it("resolveContextEngine() with config contextEngine='legacy' returns legacy engine", async () => {

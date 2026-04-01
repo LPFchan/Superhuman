@@ -222,11 +222,19 @@ describe("cli session history", () => {
 
     const merged = mergeImportedChatHistoryMessages({ localMessages, importedMessages });
     expect(merged).toHaveLength(3);
+    expect(
+      (merged[0] as { __openclaw?: { historyProvenance?: { source?: string } } }).__openclaw
+        ?.historyProvenance,
+    ).toMatchObject({ source: "original" });
     expect(merged[2]).toMatchObject({
       role: "user",
       __openclaw: {
         importedFrom: "claude-cli",
         externalId: "user-2",
+        historyProvenance: {
+          source: "imported_history",
+          importedFrom: "claude-cli",
+        },
       },
     });
   });
