@@ -4,6 +4,7 @@ import { spawnSubagentDirect } from "../agents/subagent-spawn.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { callGateway } from "../gateway/call.js";
 import { loadGatewaySessionRow } from "../gateway/session-utils.js";
+import type { ExecApprovalDecision } from "../infra/exec-approvals.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -93,6 +94,11 @@ export type OrchestrationRuntime = {
   launchWorker: (params: LaunchWorkerParams) => Promise<OrchestrationWorkerRecord>;
   getWorker: (workerId: string) => OrchestrationWorkerRecord | undefined;
   listWorkers: () => OrchestrationWorkerRecord[];
+  continueWorker: (params: {
+    workerId: string;
+    message: string;
+    interrupt?: boolean;
+  }) => Promise<boolean>;
   sendWorkerFollowUp: (params: {
     workerId: string;
     message: string;
@@ -100,10 +106,26 @@ export type OrchestrationRuntime = {
   }) => Promise<boolean>;
   interruptWorker: (workerId: string) => Promise<boolean>;
   stopWorker: (workerId: string) => Promise<boolean>;
+  collectWorker: (params: { workerId: string }) => {
+    worker: OrchestrationWorkerRecord;
+    terminalMessage?: ReturnType<OrchestrationStore["listMailbox"]>[number];
+    approvals: OrchestrationApprovalRecord[];
+  } | null;
   waitForWorkerTerminal: (params: { workerId: string; timeoutMs?: number }) => Promise<boolean>;
   listMailboxMessages: (
     recipientSessionKey?: string,
   ) => ReturnType<OrchestrationStore["listMailbox"]>;
+  listApprovals: (params?: {
+    workerId?: string;
+    controllerSessionKey?: string;
+    status?: OrchestrationApprovalRecord["status"];
+  }) => OrchestrationApprovalRecord[];
+  resolveApproval: (params: {
+    approvalId: string;
+    decision: Extract<ExecApprovalDecision, "allow-once" | "allow-always" | "deny">;
+    resolvedBySessionKey?: string | null;
+    note?: string;
+  }) => Promise<boolean>;
   recordApprovalRequested: (params: ApprovalMirrorRequestedParams) => Promise<void>;
   recordApprovalResolved: (params: ApprovalMirrorResolvedParams) => Promise<void>;
   stop: () => void;
@@ -164,8 +186,34 @@ function buildApprovalText(params: {
   return `Worker ${scope} approval ${params.status ?? "resolved"}${params.sessionKey ? ` for ${params.sessionKey}` : ""}.`;
 }
 
+function buildApprovalDecisionText(params: {
+  kind: "exec" | "plugin";
+  decision: Extract<ExecApprovalDecision, "allow-once" | "allow-always" | "deny">;
+  sessionKey?: string;
+}): string {
+  const scope = params.kind === "exec" ? "exec" : "plugin";
+  return `Coordinator decided ${params.decision} for worker ${scope} approval${params.sessionKey ? ` from ${params.sessionKey}` : ""}.`;
+}
+
 function buildApprovalRecordId(kind: "exec" | "plugin", requestId: string): string {
   return `${kind}:${requestId}`;
+}
+
+function buildWorkerControlAuditText(params: {
+  action: "continue" | "interrupt" | "stop" | "collect";
+  worker: OrchestrationWorkerRecord;
+}): string {
+  const label = params.worker.label?.trim() || params.worker.task.trim() || "Worker";
+  switch (params.action) {
+    case "continue":
+      return `Coordinator continued worker: ${label}.`;
+    case "interrupt":
+      return `Coordinator interrupted worker: ${label}.`;
+    case "stop":
+      return `Coordinator stopped worker: ${label}.`;
+    case "collect":
+      return `Coordinator collected worker result: ${label}.`;
+  }
 }
 
 function xmlEscape(value: string): string {
@@ -212,9 +260,19 @@ function buildTaskNotificationEnvelope(params: {
   return lines.join("\n");
 }
 
-function mapTaskStatusToCoordinatorStatus(task: TaskRecord): CoordinatorNotificationStatus {
+function mapTaskStatusToCoordinatorStatus(
+  task: TaskRecord,
+  worker?: OrchestrationWorkerRecord,
+): CoordinatorNotificationStatus {
   if (task.orchestration?.queueState === "refused" || task.orchestration?.refusalReason) {
     return "refused";
+  }
+  if (
+    typeof worker?.stopRequestedAt === "number" &&
+    typeof task.endedAt === "number" &&
+    task.endedAt >= worker.stopRequestedAt
+  ) {
+    return "killed";
   }
   if (task.status === "succeeded") {
     return task.terminalOutcome === "blocked" ? "failed" : "completed";
@@ -278,6 +336,28 @@ function queueMailboxMessage(params: {
   return message;
 }
 
+function appendMailboxAuditRecord(params: {
+  store: OrchestrationStore;
+  recipientSessionKey: string;
+  senderSessionKey?: string;
+  workerId?: string;
+  kind: OrchestrationMailboxMessageKind;
+  text: string;
+  payload?: Record<string, unknown>;
+}) {
+  return params.store.appendMailbox({
+    recipientSessionKey: params.recipientSessionKey,
+    senderSessionKey: params.senderSessionKey,
+    workerId: params.workerId,
+    kind: params.kind,
+    text: params.text,
+    payload: params.payload,
+    deliveryStatus: "stored",
+    deliveryStateUpdatedAt: Date.now(),
+    correlationId: params.workerId,
+  });
+}
+
 function drainMailboxForSession(params: {
   store: OrchestrationStore;
   recipientSessionKey: string;
@@ -318,6 +398,12 @@ function createApprovalHistoryEntry(params: {
     at: Date.now(),
     ...(params.payload ? { payload: params.payload } : {}),
   };
+}
+
+function mapApprovalDecisionStatus(
+  decision: Extract<ExecApprovalDecision, "allow-once" | "allow-always" | "deny">,
+): "approved" | "denied" {
+  return decision === "deny" ? "denied" : "approved";
 }
 
 function createOrchestrationTaskRecord(params: {
@@ -482,7 +568,13 @@ export function startSuperOrchestrationRuntime(params: {
       ...(task.status === "running" ? { queueStartedAt: task.startedAt ?? Date.now() } : {}),
     });
     if (isTerminalTaskStatus(task.status) && worker.state !== "terminal") {
-      const summary = formatTaskTerminalMessage(task);
+      const summary =
+        typeof worker.stopRequestedAt === "number" &&
+        typeof task.endedAt === "number" &&
+        task.endedAt >= worker.stopRequestedAt &&
+        task.status === "cancelled"
+          ? "Worker stopped by coordinator."
+          : formatTaskTerminalMessage(task);
       getActiveSuperNotificationCenter()?.publish({
         kind: "task_complete",
         title: worker.label?.trim() || worker.task.trim() || "Background task finished",
@@ -503,7 +595,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_terminal",
         text: buildTaskNotificationEnvelope({
           worker: updatedWorker,
-          status: mapTaskStatusToCoordinatorStatus(task),
+          status: mapTaskStatusToCoordinatorStatus(task, updatedWorker),
           summary,
           result: task.terminalSummary ?? task.error,
           usage: {
@@ -1204,12 +1296,31 @@ export function startSuperOrchestrationRuntime(params: {
       return store.listWorkers();
     },
 
-    async sendWorkerFollowUp(params) {
+    async continueWorker(params) {
       const worker = store.getWorker(params.workerId);
       const childSessionKey = worker?.childSessionKey?.trim();
       if (!worker || !childSessionKey) {
         return false;
       }
+      const now = Date.now();
+      store.patchWorker(worker.workerId, {
+        updatedAt: now,
+        lastControlAction: "continue",
+        lastControlAt: now,
+      });
+      appendMailboxAuditRecord({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.controllerSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_control",
+        text: buildWorkerControlAuditText({ action: "continue", worker }),
+        payload: {
+          action: "continue",
+          childSessionKey,
+          interrupt: params.interrupt === true,
+        },
+      });
       await callGateway({
         method: params.interrupt ? "sessions.steer" : "sessions.send",
         params: {
@@ -1221,12 +1332,35 @@ export function startSuperOrchestrationRuntime(params: {
       return true;
     },
 
+    async sendWorkerFollowUp(params) {
+      return await runtime.continueWorker(params);
+    },
+
     async interruptWorker(workerId) {
       const worker = store.getWorker(workerId);
       const childSessionKey = worker?.childSessionKey?.trim();
       if (!worker || !childSessionKey) {
         return false;
       }
+      const now = Date.now();
+      store.patchWorker(worker.workerId, {
+        updatedAt: now,
+        lastControlAction: "interrupt",
+        lastControlAt: now,
+      });
+      appendMailboxAuditRecord({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.controllerSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_control",
+        text: buildWorkerControlAuditText({ action: "interrupt", worker }),
+        payload: {
+          action: "interrupt",
+          childSessionKey,
+          runId: worker.runId,
+        },
+      });
       await callGateway({
         method: "sessions.abort",
         params: {
@@ -1239,7 +1373,164 @@ export function startSuperOrchestrationRuntime(params: {
     },
 
     async stopWorker(workerId) {
-      return await runtime.interruptWorker(workerId);
+      const worker = store.getWorker(workerId);
+      if (!worker) {
+        return false;
+      }
+      const now = Date.now();
+      if (worker.state === "queued") {
+        store.patchWorker(worker.workerId, {
+          state: "terminal",
+          updatedAt: now,
+          taskStatus: "cancelled",
+          lastControlAction: "stop",
+          lastControlAt: now,
+          stopRequestedAt: now,
+        });
+        if (worker.taskId) {
+          patchTaskById({
+            taskId: worker.taskId,
+            patch: {
+              status: "cancelled",
+              endedAt: now,
+              lastEventAt: now,
+              terminalSummary: "Worker stopped before launch.",
+              progressSummary: "Worker stopped before launch.",
+              orchestration: {
+                queueState: "terminal",
+                lastHeartbeatAt: now,
+                lastActivityAt: now,
+              },
+            },
+          });
+        }
+        queueMailboxMessage({
+          store,
+          recipientSessionKey: worker.controllerSessionKey,
+          workerId: worker.workerId,
+          kind: "worker_terminal",
+          text: buildTaskNotificationEnvelope({
+            worker: {
+              ...worker,
+              state: "terminal",
+              taskStatus: "cancelled",
+              stopRequestedAt: now,
+            },
+            status: "killed",
+            summary: "Worker stopped before launch.",
+            result: "stopped",
+          }),
+          payload: {
+            status: "cancelled",
+            taskId: worker.taskId,
+            stoppedBeforeLaunch: true,
+          },
+        });
+        appendMailboxAuditRecord({
+          store,
+          recipientSessionKey: worker.controllerSessionKey,
+          senderSessionKey: worker.controllerSessionKey,
+          workerId: worker.workerId,
+          kind: "worker_control",
+          text: buildWorkerControlAuditText({ action: "stop", worker }),
+          payload: {
+            action: "stop",
+            stoppedBeforeLaunch: true,
+          },
+        });
+        drainMailboxForSession({
+          store,
+          recipientSessionKey: worker.controllerSessionKey,
+        });
+        void processQueue(worker.controllerSessionKey);
+        return true;
+      }
+
+      const childSessionKey = worker.childSessionKey?.trim();
+      if (!childSessionKey) {
+        return false;
+      }
+      store.patchWorker(worker.workerId, {
+        updatedAt: now,
+        lastControlAction: "stop",
+        lastControlAt: now,
+        stopRequestedAt: now,
+      });
+      appendMailboxAuditRecord({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.controllerSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_control",
+        text: buildWorkerControlAuditText({ action: "stop", worker }),
+        payload: {
+          action: "stop",
+          childSessionKey,
+          runId: worker.runId,
+        },
+      });
+      if (worker.taskId) {
+        patchTaskById({
+          taskId: worker.taskId,
+          patch: {
+            progressSummary: "Worker stop requested.",
+            lastEventAt: now,
+            orchestration: {
+              lastHeartbeatAt: now,
+              lastActivityAt: now,
+            },
+          },
+        });
+      }
+      await callGateway({
+        method: "sessions.abort",
+        params: {
+          key: childSessionKey,
+          ...(worker.runId ? { runId: worker.runId } : {}),
+        },
+        timeoutMs: 10_000,
+      });
+      return true;
+    },
+
+    collectWorker(params) {
+      const worker = store.getWorker(params.workerId);
+      if (!worker || (worker.state !== "terminal" && worker.state !== "refused")) {
+        return null;
+      }
+      const now = Date.now();
+      const updatedWorker =
+        store.patchWorker(worker.workerId, {
+          updatedAt: now,
+          lastControlAction: "collect",
+          lastControlAt: now,
+          lastCollectedAt: now,
+        }) ?? worker;
+      appendMailboxAuditRecord({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.controllerSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_control",
+        text: buildWorkerControlAuditText({ action: "collect", worker: updatedWorker }),
+        payload: {
+          action: "collect",
+          state: updatedWorker.state,
+        },
+      });
+      const terminalMessage = store
+        .listMailbox(worker.controllerSessionKey)
+        .filter(
+          (message) => message.workerId === worker.workerId && message.kind === "worker_terminal",
+        )
+        .toSorted((left, right) => right.createdAt - left.createdAt)[0];
+      return {
+        worker: updatedWorker,
+        terminalMessage,
+        approvals: store
+          .listApprovals()
+          .filter((approval) => approval.workerId === worker.workerId),
+      };
     },
 
     async waitForWorkerTerminal(params) {
@@ -1260,6 +1551,66 @@ export function startSuperOrchestrationRuntime(params: {
 
     listMailboxMessages(recipientSessionKey) {
       return store.listMailbox(recipientSessionKey);
+    },
+
+    listApprovals(filter) {
+      return store.listApprovals().filter((approval) => {
+        if (filter?.workerId && approval.workerId !== filter.workerId) {
+          return false;
+        }
+        if (
+          filter?.controllerSessionKey &&
+          approval.controllerSessionKey !== filter.controllerSessionKey
+        ) {
+          return false;
+        }
+        if (filter?.status && approval.status !== filter.status) {
+          return false;
+        }
+        return true;
+      });
+    },
+
+    async resolveApproval(resolveParams) {
+      const approval = store
+        .listApprovals()
+        .find((record) => record.approvalId === resolveParams.approvalId);
+      if (!approval || approval.status !== "requested") {
+        return false;
+      }
+      const worker = store.getWorker(approval.workerId);
+      if (!worker) {
+        return false;
+      }
+      await callGateway({
+        method: approval.kind === "exec" ? "exec.approval.resolve" : "plugin.approval.resolve",
+        params: {
+          id: approval.requestId,
+          decision: resolveParams.decision,
+        },
+        timeoutMs: 10_000,
+      });
+      appendMailboxAuditRecord({
+        store,
+        recipientSessionKey: approval.controllerSessionKey,
+        senderSessionKey: resolveParams.resolvedBySessionKey ?? approval.controllerSessionKey,
+        workerId: approval.workerId,
+        kind: "approval_decision",
+        text: buildApprovalDecisionText({
+          kind: approval.kind,
+          decision: resolveParams.decision,
+          sessionKey: approval.childSessionKey,
+        }),
+        payload: {
+          approvalId: approval.approvalId,
+          requestId: approval.requestId,
+          decision: resolveParams.decision,
+          status: mapApprovalDecisionStatus(resolveParams.decision),
+          resolvedBySessionKey: resolveParams.resolvedBySessionKey ?? approval.controllerSessionKey,
+          note: resolveParams.note,
+        },
+      });
+      return true;
     },
 
     async recordApprovalRequested(approvalParams) {

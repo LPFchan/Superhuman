@@ -266,4 +266,247 @@ describe("orchestration-runtime", () => {
       }
     });
   });
+
+  it("distinguishes continue, interrupt, stop, and collect worker controls", async () => {
+    await withTempDir({ prefix: "openclaw-orchestration-runtime-" }, async (root) => {
+      process.env.OPENCLAW_STATE_DIR = root;
+      let spawnCount = 0;
+      hoisted.subagentSpawnMock.mockImplementation(
+        async (
+          params: { task: string },
+          ctx: {
+            agentSessionKey?: string;
+          },
+        ) => {
+          spawnCount += 1;
+          const runId = `run-${spawnCount}`;
+          const childSessionKey = `agent:main:subagent:child-${spawnCount}`;
+          createTaskRecord({
+            runtime: "subagent",
+            ownerKey: ctx.agentSessionKey ?? "agent:main:main",
+            requesterSessionKey: ctx.agentSessionKey,
+            scopeKind: "session",
+            childSessionKey,
+            runId,
+            task: params.task,
+            status: "running",
+            startedAt: Date.now(),
+          });
+          return {
+            status: "accepted",
+            childSessionKey,
+            runId,
+            mode: "run",
+          };
+        },
+      );
+
+      const runtime = startSuperOrchestrationRuntime({
+        cfg: {
+          agents: {
+            defaults: {
+              subagents: {
+                maxChildrenPerAgent: 1,
+              },
+            },
+          },
+        } as never,
+        workspaceDir: root,
+      });
+
+      try {
+        const worker1 = await runtime.launchWorker({
+          runtime: "subagent",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          task: "First delegated task",
+        });
+        const worker2 = await runtime.launchWorker({
+          runtime: "subagent",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          task: "Second delegated task",
+        });
+
+        await waitForAssertion(() => {
+          expect(runtime.getWorker(worker1.workerId)?.state).toBe("running");
+          expect(runtime.getWorker(worker2.workerId)?.state).toBe("queued");
+        });
+
+        hoisted.callGatewayMock.mockClear();
+
+        expect(
+          await runtime.continueWorker({
+            workerId: worker1.workerId,
+            message: "Keep going and summarize your progress.",
+          }),
+        ).toBe(true);
+        expect(
+          hoisted.callGatewayMock.mock.calls.some(
+            ([call]) =>
+              call &&
+              typeof call === "object" &&
+              "method" in call &&
+              call.method === "sessions.send",
+          ),
+        ).toBe(true);
+
+        expect(await runtime.interruptWorker(worker1.workerId)).toBe(true);
+        expect(
+          hoisted.callGatewayMock.mock.calls.some(
+            ([call]) =>
+              call &&
+              typeof call === "object" &&
+              "method" in call &&
+              call.method === "sessions.abort",
+          ),
+        ).toBe(true);
+
+        hoisted.callGatewayMock.mockClear();
+        expect(await runtime.stopWorker(worker2.workerId)).toBe(true);
+        expect(hoisted.callGatewayMock).not.toHaveBeenCalled();
+
+        await waitForAssertion(() => {
+          expect(runtime.getWorker(worker2.workerId)?.state).toBe("terminal");
+          expect(getTaskById(runtime.getWorker(worker2.workerId)?.taskId ?? "")?.status).toBe(
+            "cancelled",
+          );
+        });
+
+        const collected = runtime.collectWorker({ workerId: worker2.workerId });
+        expect(collected?.worker.lastControlAction).toBe("collect");
+        expect(collected?.worker.lastCollectedAt).toEqual(expect.any(Number));
+        expect(collected?.terminalMessage?.text).toContain("<status>killed</status>");
+
+        const mailbox = runtime.listMailboxMessages("agent:main:main");
+        const controlActions = mailbox
+          .filter((message) => message.kind === "worker_control")
+          .map((message) => message.payload?.action);
+        expect(controlActions).toEqual(
+          expect.arrayContaining(["continue", "interrupt", "stop", "collect"]),
+        );
+      } finally {
+        runtime.stop();
+      }
+    });
+  });
+
+  it("routes approval decisions through orchestration and keeps mailbox audit records", async () => {
+    await withTempDir({ prefix: "openclaw-orchestration-runtime-" }, async (root) => {
+      process.env.OPENCLAW_STATE_DIR = root;
+      hoisted.subagentSpawnMock.mockImplementation(
+        async (
+          params: { task: string },
+          ctx: {
+            agentSessionKey?: string;
+          },
+        ) => {
+          createTaskRecord({
+            runtime: "subagent",
+            ownerKey: ctx.agentSessionKey ?? "agent:main:main",
+            requesterSessionKey: ctx.agentSessionKey,
+            scopeKind: "session",
+            childSessionKey: "agent:main:subagent:child-1",
+            runId: "run-1",
+            task: params.task,
+            status: "running",
+            startedAt: Date.now(),
+          });
+          return {
+            status: "accepted",
+            childSessionKey: "agent:main:subagent:child-1",
+            runId: "run-1",
+            mode: "run",
+          };
+        },
+      );
+
+      const runtime = startSuperOrchestrationRuntime({
+        cfg: {
+          agents: {
+            defaults: {
+              subagents: {
+                maxChildrenPerAgent: 1,
+              },
+            },
+          },
+        } as never,
+        workspaceDir: root,
+      });
+
+      try {
+        const worker = await runtime.launchWorker({
+          runtime: "subagent",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          task: "Approval-driven delegated task",
+        });
+
+        await waitForAssertion(() => {
+          expect(runtime.getWorker(worker.workerId)?.state).toBe("running");
+        });
+
+        await runtime.recordApprovalRequested({
+          kind: "exec",
+          requestId: "req-1",
+          sessionKey: "agent:main:subagent:child-1",
+          payload: {
+            command: "ls",
+          },
+        });
+
+        expect(
+          runtime.listApprovals({ workerId: worker.workerId, status: "requested" }),
+        ).toHaveLength(1);
+
+        hoisted.callGatewayMock.mockClear();
+        expect(
+          await runtime.resolveApproval({
+            approvalId: "exec:req-1",
+            decision: "allow-once",
+            resolvedBySessionKey: "agent:main:main",
+            note: "Approved from coordinator runtime",
+          }),
+        ).toBe(true);
+
+        expect(hoisted.callGatewayMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            method: "exec.approval.resolve",
+            params: {
+              id: "req-1",
+              decision: "allow-once",
+            },
+          }),
+        );
+
+        const decisionAudit = runtime
+          .listMailboxMessages("agent:main:main")
+          .find((message) => message.kind === "approval_decision");
+        expect(decisionAudit?.payload).toMatchObject({
+          approvalId: "exec:req-1",
+          decision: "allow-once",
+          status: "approved",
+          note: "Approved from coordinator runtime",
+        });
+
+        await runtime.recordApprovalResolved({
+          kind: "exec",
+          requestId: "req-1",
+          sessionKey: "agent:main:subagent:child-1",
+          status: "approved",
+          payload: {
+            decision: "allow-once",
+          },
+        });
+
+        const approval = runtime.listApprovals({
+          workerId: worker.workerId,
+          status: "approved",
+        })[0];
+        expect(approval?.history.map((entry) => entry.status)).toEqual(["requested", "approved"]);
+      } finally {
+        runtime.stop();
+      }
+    });
+  });
 });

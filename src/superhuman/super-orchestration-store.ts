@@ -9,7 +9,9 @@ export type OrchestrationMailboxMessageKind =
   | "worker_queued"
   | "worker_started"
   | "worker_terminal"
+  | "worker_control"
   | "approval_requested"
+  | "approval_decision"
   | "approval_resolved";
 
 export type OrchestrationMailboxDeliveryStatus =
@@ -45,6 +47,10 @@ export type OrchestrationWorkerRecord = {
   queueEnteredAt?: number;
   queueStartedAt?: number;
   queueDrainPolicy?: "oldest_first";
+  lastControlAction?: "continue" | "interrupt" | "stop" | "collect";
+  lastControlAt?: number;
+  stopRequestedAt?: number;
+  lastCollectedAt?: number;
   launchRequest: Record<string, unknown>;
 };
 
