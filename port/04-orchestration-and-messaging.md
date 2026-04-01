@@ -26,18 +26,21 @@ Implementation scope:
 
 - Add runtime role types: `lead`, `worker`, `subagent`, `remote_peer`.
 - Store role and parent-child linkage in the state database.
+- Record per-worker budget inheritance and queue state in the durable task model, not only the live runtime.
 
 2. Port the coordinator contract before implementing worker UI.
 
 - Add a coordinator system prompt and runtime mode that treats worker outputs as internal signals.
 - Make workers addressable by stable IDs.
 - Normalize every worker result into a machine-readable task-notification envelope.
+- Add explicit spawn refusal reasons and queue placement outcomes when worker caps are reached.
 
 3. Implement two worker backends.
 
 - In-process workers for low-latency delegation.
 - Out-of-process workers for stronger isolation.
 - Expose the same control surface from both: launch, send follow-up, interrupt, stop, collect terminal result, emit progress.
+- Enforce `maxConcurrentWorkersPerLead` and `maxQueuedWorkersPerLead` as runtime policy rather than prompt advice.
 
 4. Implement inbox and mailbox transport.
 
@@ -54,12 +57,14 @@ Implementation scope:
 6. Add task-state normalization.
 
 - Standardize status, prompt, budget used, tool count, duration, last heartbeat or last activity, and final result for every worker task.
+- Standardize spawn count, queue delay, parent budget, child budget, and refusal reason for every worker task.
 
 Implementation notes:
 
 - Treat worker identity and message durability as foundational data-model decisions, not UI details.
 - In-process and out-of-process workers must converge on the same lifecycle API.
 - Permission relay must be inspectable from the operator perspective before proactive automation can depend on it.
+- Worker fan-out must be bounded by persisted policy. Unbounded swarm behavior is explicitly out of scope.
 
 Source extraction map:
 
@@ -84,6 +89,7 @@ Deliverables:
 - Coordinator runtime mode and normalized worker notification envelopes.
 - Durable mailbox transport with delivery-state handling.
 - Permission relay and worker task-state normalization.
+- Worker cap, queue, and budget accounting that survive restarts.
 
 Exit criteria:
 
@@ -91,6 +97,7 @@ Exit criteria:
 - Worker outputs arrive as normalized task notifications.
 - Permission approvals can cross process or session boundaries without ambiguity.
 - Message delivery survives busy periods and process restarts.
+- Worker fan-out remains bounded, attributable, and inspectable under load.
 
 Out of scope:
 

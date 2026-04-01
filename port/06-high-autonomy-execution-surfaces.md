@@ -32,11 +32,13 @@ Implementation scope:
 
 - Let a local operator-facing session render and answer remote tool approvals using the same permission model as local tools.
 - Degrade unknown remote tools into stubbed inspectable requests instead of hard failures.
+- Preserve verification state, partial-result metadata, and artifact provenance across the permission bridge rather than collapsing them into opaque remote output.
 
 3. Add remote environment abstraction.
 
 - Define explicit environment kinds: `local`, `remote`, `scheduled_remote`, `computer_use`.
 - Make each environment declare capabilities rather than acting as a bare transport endpoint.
+- Require capability declarations to include semantic code-tool support, workspace-search-only fallback, and artifact/provenance replay support.
 
 4. Add optional computer-use plane only after policy unification.
 
@@ -54,6 +56,7 @@ Implementation notes:
 - Remote execution must inherit the exact same runtime accounting and approval model as local execution.
 - Environment kind should become a first-class planning input for tool policy and capability negotiation.
 - Computer-use support should remain optional and explicitly gated.
+- Remote execution must not silently downgrade rename, refactor, verification, or provenance-sensitive tasks when the remote environment lacks the required capabilities.
 
 Source extraction map:
 
@@ -76,6 +79,7 @@ Deliverables:
 - Explicit environment kinds and capability negotiation.
 - Optional computer-use support behind the unified policy layer.
 - Stable provider and backend adapter contracts.
+- Remote propagation of verification, provenance, and semantic-tool capability state.
 
 Exit criteria:
 
@@ -84,6 +88,7 @@ Exit criteria:
 - Capability negotiation is explicit by environment kind.
 - Optional computer-use execution is policy-bound, inspectable, and cleanly torn down.
 - Provider or backend changes do not require rewriting core runtime logic.
+- Remote runs cannot silently fall back from semantic tooling or verified evidence to grep-only or preview-only behavior without surfacing that downgrade.
 
 Out of scope:
 

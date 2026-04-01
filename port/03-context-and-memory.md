@@ -26,24 +26,28 @@ Implementation scope:
 - Back `ContextPressureSnapshot` with actual token estimation.
 - Compute total estimated input tokens, reserved output budget, effective context window, autocompact threshold, and hard blocking threshold.
 - Persist each snapshot at turn boundaries so context failures are debuggable later.
+- Persist compaction and collapse event payloads alongside the snapshot: threshold used, recovery mode, restored artifacts, and dropped spans.
 
 2. Port autocompact and reactive compaction.
 
 - Compact proactively when the threshold is crossed before a model call.
 - Compact reactively after provider overflow or `prompt_too_long` errors.
 - Add a circuit breaker that stops repeated doomed compaction attempts after a bounded number of failures.
+- Require the operator-visible result to say whether the model is now working from original content, collapsed content, restored files, or a mixed state.
 
 3. Port context collapse as a separate subsystem.
 
 - Maintain a collapse store with committed summaries, staged spans, and replay metadata.
 - Project the visible conversation view at read time instead of destructively rewriting the main log.
 - Drain staged collapse spans before falling back to reactive compact.
+- Carry forward partial-read, persisted-preview, and imported-history provenance so collapse cannot silently make partial evidence look complete.
 
 4. Build the memory pipeline in three layers.
 
 - Storage: keep OpenClaw-style pluginized file-backed memory storage and retrieval.
 - Extraction: port Claude end-of-turn extraction as a forked subagent restricted to approved memory roots.
 - Prompt semantics: apply Hermes frozen-snapshot rules so memory prompt content stays fixed for the active session unless policy explicitly refreshes it.
+- Require extraction and consolidation to preserve source provenance for truncated, partial, preview-derived, or collapsed evidence instead of flattening it into authoritative memory.
 
 5. Implement AutoDream-style consolidation.
 
@@ -51,6 +55,7 @@ Implementation scope:
 - Run it on time and session-count gates, not every turn.
 - Constrain writes to memory roots and exploration outside them to read-only.
 - Record touched files and emit a visible completion summary.
+- Refuse to treat preview-only or partial-read evidence as equivalent to fully read source content during consolidation.
 
 6. Add team memory sync only after local memory is stable.
 
@@ -62,6 +67,7 @@ Implementation notes:
 - Treat compaction and collapse as operator-visible system behavior, not invisible prompt rewriting.
 - Extraction and consolidation must be sandboxed more tightly than the main assistant.
 - Memory stability is a release blocker for later proactive features.
+- Replay must remain provenance-aware: original, imported, collapsed, restored, partial, and preview-derived states must remain distinguishable in stored history.
 
 Source extraction map:
 
@@ -95,6 +101,7 @@ Deliverables:
 - Proactive compaction, reactive compaction, and replayable collapse.
 - A three-layer memory pipeline with extraction and stable prompt semantics.
 - Background consolidation and audited team-memory sync.
+- Provenance-preserving summaries and memory extraction that do not launder partial evidence into unqualified memory.
 
 Exit criteria:
 
@@ -103,6 +110,7 @@ Exit criteria:
 - Memory extraction adds useful durable state with low operator intervention.
 - Background consolidation improves memory structure without mutating unrelated state.
 - Team memory sync converges safely across collaborators and rejects secret-bearing files.
+- Operators can tell which summary and memory facts came from full reads versus partial, preview-derived, imported, or collapsed context.
 
 Out of scope:
 

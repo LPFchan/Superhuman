@@ -38,11 +38,13 @@ Implementation scope:
 - Add durable and session-only scheduled jobs.
 - Support one-shot jobs, recurring jobs, persisted durable jobs, jitter windows, and missed-job recovery on restart.
 - Enqueue scheduled jobs into the same runtime loop rather than bypassing it.
+- Preserve the same verification, partial-result, and capability-negotiation constraints as interactive runs instead of letting scheduled jobs bypass them.
 
 4. Port remote scheduled agents.
 
 - Add a remote trigger service that can create cloud or remote scheduled executions with repo source, model selection, connector or plugin attachments, and a self-contained prompt payload.
 - Make remote jobs discoverable and runnable from the same control plane as local schedules.
+- Require remote scheduled jobs to publish environment capabilities before attempting semantic rename or refactor tasks.
 
 5. Port notification and delivery surfaces.
 
@@ -59,12 +61,14 @@ Implementation scope:
 
 - Record trigger source, reason, plan, actions taken, and result for every proactive or scheduled action.
 - Make these records queryable from local state and visible in operator surfaces.
+- Record whether the automation acted on verified evidence, partial reads, persisted previews, or collapsed summaries.
 
 Implementation notes:
 
 - Proactive mode should be a scheduler plus policy layer, not a permanent prompt mutation.
 - Sleep and wake transitions need explicit state persistence.
 - Every autonomous action must leave enough evidence for a human to reconstruct why it happened.
+- Automation may depend on earlier phases, but it must not weaken them. Scheduled or proactive runs do not get looser verification or provenance rules than interactive runs.
 
 Source extraction map:
 
@@ -100,6 +104,7 @@ Exit criteria:
 - Remote scheduled jobs have the same identity and observability model as local ones.
 - Notifications and file deliveries are attributable to concrete actions and triggers.
 - External event subscriptions feed directly into the runtime as structured work.
+- Proactive and scheduled actions preserve the same evidence, verification, and capability constraints as manual runs.
 
 Out of scope:
 

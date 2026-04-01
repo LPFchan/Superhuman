@@ -24,14 +24,16 @@ Implementation scope:
 1. Replace the ad hoc agent loop contract with an explicit runtime loop API.
 
 - Introduce an `AgentRuntime` service responsible for one turn of model execution.
-- Split the loop into explicit stages: prompt assembly, model call, tool planning, tool execution, post-tool continuation, terminal response.
+- Split the loop into explicit stages: prompt assembly, model call, tool planning, tool execution, verification planning, verification execution, post-tool continuation, terminal response.
 - Emit structured state-store events at each stage boundary.
+- Require terminal success to record a verification outcome of `verified`, `not_verifiable`, or `verification_failed` when code-editing tools ran.
 
 2. Port Hermes-style iteration budgeting.
 
 - Add an `IterationBudget` object per runtime invocation.
 - Track maximum iterations, used iterations, refunded iterations, and exhaustion reason.
 - Give tool-driven subagents independent child budgets with configurable caps.
+- Persist child-budget inheritance, spawn count, concurrency slot, and queue delay for spawned workers.
 - Treat `execute_code`-style programmatic tool calls as refundable work rather than full model turns.
 
 3. Port tool batch safety classification.
@@ -39,6 +41,7 @@ Implementation scope:
 - Add tool metadata flags: `never_parallel`, `parallel_safe`, `path_scoped`, `interactive_only`, `destructive_possible`.
 - Implement a `ToolBatchPlanner` that decides between concurrent and sequential execution.
 - Allow `path_scoped` concurrency only when target scopes do not overlap.
+- Distinguish `text_search`, `symbol_reference`, `symbol_rename`, `workspace_navigation`, `partial_reading`, and `persisted_preview` capability classes so the planner can make semantics-aware decisions instead of treating all search or read tools as equivalent.
 
 4. Port command-safety heuristics.
 
@@ -51,6 +54,7 @@ Implementation scope:
 - Normalize invalid Unicode and lone surrogate code points before model submission.
 - Strip transient runtime warnings from replayed history.
 - Separate turn-local annotations from replay-safe transcript content.
+- Preserve verification status, partial-read metadata, preview/full-output provenance, and imported-history provenance as structured replay-safe annotations rather than flattening them into plain text.
 
 6. Unify interrupt and cancellation semantics.
 
@@ -62,6 +66,8 @@ Implementation notes:
 - Runtime-stage event emission should become the default debugging path for later phases.
 - Budget and cancellation state must be inspectable from local state, not only in memory.
 - Command-safety gating must fail closed for clearly destructive actions.
+- Completion reporting is part of the runtime contract, not a style preference. If the runtime cannot verify edited code, that fact must be persisted and exposed in the terminal state.
+- Partial tool evidence must never be silently upgraded into complete evidence for summaries, verification, or final completion reports.
 
 Source extraction map:
 
@@ -85,6 +91,7 @@ Deliverables:
 - Iteration budget enforcement and child-budget propagation.
 - A tool batch planner and risk classifier wired into execution.
 - Sanitized replayable transcripts and unified cancellation semantics.
+- Structured verification outcomes and structured partial-result metadata carried through the runtime.
 
 Exit criteria:
 
@@ -93,6 +100,8 @@ Exit criteria:
 - Tool batches execute deterministically under declared policy.
 - Unsafe shell actions are classified before execution.
 - Replayed history is stable and free of turn-local garbage.
+- Successful code-editing runs cannot be reported without a recorded verification outcome.
+- Rename and refactor planning can tell when only text-search capability is available.
 
 Out of scope:
 

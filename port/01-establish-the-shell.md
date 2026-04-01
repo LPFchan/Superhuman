@@ -32,6 +32,8 @@ Implementation scope:
 - Start with four tables only: `sessions`, `messages`, `actions`, `artifacts`.
 - Add FTS5 indexing only for message content in this phase.
 - Store normalized message text, session metadata, and action summaries, not every raw tool payload.
+- Make `actions` capable of storing verification attempts, compaction decisions, worker-spawn events, and capability-negotiation outcomes.
+- Make `artifacts` capable of storing persisted-preview/full-output relationships, verification logs, and partial-read descriptors.
 
 3. Add a shell-facing persistence adapter.
 
@@ -39,6 +41,7 @@ Implementation scope:
 - Make the adapter write-through and idempotent.
 - Tolerate duplicate session-start and session-end events.
 - Keep the existing OpenClaw session store authoritative for routing during this phase.
+- Extend the adapter contract so transcript imports, transcript updates, and cross-session provenance can be persisted without relying on assistant prose.
 
 4. Define the first stable internal interfaces.
 
@@ -51,8 +54,10 @@ Implementation scope:
 5. Add the smallest useful Claude-facing compatibility layer.
 
 - Introduce a `ConversationWindow` abstraction exposing ordered messages, approximate token count, latest assistant turn ID, and latest user turn ID.
-- Introduce a `ContextPressureSnapshot` exposing estimated input tokens, effective model context limit, remaining budget, and an overflow-risk flag.
+- Introduce a `ContextPressureSnapshot` exposing estimated input tokens, effective model context limit, remaining budget, an overflow-risk flag, and persisted compaction-event references.
 - Introduce a no-op `CompactionManager` interface with `getSnapshot()`, `shouldCompact()`, `compact()`, and `recoverFromOverflow()`.
+- Add capability flags to the compatibility layer for semantic symbol operations and workspace-search-only fallbacks.
+- Require the shell-facing interfaces to preserve partial-read, persisted-preview, and imported-history provenance as structured metadata.
 - Do not implement real compaction yet. The goal is to create the seam so later Claude ports do not force a shell rewrite.
 
 Implementation notes:
@@ -60,6 +65,7 @@ Implementation notes:
 - New state writes should be append-first and replayable.
 - Boot and routing behavior must remain source-compatible with the existing shell.
 - Session identity drift is a blocker for closing this phase.
+- This phase is where hidden runtime facts become visible state. If a later phase depends on verification status, worker lineage, preview/full artifact relationships, or partial-read provenance, the storage seam must already exist here.
 
 Source extraction map:
 
@@ -85,6 +91,7 @@ Deliverables:
 - A persistence adapter wired to the existing shell lifecycle.
 - Stable registry interfaces for sessions, channels, plugins, bootstrap, and state.
 - Context-management seam types defined and reachable from the shell.
+- Capability advertisement and provenance-bearing shell interfaces for later semantic-tool, compaction, and artifact work.
 
 Exit criteria:
 
@@ -92,6 +99,7 @@ Exit criteria:
 - SQLite state exists and is populated for every new session and message.
 - Restarting the process does not corrupt session identity or duplicate durable state.
 - The new context interfaces exist and are wired even though compaction remains a stub.
+- Verification events, preview/full artifact links, partial-read markers, and capability flags have a durable home in state even if later phases do not use them yet.
 
 Out of scope:
 

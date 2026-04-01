@@ -20,11 +20,11 @@ Superhuman should treat the assistant environment as the primary object: session
 
 2. Autonomous, but inspectable.
 
-Every proactive or background action should be attributable, searchable, reversible where possible, and visible through logs, state, or timeline views.
+Every proactive or background action should be attributable, searchable, reversible where possible, and visible through logs, state, or timeline views. This includes compaction, verification, persisted previews, partial reads, and worker fan-out, not just user-visible task outcomes.
 
 3. Capability layering.
 
-The architecture should separate platform shell, runtime core, memory, orchestration, automation, and execution surfaces so each can evolve independently.
+The architecture should separate platform shell, runtime core, memory, orchestration, automation, and execution surfaces so each can evolve independently. Safety, quality, and completion guarantees should live in runtime policy and observable state, not only in hidden prompt wording.
 
 4. Safe degradation.
 
@@ -118,8 +118,11 @@ Key responsibilities:
 - Iteration budgets.
 - Tool-call batch safety.
 - Destructive-command heuristics.
+- Post-edit verification policy.
 - Consistent interrupt and cancellation handling.
 - Input and transcript sanitization.
+- Structured propagation of partial-read and partial-result metadata.
+- Semantic-versus-text tool capability awareness.
 - Tool execution concurrency policy.
 
 End goal:
@@ -131,6 +134,8 @@ Success indicators:
 - Autonomous loops cannot spin indefinitely without budget accounting.
 - Unsafe command patterns are intercepted before execution.
 - Parallel tool execution is deterministic under policy.
+- The system never reports success without recording whether verification ran and what passed or failed.
+- Partial tool evidence is explicitly marked and never silently treated as complete evidence.
 - Transcript replay does not degrade from corrupted or unsafe message content.
 
 Module success definition:
@@ -154,6 +159,9 @@ Key responsibilities:
 - Reactive fallback on overflow.
 - Context collapse and replayable summary commits.
 - Overflow recovery paths.
+- Operator-visible compaction events.
+- Restored-file and dropped-span accounting.
+- Partial-read provenance through collapse and replay.
 - Manual compaction entry points for operators.
 
 End goal:
@@ -164,7 +172,7 @@ Success indicators:
 
 - Long sessions remain operational without frequent manual resets.
 - Overflow events recover automatically in most cases.
-- Context history remains inspectable after summarization.
+- Context history remains inspectable after summarization, with provenance for collapsed, restored, imported, and partial content.
 - Context management behavior is observable in logs and UI.
 
 Module success definition:
@@ -191,6 +199,7 @@ Key responsibilities:
 - Background consolidation and dreaming.
 - Repo-shared team memory sync.
 - Frozen prompt snapshot during active session.
+- Provenance preservation for truncated, partial, or preview-derived evidence.
 - Injection and secret scanning on memory writes.
 
 End goal:
@@ -202,6 +211,7 @@ Success indicators:
 - Valuable memories are extracted without manual prompting.
 - Shared repo memory syncs safely.
 - Memory writes do not destabilize active prompt caching.
+- Memory extraction and consolidation do not silently upgrade partial evidence into authoritative memory without attribution.
 - Dangerous memory content is rejected automatically.
 
 Module success definition:
@@ -227,6 +237,8 @@ Key responsibilities:
 - Out-of-process workers.
 - Cross-session messaging.
 - Permission relay and approval flow.
+- Worker cap and queue policy.
+- Spawn-budget accounting.
 - Task notifications, worker lifecycle, and status aggregation.
 
 End goal:
@@ -238,6 +250,7 @@ Success indicators:
 - Workers can be launched, continued, stopped, and resumed cleanly.
 - Permission approvals can be delegated and routed.
 - Cross-session messages arrive reliably and are attributable.
+- Worker fan-out remains bounded and inspectable under load.
 - Multi-agent work improves throughput without destroying operator visibility.
 
 Module success definition:
@@ -264,6 +277,7 @@ Key responsibilities:
 - Boot-time checks.
 - Notification and file-delivery actions.
 - PR subscriptions and event-driven follow-ups.
+- Automation logging with provenance and evidence links.
 
 End goal:
 
@@ -274,7 +288,7 @@ Success indicators:
 - The assistant can wake itself, decide to act, and record why.
 - Scheduled tasks survive restarts when intended.
 - Remote triggers execute with correct repo and environment context.
-- Notifications and action logs are visible and attributable.
+- Notifications and action logs are visible, attributable, and linked to the verification, compaction, and artifact evidence they depended on.
 
 Module success definition:
 
@@ -299,6 +313,7 @@ Key responsibilities:
 - Local background execution.
 - Remote and cloud execution.
 - Session ingress and event transport.
+- Environment capability negotiation, including semantic code-tool support.
 - Optional computer-use surface.
 - Provider and backend abstraction.
 
@@ -310,6 +325,7 @@ Success indicators:
 
 - Local and remote sessions behave like the same assistant with different execution planes.
 - Scheduled remote jobs can be created and inspected from the same control plane.
+- Rename and refactor safety depends on explicit host capabilities, not on assuming generic search is sufficient.
 - Provider or backend swaps do not require core logic rewrites.
 
 Module success definition:
@@ -334,6 +350,11 @@ Key responsibilities:
 - FTS search.
 - Token and cost tracking.
 - Task and action history.
+- Verification history and evidence artifacts.
+- Compaction event history.
+- Persisted-preview and full-output provenance.
+- Partial-read and truncation event history.
+- Worker fan-out and child-budget history.
 - Append-only memory and action logs.
 - Failure and recovery visibility.
 
