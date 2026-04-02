@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
+import { createStructuredExternalAutomationPolicy } from "./super-automation-policy.js";
 import type { StateStore } from "./super-runtime-seams.js";
 import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
@@ -186,6 +187,10 @@ export function startSuperSubscriptionManager(params: {
           ? "Queued structured subscription event"
           : "Ignored subscription event with no matching session",
         resultStatus: sessionKey ? "queued" : "ignored",
+        ...createStructuredExternalAutomationPolicy({
+          policySummary:
+            "Subscription events are accepted only as structured external input and converted into queued work items instead of being treated as already-verified repository state.",
+        }),
         details: {
           repo: event.repo,
           pullRequestNumber: event.pullRequestNumber,

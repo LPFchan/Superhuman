@@ -4,9 +4,13 @@ import type { StatementSync } from "node:sqlite";
 import type {
   AbortNodeStatus,
   AgentRuntimeStage,
+  AutomationCapabilityPosture,
+  AutomationEvidencePosture,
   RuntimeBudgetExhaustionReason,
   RuntimeInvocationMode,
   RuntimeInvocationStatus,
+  AutomationVerificationPosture,
+  SuperShellCapabilityMode,
   TeamMemorySyncDirection,
   TeamMemorySyncStatus,
   VerificationOutcome,
@@ -153,8 +157,15 @@ export type AutomationEventRow = {
   trigger_source: string;
   reason: string | null;
   plan_summary: string | null;
+  policy_summary: string | null;
   action_summary: string | null;
   result_status: string;
+  evidence_posture: AutomationEvidencePosture | null;
+  evidence_sources_json: string | null;
+  verification_posture: AutomationVerificationPosture | null;
+  verification_outcome: VerificationOutcome | null;
+  capability_posture: AutomationCapabilityPosture | null;
+  capability_mode: SuperShellCapabilityMode | null;
   details_json: string | null;
   created_at: number;
 };

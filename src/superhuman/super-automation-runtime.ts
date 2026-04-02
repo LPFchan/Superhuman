@@ -6,6 +6,7 @@ import { onAgentEvent } from "../infra/agent-events.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
+import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
 import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
 import { SuperProactiveLoop } from "./super-proactive-loop.js";
 import type {
@@ -44,6 +45,13 @@ function appendMirroredAction(stateStore: StateStore, event: StateAutomationEven
       triggerSource: event.triggerSource,
       reason: event.reason,
       planSummary: event.planSummary,
+      policySummary: event.policySummary,
+      evidencePosture: event.evidencePosture,
+      evidenceSources: event.evidenceSources,
+      verificationPosture: event.verificationPosture,
+      verificationOutcome: event.verificationOutcome,
+      capabilityPosture: event.capabilityPosture,
+      capabilityMode: event.capabilityMode,
       ...event.details,
     },
   };
@@ -130,6 +138,11 @@ export function startSuperAutomationRuntime(params: {
               ? "Skipped BOOT.md automation"
               : "BOOT.md automation failed",
         resultStatus: result.status,
+        ...createTrustedStateAutomationPolicy({
+          policySummary:
+            "BOOT.md execution was allowed by trusted workspace startup state; downstream work still uses the normal runtime verification and provenance rules.",
+          evidenceSources: ["runtime_state"],
+        }),
         details:
           result.status === "failed"
             ? { reason: result.reason }
@@ -151,6 +164,12 @@ export function startSuperAutomationRuntime(params: {
         reason: event.error ?? event.summary,
         actionSummary: `Cron ${event.action}: ${event.jobId}`,
         resultStatus: event.action === "finished" ? (event.status ?? "finished") : event.action,
+        ...createTrustedStateAutomationPolicy({
+          policySummary:
+            "Host cron fired this job from durable scheduler state; any resulting agent work remains subject to the same verification and capability gates as manual runs.",
+          evidenceSources: ["scheduler_state"],
+          verificationPosture: "unknown",
+        }),
         details: {
           jobId: event.jobId,
           action: event.action,
@@ -170,6 +189,12 @@ export function startSuperAutomationRuntime(params: {
           message: event.summary ?? `Cron job ${event.jobId} completed.`,
           sessionKey: event.sessionKey,
           runId: event.sessionId,
+          audit: createTrustedStateAutomationPolicy({
+            policySummary:
+              "This notification was emitted from a durable cron completion event; verification posture of the underlying run remains runtime-owned.",
+            evidenceSources: ["scheduler_state"],
+            verificationPosture: "unknown",
+          }),
           metadata: {
             jobId: event.jobId,
             status: event.status,

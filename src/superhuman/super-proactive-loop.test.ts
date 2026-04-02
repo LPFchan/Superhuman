@@ -57,6 +57,10 @@ describe("SuperProactiveLoop", () => {
           automationKind: "proactive_loop",
           triggerSource: "idle",
           resultStatus: "queued",
+          evidencePosture: "trusted_state",
+          evidenceSources: ["runtime_state"],
+          verificationPosture: "not_required",
+          capabilityPosture: "not_required",
         }),
       ]),
     );

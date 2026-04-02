@@ -140,8 +140,15 @@ function ensureStateSchema(db: DatabaseSync): void {
       trigger_source TEXT NOT NULL,
       reason TEXT,
       plan_summary TEXT,
+      policy_summary TEXT,
       action_summary TEXT,
       result_status TEXT NOT NULL,
+      evidence_posture TEXT,
+      evidence_sources_json TEXT,
+      verification_posture TEXT,
+      verification_outcome TEXT,
+      capability_posture TEXT,
+      capability_mode TEXT,
       details_json TEXT,
       created_at INTEGER NOT NULL,
       FOREIGN KEY(session_key) REFERENCES sessions(session_key)
@@ -385,6 +392,13 @@ function ensureStateSchema(db: DatabaseSync): void {
   ensureColumn(db, "artifacts", "partial_read_json", "TEXT");
   ensureColumn(db, "artifacts", "verification_action_id", "TEXT");
   ensureColumn(db, "artifacts", "metadata_json", "TEXT");
+  ensureColumn(db, "automation_events", "policy_summary", "TEXT");
+  ensureColumn(db, "automation_events", "evidence_posture", "TEXT");
+  ensureColumn(db, "automation_events", "evidence_sources_json", "TEXT");
+  ensureColumn(db, "automation_events", "verification_posture", "TEXT");
+  ensureColumn(db, "automation_events", "verification_outcome", "TEXT");
+  ensureColumn(db, "automation_events", "capability_posture", "TEXT");
+  ensureColumn(db, "automation_events", "capability_mode", "TEXT");
   ensureColumn(db, "runtime_invocations", "verification_outcome", "TEXT");
   ensureColumn(db, "runtime_invocations", "verification_required", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(

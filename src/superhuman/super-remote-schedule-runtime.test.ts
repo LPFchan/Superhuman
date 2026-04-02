@@ -104,6 +104,19 @@ describe("SuperRemoteScheduleRuntime", () => {
         kind: "scheduled_run_fired",
       }),
     );
+    expect(stateStore.listAutomationEvents({ sessionKey: "main" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          automationKind: "remote_scheduled_job",
+          resultStatus: "queued",
+          evidencePosture: "trusted_state",
+          evidenceSources: ["scheduler_state", "runtime_state"],
+          verificationPosture: "unknown",
+          capabilityPosture: "satisfied",
+          capabilityMode: "semantic_rename",
+        }),
+      ]),
+    );
 
     stateStore.close();
   });
@@ -171,6 +184,19 @@ describe("SuperRemoteScheduleRuntime", () => {
       }),
     );
     expect(enqueueSystemEvent).not.toHaveBeenCalled();
+    expect(stateStore.listAutomationEvents({ sessionKey: "main" })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          automationKind: "remote_scheduled_job",
+          resultStatus: "blocked",
+          evidencePosture: "trusted_state",
+          evidenceSources: ["scheduler_state", "runtime_state"],
+          verificationPosture: "unknown",
+          capabilityPosture: "blocked",
+          capabilityMode: "workspace_search_only",
+        }),
+      ]),
+    );
 
     stateStore.close();
   });

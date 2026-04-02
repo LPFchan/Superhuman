@@ -1,4 +1,5 @@
 import type {
+  AutomationEvidenceSource,
   StateAutomationEventAppend,
   StateAutomationEventRecord,
   StateAutomationLoopStateRecord,
@@ -43,8 +44,17 @@ function mapAutomationEventRow(row: AutomationEventRow): StateAutomationEventRec
     triggerSource: row.trigger_source,
     reason: row.reason ?? undefined,
     planSummary: row.plan_summary ?? undefined,
+    policySummary: row.policy_summary ?? undefined,
     actionSummary: row.action_summary ?? undefined,
     resultStatus: row.result_status,
+    evidencePosture: row.evidence_posture ?? undefined,
+    evidenceSources: parseJsonValue(row.evidence_sources_json) as
+      | AutomationEvidenceSource[]
+      | undefined,
+    verificationPosture: row.verification_posture ?? undefined,
+    verificationOutcome: row.verification_outcome ?? undefined,
+    capabilityPosture: row.capability_posture ?? undefined,
+    capabilityMode: row.capability_mode ?? undefined,
     details: parseJsonValue(row.details_json),
     createdAt: row.created_at,
   };
@@ -113,8 +123,15 @@ export function createAutomationStateStoreApi(params: {
           event.triggerSource,
           event.reason ?? null,
           event.planSummary ?? null,
+          event.policySummary ?? null,
           event.actionSummary ?? null,
           event.resultStatus,
+          event.evidencePosture ?? null,
+          stringifyJson(event.evidenceSources),
+          event.verificationPosture ?? null,
+          event.verificationOutcome ?? null,
+          event.capabilityPosture ?? null,
+          event.capabilityMode ?? null,
           stringifyJson(event.details),
           event.createdAt,
         );

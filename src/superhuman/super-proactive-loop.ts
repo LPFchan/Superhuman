@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
 import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
 import type {
   AutomationLoopState,
@@ -225,6 +226,11 @@ export class SuperProactiveLoop {
       reason: event.reason,
       actionSummary: event.actionSummary,
       resultStatus: event.resultStatus,
+      ...createTrustedStateAutomationPolicy({
+        policySummary:
+          "Proactive loop transitions are driven only by trusted local runtime state and do not themselves relax downstream verification or capability rules.",
+        evidenceSources: ["runtime_state"],
+      }),
       details: {
         state: state.state,
         wakeAt: state.wakeAt,
@@ -322,6 +328,11 @@ export class SuperProactiveLoop {
       reason: "idle threshold reached",
       actionSummary: "Queued proactive wake for idle session",
       resultStatus: "queued",
+      ...createTrustedStateAutomationPolicy({
+        policySummary:
+          "The idle wake was queued from trusted session activity state only; the downstream proactive run must still evaluate evidence quality before taking any substantive action.",
+        evidenceSources: ["runtime_state"],
+      }),
       details: {
         idleForMs,
       },
@@ -332,6 +343,11 @@ export class SuperProactiveLoop {
       title: "Proactive wake queued",
       message: `Queued a proactive wake after ${idleForMs}ms of inactivity.`,
       sessionKey: this.sessionKey,
+      audit: createTrustedStateAutomationPolicy({
+        policySummary:
+          "This notification reflects an idle-driven proactive wake sourced from trusted runtime state rather than verified task evidence.",
+        evidenceSources: ["runtime_state"],
+      }),
       metadata: {
         idleForMs,
       },

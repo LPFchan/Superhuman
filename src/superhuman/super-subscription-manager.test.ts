@@ -65,6 +65,9 @@ describe("SuperSubscriptionManager", () => {
           automationKind: "subscription_event",
           triggerSource: "pr_review",
           resultStatus: "queued",
+          evidencePosture: "structured_external",
+          evidenceSources: ["structured_external"],
+          verificationPosture: "not_required",
         }),
       ]),
     );

@@ -43,11 +43,16 @@ describe("startSuperAutomationRuntime", () => {
           automationKind: "boot",
           triggerSource: "boot",
           resultStatus: "ran",
+          evidencePosture: "trusted_state",
+          evidenceSources: ["runtime_state"],
         }),
         expect.objectContaining({
           automationKind: "scheduled_job",
           triggerSource: "scheduled_job",
           resultStatus: "ok",
+          evidencePosture: "trusted_state",
+          evidenceSources: ["scheduler_state"],
+          verificationPosture: "unknown",
         }),
       ]),
     );

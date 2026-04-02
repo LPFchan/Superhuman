@@ -5,6 +5,7 @@ import type { CronService } from "../cron/service.js";
 import type { CronJob } from "../cron/types.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
+import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
 import {
   getActiveSuperNotificationCenter,
   type SuperNotificationCenter,
@@ -254,6 +255,12 @@ export function startSuperRemoteScheduleRuntime(params: {
           reason: error instanceof Error ? error.message : String(error),
           actionSummary: `Failed to resync mirrored cron job for ${record.name}`,
           resultStatus: "failed",
+          ...createTrustedStateAutomationPolicy({
+            policySummary:
+              "Remote schedule startup resync relies on trusted persisted scheduler state and does not itself assert that any queued work was verified.",
+            evidenceSources: ["scheduler_state"],
+            verificationPosture: "unknown",
+          }),
           details: {
             jobId: record.jobId,
             cronJobId: record.cronJobId,
@@ -351,6 +358,14 @@ export function startSuperRemoteScheduleRuntime(params: {
           reason: "required capabilities unavailable",
           actionSummary: `Blocked remote scheduled job ${job.name}`,
           resultStatus: "blocked",
+          ...createTrustedStateAutomationPolicy({
+            policySummary:
+              "Remote scheduled work was blocked because required semantic capabilities were not present in the declared execution environment.",
+            evidenceSources: ["scheduler_state", "runtime_state"],
+            verificationPosture: "unknown",
+            capabilityPosture: "blocked",
+            capabilityMode: capabilitySnapshot.mode,
+          }),
           details: {
             jobId: job.jobId,
             missingCapabilities,
@@ -363,6 +378,14 @@ export function startSuperRemoteScheduleRuntime(params: {
           title: `Remote run blocked: ${job.name}`,
           message: `Missing required capabilities: ${missingCapabilities.join(", ")}.`,
           sessionKey,
+          audit: createTrustedStateAutomationPolicy({
+            policySummary:
+              "This failure notification exists because the remote environment could not satisfy the declared capability requirements for the scheduled task.",
+            evidenceSources: ["scheduler_state", "runtime_state"],
+            verificationPosture: "unknown",
+            capabilityPosture: "blocked",
+            capabilityMode: capabilitySnapshot.mode,
+          }),
           metadata: {
             jobId: job.jobId,
             missingCapabilities,
@@ -398,6 +421,14 @@ export function startSuperRemoteScheduleRuntime(params: {
         reason: "remote schedule fired",
         actionSummary: `Queued remote scheduled job ${job.name}`,
         resultStatus: "queued",
+        ...createTrustedStateAutomationPolicy({
+          policySummary:
+            "Remote scheduled work was queued from durable scheduler state after capability checks passed; the remote run must still apply its own verification and evidence-quality gates.",
+          evidenceSources: ["scheduler_state", "runtime_state"],
+          verificationPosture: "unknown",
+          capabilityPosture: job.requiredCapabilities.length > 0 ? "satisfied" : "not_required",
+          capabilityMode: capabilitySnapshot.mode,
+        }),
         details: {
           jobId: job.jobId,
           repoRoot: job.repoRoot,
@@ -415,6 +446,14 @@ export function startSuperRemoteScheduleRuntime(params: {
         title: `Scheduled run fired: ${job.name}`,
         message: `Queued remote scheduled job ${job.jobId}.`,
         sessionKey,
+        audit: createTrustedStateAutomationPolicy({
+          policySummary:
+            "This notification reflects a remote schedule that passed environment capability checks and was queued from durable scheduler state.",
+          evidenceSources: ["scheduler_state", "runtime_state"],
+          verificationPosture: "unknown",
+          capabilityPosture: job.requiredCapabilities.length > 0 ? "satisfied" : "not_required",
+          capabilityMode: capabilitySnapshot.mode,
+        }),
         metadata: {
           jobId: job.jobId,
           remote: true,

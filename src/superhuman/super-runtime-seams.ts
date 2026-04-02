@@ -315,6 +315,29 @@ export type StateTeamMemorySyncStateUpsert = StateTeamMemorySyncStateRecord;
 
 export type AutomationLoopState = "active" | "paused" | "sleeping" | "disabled";
 
+export type AutomationEvidenceSource =
+  | StateEvidenceSource
+  | "runtime_state"
+  | "scheduler_state"
+  | "structured_external";
+
+export type AutomationEvidencePosture =
+  | "verified"
+  | "trusted_state"
+  | "structured_external"
+  | "provisional"
+  | "mixed"
+  | "unknown";
+
+export type AutomationVerificationPosture =
+  | "verified"
+  | "not_required"
+  | "not_verifiable"
+  | "verification_failed"
+  | "unknown";
+
+export type AutomationCapabilityPosture = "satisfied" | "not_required" | "blocked" | "unknown";
+
 export type StateAutomationLoopStateRecord = {
   sessionKey: string;
   state: AutomationLoopState;
@@ -336,8 +359,15 @@ export type StateAutomationEventAppend = {
   triggerSource: string;
   reason?: string;
   planSummary?: string;
+  policySummary?: string;
   actionSummary?: string;
   resultStatus: string;
+  evidencePosture?: AutomationEvidencePosture;
+  evidenceSources?: AutomationEvidenceSource[];
+  verificationPosture?: AutomationVerificationPosture;
+  verificationOutcome?: VerificationOutcome;
+  capabilityPosture?: AutomationCapabilityPosture;
+  capabilityMode?: SuperShellCapabilityMode;
   details?: StateStructuredDetails;
   createdAt: number;
 };

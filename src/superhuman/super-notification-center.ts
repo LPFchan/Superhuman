@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
+import type { SuperAutomationPolicyAudit } from "./super-automation-policy.js";
 import type { StateStore } from "./super-runtime-seams.js";
 import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
@@ -39,6 +40,7 @@ export type SuperNotificationCenter = {
     sessionKey?: string;
     runId?: string;
     artifactIds?: string[];
+    audit?: SuperAutomationPolicyAudit;
     metadata?: Record<string, unknown>;
   }) => SuperNotificationRecord;
   publishArtifact: (params: {
@@ -49,6 +51,7 @@ export type SuperNotificationCenter = {
     label: string;
     storagePath: string;
     mimeType?: string;
+    audit?: SuperAutomationPolicyAudit;
     metadata?: Record<string, unknown>;
   }) => SuperNotificationRecord;
   listNotifications: (params?: {
@@ -153,6 +156,11 @@ export function startSuperNotificationCenter(params: {
       reason: record.title,
       actionSummary: record.message,
       resultStatus: record.deliveryStatus,
+      ...(record.metadata?.automationAudit &&
+      typeof record.metadata.automationAudit === "object" &&
+      !Array.isArray(record.metadata.automationAudit)
+        ? (record.metadata.automationAudit as SuperAutomationPolicyAudit)
+        : {}),
       details: {
         notificationKind: record.kind,
         artifactIds: record.artifactIds,
@@ -179,6 +187,10 @@ export function startSuperNotificationCenter(params: {
   const center: SuperNotificationCenter = {
     publish(notification) {
       const createdAt = Date.now();
+      const metadata = {
+        ...(notification.metadata ? { ...notification.metadata } : {}),
+        ...(notification.audit ? { automationAudit: { ...notification.audit } } : {}),
+      };
       return publishNotification({
         notificationId: crypto.randomUUID(),
         kind: notification.kind,
@@ -189,12 +201,16 @@ export function startSuperNotificationCenter(params: {
         artifactIds: notification.artifactIds ? [...notification.artifactIds] : [],
         createdAt,
         deliveryStatus: notification.sessionKey ? "session_queued" : "stored",
-        metadata: notification.metadata ? { ...notification.metadata } : undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       });
     },
 
     publishArtifact(notification) {
       const createdAt = Date.now();
+      const metadata = {
+        ...(notification.metadata ? { ...notification.metadata } : {}),
+        ...(notification.audit ? { automationAudit: { ...notification.audit } } : {}),
+      };
       const artifactId = `operator-delivery:${crypto.randomUUID()}`;
       params.stateStore.appendArtifact({
         artifactId,
@@ -220,7 +236,7 @@ export function startSuperNotificationCenter(params: {
         artifactIds: [artifactId],
         createdAt,
         deliveryStatus: notification.sessionKey ? "session_queued" : "stored",
-        metadata: notification.metadata ? { ...notification.metadata } : undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       });
     },
 

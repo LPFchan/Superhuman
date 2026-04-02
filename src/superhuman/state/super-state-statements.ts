@@ -345,11 +345,18 @@ export function createStateStoreStatements(db: DatabaseSync): StateStoreStatemen
         trigger_source,
         reason,
         plan_summary,
+        policy_summary,
         action_summary,
         result_status,
+        evidence_posture,
+        evidence_sources_json,
+        verification_posture,
+        verification_outcome,
+        capability_posture,
+        capability_mode,
         details_json,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     selectAutomationEvents: db.prepare(`
       SELECT
@@ -360,8 +367,15 @@ export function createStateStoreStatements(db: DatabaseSync): StateStoreStatemen
         trigger_source,
         reason,
         plan_summary,
+        policy_summary,
         action_summary,
         result_status,
+        evidence_posture,
+        evidence_sources_json,
+        verification_posture,
+        verification_outcome,
+        capability_posture,
+        capability_mode,
         details_json,
         created_at
       FROM automation_events

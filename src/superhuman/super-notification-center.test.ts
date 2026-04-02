@@ -40,6 +40,13 @@ describe("SuperNotificationCenter", () => {
       title: "Nightly report",
       message: "Queued nightly report run.",
       sessionKey: "main",
+      audit: {
+        policySummary: "Notification mirrors a scheduler-driven automation event.",
+        evidencePosture: "trusted_state",
+        evidenceSources: ["scheduler_state"],
+        verificationPosture: "unknown",
+        capabilityPosture: "not_required",
+      },
       metadata: { jobId: "job-1" },
     });
 
@@ -60,6 +67,9 @@ describe("SuperNotificationCenter", () => {
         expect.objectContaining({
           automationKind: "notification",
           triggerSource: "scheduled_run_fired",
+          evidencePosture: "trusted_state",
+          evidenceSources: ["scheduler_state"],
+          verificationPosture: "unknown",
         }),
       ]),
     );
