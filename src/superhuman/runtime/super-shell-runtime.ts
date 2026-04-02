@@ -7,13 +7,23 @@ import { runBootOnce, type BootRunResult } from "../../gateway/boot.js";
 import { resolveSessionKeyForRun } from "../../gateway/server-session-key.js";
 import type { PluginRegistry as OpenClawPluginRegistry } from "../../plugins/registry.js";
 import {
+  createSuperExecutionBackendRegistry,
+  createSuperExecutionEnvironmentRegistry,
+  createSuperExecutionProviderRegistry,
+  startSuperComputerUseRuntime,
+} from "../super-execution-surfaces.js";
+import {
   createSuperPluginCapabilityRegistry,
   type ChannelRegistry,
+  type ExecutionBackendRegistry,
+  type ExecutionEnvironmentRegistry,
+  type ExecutionProviderRegistry,
   type PluginRegistry,
   type SandboxRuntimeRegistry,
   type ShellCapabilityRegistry,
   type SessionRegistry,
   type StateStore,
+  type SuperComputerUseRuntime,
   type WorkspaceBootstrap,
 } from "../super-runtime-seams.js";
 import { SuperSessionPersistenceAdapter } from "../super-session-persistence-adapter.js";
@@ -31,7 +41,11 @@ export type SuperShellRuntimeServices = {
   channelRegistry: ChannelRegistry;
   pluginRegistry: PluginRegistry;
   shellCapabilityRegistry: ShellCapabilityRegistry;
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
+  executionBackendRegistry: ExecutionBackendRegistry;
+  executionProviderRegistry: ExecutionProviderRegistry;
   sandboxRuntimeRegistry: SandboxRuntimeRegistry;
+  computerUseRuntime: SuperComputerUseRuntime;
   workspaceBootstrap: WorkspaceBootstrap;
   stop: () => void;
 };
@@ -155,6 +169,9 @@ export function startSuperShellRuntime(params: {
     pluginRegistry: params.pluginRegistry,
   });
   adapter.start();
+  const executionEnvironmentRegistry = createSuperExecutionEnvironmentRegistry({
+    shellCapabilityRegistry,
+  });
 
   return {
     stateStore,
@@ -165,10 +182,14 @@ export function startSuperShellRuntime(params: {
       getShellContracts: () => resolveSuperPluginShellContracts(params.pluginRegistry),
     },
     shellCapabilityRegistry,
+    executionEnvironmentRegistry,
+    executionBackendRegistry: createSuperExecutionBackendRegistry(),
+    executionProviderRegistry: createSuperExecutionProviderRegistry(),
     sandboxRuntimeRegistry: createSandboxRuntimeRegistry({
       cfg: params.cfg,
       stateStore,
     }),
+    computerUseRuntime: startSuperComputerUseRuntime(),
     workspaceBootstrap: createWorkspaceBootstrap({
       cfg: params.cfg,
       deps: params.deps,

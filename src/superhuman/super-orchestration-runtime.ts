@@ -31,11 +31,18 @@ import {
   type OrchestrationStore,
   type OrchestrationWorkerRecord,
 } from "./super-orchestration-store.js";
+import {
+  startSuperRemoteSessionManager,
+  type SuperRemoteApprovalResolution,
+  type SuperRemoteSessionEvent,
+  type SuperRemoteSessionManager,
+} from "./super-remote-session-manager.js";
+import type { ExecutionEnvironmentRegistry, StateStore } from "./super-runtime-seams.js";
 
 const log = createSubsystemLogger("superhuman/orchestration");
 
 export type LaunchWorkerParams = {
-  runtime: "subagent" | "acp";
+  runtime: "subagent" | "acp" | "remote";
   controllerSessionKey: string;
   requesterSessionKey: string;
   task: string;
@@ -73,6 +80,22 @@ export type LaunchWorkerParams = {
     mimeType?: string;
   }>;
   attachMountPath?: string;
+  remoteSessionKey?: string;
+  remoteAdapterId?: string;
+  remoteProviderId?: string;
+  remoteCapabilityMode?: "workspace_search_only" | "symbol_references" | "semantic_rename";
+  remoteCapabilityRequirements?: Array<
+    | "workspace_search_only"
+    | "symbol_references"
+    | "semantic_rename"
+    | "verification_replay"
+    | "artifact_replay"
+    | "provenance_replay"
+    | "computer_use"
+  >;
+  remoteSupportsVerificationReplay?: boolean;
+  remoteSupportsArtifactReplay?: boolean;
+  remoteSupportsProvenanceReplay?: boolean;
 };
 
 export type ApprovalMirrorRequestedParams = {
@@ -91,6 +114,7 @@ export type ApprovalMirrorResolvedParams = {
 };
 
 export type OrchestrationRuntime = {
+  remoteSessionManager: SuperRemoteSessionManager;
   launchWorker: (params: LaunchWorkerParams) => Promise<OrchestrationWorkerRecord>;
   getWorker: (workerId: string) => OrchestrationWorkerRecord | undefined;
   listWorkers: () => OrchestrationWorkerRecord[];
@@ -153,8 +177,8 @@ let activeRuntime: OrchestrationRuntime | null = null;
 
 function resolveWorkerBackend(
   runtime: LaunchWorkerParams["runtime"],
-): "in_process" | "out_of_process" {
-  return runtime === "acp" ? "out_of_process" : "in_process";
+): "in_process" | "out_of_process" | "remote_peer" {
+  return runtime === "acp" ? "out_of_process" : runtime === "remote" ? "remote_peer" : "in_process";
 }
 
 function isActiveWorkerState(state: OrchestrationWorkerRecord["state"]): boolean {
@@ -432,7 +456,12 @@ function createOrchestrationTaskRecord(params: {
     progressSummary: params.status === "queued" ? buildQueuedMessage(params.worker) : undefined,
     ...(params.error ? { error: params.error } : {}),
     orchestration: {
-      executionRole: params.worker.runtime === "acp" ? "worker" : "subagent",
+      executionRole:
+        params.worker.runtime === "remote"
+          ? "remote_peer"
+          : params.worker.runtime === "acp"
+            ? "worker"
+            : "subagent",
       workerBackend: params.worker.backend,
       controllerSessionKey: params.worker.controllerSessionKey,
       queueState: params.queueState,
@@ -535,11 +564,22 @@ export function getActiveSuperOrchestrationRuntime(): OrchestrationRuntime | nul
 export function startSuperOrchestrationRuntime(params: {
   cfg: OpenClawConfig;
   workspaceDir: string;
+  stateStore: StateStore;
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
+  remoteSessionManager?: SuperRemoteSessionManager;
 }): OrchestrationRuntime {
   const store = createSuperOrchestrationStore({ workspaceDir: params.workspaceDir });
   const previousHooks = getTaskRegistryHooks();
   let stopped = false;
   const launchPromises = new Map<string, Promise<void>>();
+  let runtime: OrchestrationRuntime;
+  const remoteSessionManager =
+    params.remoteSessionManager ??
+    startSuperRemoteSessionManager({
+      workspaceDir: params.workspaceDir,
+      stateStore: params.stateStore,
+      environmentRegistry: params.executionEnvironmentRegistry,
+    });
 
   const countActiveWorkersForController = (controllerSessionKey: string): number =>
     store
@@ -705,6 +745,202 @@ export function startSuperOrchestrationRuntime(params: {
     },
   });
 
+  const handleRemoteSessionEvent = (event: SuperRemoteSessionEvent) => {
+    const worker = store.getWorker(event.workerId);
+    if (!worker) {
+      return;
+    }
+    if (event.type === "connected") {
+      store.patchWorker(worker.workerId, {
+        state: "running",
+        updatedAt: event.createdAt,
+      });
+      if (worker.taskId) {
+        patchTaskById({
+          taskId: worker.taskId,
+          patch: {
+            status: "running",
+            startedAt: event.createdAt,
+            lastEventAt: event.createdAt,
+            progressSummary: buildStartedMessage(worker),
+            orchestration: {
+              queueState: "running",
+              lastHeartbeatAt: event.createdAt,
+              lastActivityAt: event.createdAt,
+            },
+          },
+        });
+      }
+      queueMailboxMessage({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.childSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_started",
+        text: buildTaskNotificationEnvelope({
+          worker,
+          status: "running",
+          summary: buildStartedMessage(worker),
+        }),
+        payload: {
+          childSessionKey: worker.childSessionKey,
+          backend: worker.backend,
+          remote: true,
+        },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+      });
+      return;
+    }
+    if (event.type === "reconnecting") {
+      store.patchWorker(worker.workerId, {
+        state: "launching",
+        updatedAt: event.createdAt,
+      });
+      queueMailboxMessage({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_control",
+        text: `Worker reconnecting: ${worker.label?.trim() || worker.task.trim() || worker.workerId}.`,
+        payload: {
+          action: "reconnecting",
+          reason: event.reason,
+          remote: true,
+        },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+      });
+      return;
+    }
+    if (event.type === "progress") {
+      appendMailboxAuditRecord({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.childSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_control",
+        text: event.summary,
+        payload: {
+          action: "progress",
+          stage: event.stage,
+          details: event.details,
+          remote: true,
+        },
+      });
+      return;
+    }
+    if (event.type === "approval_requested") {
+      void runtime.recordApprovalRequested({
+        kind: "plugin",
+        requestId: event.request.requestId,
+        sessionKey: worker.childSessionKey,
+        payload: {
+          toolName: event.request.toolName,
+          input: event.request.input,
+          summary: event.request.summary,
+          capabilityRequirements: event.request.capabilityRequirements,
+          verification: event.request.verification,
+          provenance: event.request.provenance,
+          artifact: event.request.artifact,
+          requiresLocalToolStub: event.request.requiresLocalToolStub,
+        },
+      });
+      return;
+    }
+    if (event.type === "approval_resolved") {
+      void runtime.recordApprovalResolved({
+        kind: "plugin",
+        requestId: event.requestId,
+        sessionKey: worker.childSessionKey,
+        status:
+          event.resolution.decision === "expired"
+            ? "expired"
+            : event.resolution.decision === "approved"
+              ? "approved"
+              : "denied",
+        payload: {
+          resolution: event.resolution,
+          remote: true,
+        },
+      });
+      return;
+    }
+    if (event.type === "approval_cancelled") {
+      void runtime.recordApprovalResolved({
+        kind: "plugin",
+        requestId: event.requestId,
+        sessionKey: worker.childSessionKey,
+        status: "expired",
+        payload: {
+          toolCallId: event.toolCallId,
+          cancelled: true,
+          remote: true,
+        },
+      });
+      return;
+    }
+    if (event.type === "terminal") {
+      store.patchWorker(worker.workerId, {
+        state: "terminal",
+        updatedAt: event.createdAt,
+        taskStatus: event.error ? "failed" : "succeeded",
+        lastError: event.error,
+      });
+      if (worker.taskId) {
+        patchTaskById({
+          taskId: worker.taskId,
+          patch: {
+            status: event.error ? "failed" : "succeeded",
+            endedAt: event.createdAt,
+            lastEventAt: event.createdAt,
+            error: event.error,
+            terminalSummary: event.result ?? event.summary,
+            terminalOutcome: event.error ? "blocked" : "succeeded",
+            orchestration: {
+              queueState: "terminal",
+              lastHeartbeatAt: event.createdAt,
+              lastActivityAt: event.createdAt,
+            },
+          },
+        });
+      }
+      queueMailboxMessage({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+        senderSessionKey: worker.childSessionKey,
+        workerId: worker.workerId,
+        kind: "worker_terminal",
+        text: buildTaskNotificationEnvelope({
+          worker: {
+            ...worker,
+            state: "terminal",
+          },
+          status: event.error ? "failed" : "completed",
+          summary: event.summary,
+          result: event.result ?? event.error,
+        }),
+        payload: {
+          result: event.result,
+          verificationOutcome: event.verificationOutcome,
+          provenance: event.provenance,
+          artifact: event.artifact,
+          error: event.error,
+          remote: true,
+        },
+      });
+      drainMailboxForSession({
+        store,
+        recipientSessionKey: worker.controllerSessionKey,
+      });
+    }
+  };
+  remoteSessionManager?.setEventHandler(handleRemoteSessionEvent);
+
   const processQueue = async (controllerSessionKey: string): Promise<void> => {
     const trimmed = controllerSessionKey.trim();
     if (!trimmed || stopped) {
@@ -764,112 +1000,174 @@ export function startSuperOrchestrationRuntime(params: {
     try {
       const launchRequest = current.launchRequest;
       const result =
-        current.runtime === "acp"
-          ? await spawnAcpDirect(
-              {
-                task: current.task,
-                label: current.label,
-                agentId:
-                  typeof launchRequest.agentId === "string" ? launchRequest.agentId : undefined,
-                resumeSessionId:
-                  typeof launchRequest.resumeSessionId === "string"
-                    ? launchRequest.resumeSessionId
+        current.runtime === "remote"
+          ? await (async () => {
+              if (!remoteSessionManager) {
+                return {
+                  status: "error" as const,
+                  error: "Remote session manager is unavailable.",
+                  childSessionKey: undefined,
+                  runId: undefined,
+                };
+              }
+              if (
+                typeof launchRequest.remoteSessionKey !== "string" ||
+                !launchRequest.remoteSessionKey.trim()
+              ) {
+                return {
+                  status: "error" as const,
+                  error: "Remote workers require remoteSessionKey.",
+                  childSessionKey: undefined,
+                  runId: undefined,
+                };
+              }
+              return await remoteSessionManager
+                .launchSession({
+                  workerId: current.workerId,
+                  sessionKey: launchRequest.remoteSessionKey,
+                  controllerSessionKey: current.controllerSessionKey,
+                  requesterSessionKey: current.requesterSessionKey,
+                  adapterId:
+                    typeof launchRequest.remoteAdapterId === "string"
+                      ? launchRequest.remoteAdapterId
+                      : undefined,
+                  providerId:
+                    typeof launchRequest.remoteProviderId === "string"
+                      ? launchRequest.remoteProviderId
+                      : undefined,
+                  label: current.label,
+                  capabilityMode:
+                    launchRequest.remoteCapabilityMode === "symbol_references" ||
+                    launchRequest.remoteCapabilityMode === "semantic_rename"
+                      ? launchRequest.remoteCapabilityMode
+                      : "workspace_search_only",
+                  capabilityRequirements: Array.isArray(launchRequest.remoteCapabilityRequirements)
+                    ? launchRequest.remoteCapabilityRequirements
+                    : [],
+                  supportsVerificationReplay:
+                    launchRequest.remoteSupportsVerificationReplay !== false,
+                  supportsArtifactReplay: launchRequest.remoteSupportsArtifactReplay !== false,
+                  supportsProvenanceReplay: launchRequest.remoteSupportsProvenanceReplay !== false,
+                })
+                .then((record) => ({
+                  status: "accepted" as const,
+                  childSessionKey: record.sessionKey,
+                  runId: `remote:${record.workerId}`,
+                  mode: "session" as const,
+                }))
+                .catch((error: unknown) => ({
+                  status: "error" as const,
+                  error: error instanceof Error ? error.message : String(error),
+                  childSessionKey: undefined,
+                  runId: undefined,
+                }));
+            })()
+          : current.runtime === "acp"
+            ? await spawnAcpDirect(
+                {
+                  task: current.task,
+                  label: current.label,
+                  agentId:
+                    typeof launchRequest.agentId === "string" ? launchRequest.agentId : undefined,
+                  resumeSessionId:
+                    typeof launchRequest.resumeSessionId === "string"
+                      ? launchRequest.resumeSessionId
+                      : undefined,
+                  cwd: typeof launchRequest.cwd === "string" ? launchRequest.cwd : undefined,
+                  mode: launchRequest.mode === "session" ? "session" : "run",
+                  thread: launchRequest.thread === true,
+                  sandbox: launchRequest.sandbox === "require" ? "require" : "inherit",
+                  streamTo: launchRequest.streamTo === "parent" ? "parent" : undefined,
+                },
+                {
+                  agentSessionKey: current.requesterSessionKey,
+                  agentChannel:
+                    typeof launchRequest.agentChannel === "string"
+                      ? launchRequest.agentChannel
+                      : undefined,
+                  agentAccountId:
+                    typeof launchRequest.agentAccountId === "string"
+                      ? launchRequest.agentAccountId
+                      : undefined,
+                  agentTo:
+                    typeof launchRequest.agentTo === "string" ? launchRequest.agentTo : undefined,
+                  agentThreadId:
+                    typeof launchRequest.agentThreadId === "string" ||
+                    typeof launchRequest.agentThreadId === "number"
+                      ? launchRequest.agentThreadId
+                      : undefined,
+                  agentGroupId:
+                    typeof launchRequest.agentGroupId === "string"
+                      ? launchRequest.agentGroupId
+                      : undefined,
+                  sandboxed: launchRequest.sandboxed === true,
+                },
+              )
+            : await spawnSubagentDirect(
+                {
+                  task: current.task,
+                  label: current.label,
+                  agentId:
+                    typeof launchRequest.agentId === "string" ? launchRequest.agentId : undefined,
+                  model: typeof launchRequest.model === "string" ? launchRequest.model : undefined,
+                  thinking:
+                    typeof launchRequest.thinking === "string" ? launchRequest.thinking : undefined,
+                  runTimeoutSeconds:
+                    typeof launchRequest.runTimeoutSeconds === "number"
+                      ? launchRequest.runTimeoutSeconds
+                      : undefined,
+                  thread: launchRequest.thread === true,
+                  mode: launchRequest.mode === "session" ? "session" : "run",
+                  cleanup: launchRequest.cleanup === "delete" ? "delete" : "keep",
+                  sandbox: launchRequest.sandbox === "require" ? "require" : "inherit",
+                  expectsCompletionMessage: true,
+                  attachments: Array.isArray(launchRequest.attachments)
+                    ? (launchRequest.attachments as LaunchWorkerParams["attachments"])
                     : undefined,
-                cwd: typeof launchRequest.cwd === "string" ? launchRequest.cwd : undefined,
-                mode: launchRequest.mode === "session" ? "session" : "run",
-                thread: launchRequest.thread === true,
-                sandbox: launchRequest.sandbox === "require" ? "require" : "inherit",
-                streamTo: launchRequest.streamTo === "parent" ? "parent" : undefined,
-              },
-              {
-                agentSessionKey: current.requesterSessionKey,
-                agentChannel:
-                  typeof launchRequest.agentChannel === "string"
-                    ? launchRequest.agentChannel
-                    : undefined,
-                agentAccountId:
-                  typeof launchRequest.agentAccountId === "string"
-                    ? launchRequest.agentAccountId
-                    : undefined,
-                agentTo:
-                  typeof launchRequest.agentTo === "string" ? launchRequest.agentTo : undefined,
-                agentThreadId:
-                  typeof launchRequest.agentThreadId === "string" ||
-                  typeof launchRequest.agentThreadId === "number"
-                    ? launchRequest.agentThreadId
-                    : undefined,
-                agentGroupId:
-                  typeof launchRequest.agentGroupId === "string"
-                    ? launchRequest.agentGroupId
-                    : undefined,
-                sandboxed: launchRequest.sandboxed === true,
-              },
-            )
-          : await spawnSubagentDirect(
-              {
-                task: current.task,
-                label: current.label,
-                agentId:
-                  typeof launchRequest.agentId === "string" ? launchRequest.agentId : undefined,
-                model: typeof launchRequest.model === "string" ? launchRequest.model : undefined,
-                thinking:
-                  typeof launchRequest.thinking === "string" ? launchRequest.thinking : undefined,
-                runTimeoutSeconds:
-                  typeof launchRequest.runTimeoutSeconds === "number"
-                    ? launchRequest.runTimeoutSeconds
-                    : undefined,
-                thread: launchRequest.thread === true,
-                mode: launchRequest.mode === "session" ? "session" : "run",
-                cleanup: launchRequest.cleanup === "delete" ? "delete" : "keep",
-                sandbox: launchRequest.sandbox === "require" ? "require" : "inherit",
-                expectsCompletionMessage: true,
-                attachments: Array.isArray(launchRequest.attachments)
-                  ? (launchRequest.attachments as LaunchWorkerParams["attachments"])
-                  : undefined,
-                attachMountPath:
-                  typeof launchRequest.attachMountPath === "string"
-                    ? launchRequest.attachMountPath
-                    : undefined,
-              },
-              {
-                agentSessionKey: current.requesterSessionKey,
-                agentChannel:
-                  typeof launchRequest.agentChannel === "string"
-                    ? launchRequest.agentChannel
-                    : undefined,
-                agentAccountId:
-                  typeof launchRequest.agentAccountId === "string"
-                    ? launchRequest.agentAccountId
-                    : undefined,
-                agentTo:
-                  typeof launchRequest.agentTo === "string" ? launchRequest.agentTo : undefined,
-                agentThreadId:
-                  typeof launchRequest.agentThreadId === "string" ||
-                  typeof launchRequest.agentThreadId === "number"
-                    ? launchRequest.agentThreadId
-                    : undefined,
-                agentGroupId:
-                  typeof launchRequest.agentGroupId === "string"
-                    ? launchRequest.agentGroupId
-                    : undefined,
-                agentGroupChannel:
-                  typeof launchRequest.agentGroupChannel === "string"
-                    ? launchRequest.agentGroupChannel
-                    : undefined,
-                agentGroupSpace:
-                  typeof launchRequest.agentGroupSpace === "string"
-                    ? launchRequest.agentGroupSpace
-                    : undefined,
-                requesterAgentIdOverride:
-                  typeof launchRequest.requesterAgentIdOverride === "string"
-                    ? launchRequest.requesterAgentIdOverride
-                    : undefined,
-                workspaceDir:
-                  typeof launchRequest.workspaceDir === "string"
-                    ? launchRequest.workspaceDir
-                    : undefined,
-              },
-            );
+                  attachMountPath:
+                    typeof launchRequest.attachMountPath === "string"
+                      ? launchRequest.attachMountPath
+                      : undefined,
+                },
+                {
+                  agentSessionKey: current.requesterSessionKey,
+                  agentChannel:
+                    typeof launchRequest.agentChannel === "string"
+                      ? launchRequest.agentChannel
+                      : undefined,
+                  agentAccountId:
+                    typeof launchRequest.agentAccountId === "string"
+                      ? launchRequest.agentAccountId
+                      : undefined,
+                  agentTo:
+                    typeof launchRequest.agentTo === "string" ? launchRequest.agentTo : undefined,
+                  agentThreadId:
+                    typeof launchRequest.agentThreadId === "string" ||
+                    typeof launchRequest.agentThreadId === "number"
+                      ? launchRequest.agentThreadId
+                      : undefined,
+                  agentGroupId:
+                    typeof launchRequest.agentGroupId === "string"
+                      ? launchRequest.agentGroupId
+                      : undefined,
+                  agentGroupChannel:
+                    typeof launchRequest.agentGroupChannel === "string"
+                      ? launchRequest.agentGroupChannel
+                      : undefined,
+                  agentGroupSpace:
+                    typeof launchRequest.agentGroupSpace === "string"
+                      ? launchRequest.agentGroupSpace
+                      : undefined,
+                  requesterAgentIdOverride:
+                    typeof launchRequest.requesterAgentIdOverride === "string"
+                      ? launchRequest.requesterAgentIdOverride
+                      : undefined,
+                  workspaceDir:
+                    typeof launchRequest.workspaceDir === "string"
+                      ? launchRequest.workspaceDir
+                      : undefined,
+                },
+              );
 
       if (result.status !== "accepted") {
         const refusalReason =
@@ -963,7 +1261,12 @@ export function startSuperOrchestrationRuntime(params: {
           taskId: task.taskId,
           patch: {
             orchestration: {
-              executionRole: current.runtime === "acp" ? "worker" : "subagent",
+              executionRole:
+                current.runtime === "remote"
+                  ? "remote_peer"
+                  : current.runtime === "acp"
+                    ? "worker"
+                    : "subagent",
               workerBackend: current.backend,
               controllerSessionKey: current.controllerSessionKey,
               queueState: "running",
@@ -1141,7 +1444,8 @@ export function startSuperOrchestrationRuntime(params: {
     }
   };
 
-  const runtime: OrchestrationRuntime = {
+  runtime = {
+    remoteSessionManager,
     async launchWorker(launchParams) {
       const workerId = crypto.randomUUID();
       const now = Date.now();
@@ -1200,6 +1504,14 @@ export function startSuperOrchestrationRuntime(params: {
           sandboxed: launchParams.sandboxed === true,
           attachments: launchParams.attachments,
           attachMountPath: launchParams.attachMountPath,
+          remoteSessionKey: launchParams.remoteSessionKey,
+          remoteAdapterId: launchParams.remoteAdapterId,
+          remoteProviderId: launchParams.remoteProviderId,
+          remoteCapabilityMode: launchParams.remoteCapabilityMode,
+          remoteCapabilityRequirements: launchParams.remoteCapabilityRequirements,
+          remoteSupportsVerificationReplay: launchParams.remoteSupportsVerificationReplay,
+          remoteSupportsArtifactReplay: launchParams.remoteSupportsArtifactReplay,
+          remoteSupportsProvenanceReplay: launchParams.remoteSupportsProvenanceReplay,
           mode: launchParams.mode ?? (launchParams.thread ? "session" : "run"),
         },
       };
@@ -1303,7 +1615,7 @@ export function startSuperOrchestrationRuntime(params: {
     async continueWorker(params) {
       const worker = store.getWorker(params.workerId);
       const childSessionKey = worker?.childSessionKey?.trim();
-      if (!worker || !childSessionKey) {
+      if (!worker) {
         return false;
       }
       const now = Date.now();
@@ -1325,6 +1637,18 @@ export function startSuperOrchestrationRuntime(params: {
           interrupt: params.interrupt === true,
         },
       });
+      if (worker.runtime === "remote") {
+        return (
+          (await remoteSessionManager?.continueSession({
+            workerId: worker.workerId,
+            message: params.message,
+            interrupt: params.interrupt,
+          })) ?? false
+        );
+      }
+      if (!childSessionKey) {
+        return false;
+      }
       await callGateway({
         method: params.interrupt ? "sessions.steer" : "sessions.send",
         params: {
@@ -1343,7 +1667,7 @@ export function startSuperOrchestrationRuntime(params: {
     async interruptWorker(workerId) {
       const worker = store.getWorker(workerId);
       const childSessionKey = worker?.childSessionKey?.trim();
-      if (!worker || !childSessionKey) {
+      if (!worker) {
         return false;
       }
       const now = Date.now();
@@ -1365,6 +1689,12 @@ export function startSuperOrchestrationRuntime(params: {
           runId: worker.runId,
         },
       });
+      if (worker.runtime === "remote") {
+        return (await remoteSessionManager?.interruptSession(worker.workerId)) ?? false;
+      }
+      if (!childSessionKey) {
+        return false;
+      }
       await callGateway({
         method: "sessions.abort",
         params: {
@@ -1451,7 +1781,7 @@ export function startSuperOrchestrationRuntime(params: {
       }
 
       const childSessionKey = worker.childSessionKey?.trim();
-      if (!childSessionKey) {
+      if (worker.runtime !== "remote" && !childSessionKey) {
         return false;
       }
       store.patchWorker(worker.workerId, {
@@ -1485,6 +1815,9 @@ export function startSuperOrchestrationRuntime(params: {
             },
           },
         });
+      }
+      if (worker.runtime === "remote") {
+        return (await remoteSessionManager?.stopSession(worker.workerId)) ?? false;
       }
       await callGateway({
         method: "sessions.abort",
@@ -1585,6 +1918,46 @@ export function startSuperOrchestrationRuntime(params: {
       const worker = store.getWorker(approval.workerId);
       if (!worker) {
         return false;
+      }
+      if (worker.runtime === "remote") {
+        const resolution: SuperRemoteApprovalResolution | { decision: "expired" } =
+          resolveParams.decision === "deny"
+            ? {
+                decision: "denied",
+                behavior: "deny",
+                message: resolveParams.feedback ?? resolveParams.note ?? "Denied by coordinator.",
+              }
+            : {
+                decision: "approved",
+                behavior: resolveParams.decision === "allow-always" ? "allow_always" : "allow_once",
+                message: resolveParams.feedback ?? resolveParams.note,
+                updatedInput: resolveParams.paramsOverride,
+              };
+        appendMailboxAuditRecord({
+          store,
+          recipientSessionKey: approval.controllerSessionKey,
+          senderSessionKey: resolveParams.resolvedBySessionKey ?? approval.controllerSessionKey,
+          workerId: approval.workerId,
+          kind: "approval_decision",
+          text: buildApprovalDecisionText({
+            kind: approval.kind,
+            decision: resolveParams.decision,
+            sessionKey: approval.childSessionKey,
+          }),
+          payload: {
+            approvalId: approval.approvalId,
+            requestId: approval.requestId,
+            decision: resolveParams.decision,
+            remote: true,
+          },
+        });
+        return (
+          (await remoteSessionManager?.resolveApproval({
+            workerId: worker.workerId,
+            requestId: approval.requestId,
+            resolution,
+          })) ?? false
+        );
       }
       await callGateway({
         method: approval.kind === "exec" ? "exec.approval.resolve" : "plugin.approval.resolve",

@@ -13,6 +13,19 @@ vi.mock("../channels/plugins/index.js", () => ({
 
 vi.mock("./super-orchestration-runtime.js", () => ({
   startSuperOrchestrationRuntime: () => ({
+    remoteSessionManager: {
+      setEventHandler: vi.fn(),
+      registerTransportFactory: vi.fn(),
+      launchSession: vi.fn(),
+      listSessions: vi.fn(() => []),
+      getSession: vi.fn(() => null),
+      listEvents: vi.fn(() => []),
+      continueSession: vi.fn(),
+      interruptSession: vi.fn(),
+      stopSession: vi.fn(),
+      resolveApproval: vi.fn(),
+      stop: vi.fn(),
+    },
     stop: vi.fn(),
   }),
   getActiveSuperOrchestrationRuntime: () => null,
@@ -81,6 +94,14 @@ describe("startSuperhumanGatewayRuntime", () => {
         providesSemanticRename: true,
       }),
     ]);
+    expect(runtime.executionEnvironmentRegistry.getSnapshot({ sessionKey: "main" })).toMatchObject({
+      kind: "local",
+      backendId: "local",
+    });
+    expect(runtime.executionBackendRegistry.getBackend("remote_peer")).toMatchObject({
+      supportsRemoteSessions: true,
+    });
+    expect(runtime.computerUseRuntime.canUseInMode("scheduled")).toBe(false);
     expect(
       runtime.sandboxRuntimeRegistry.evaluateTool({
         sessionKey: "main",

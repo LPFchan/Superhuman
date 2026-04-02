@@ -28,8 +28,8 @@ export type OrchestrationApprovalHistoryEntry = {
 
 export type OrchestrationWorkerRecord = {
   workerId: string;
-  runtime: "subagent" | "acp";
-  backend: "in_process" | "out_of_process";
+  runtime: "subagent" | "acp" | "remote";
+  backend: "in_process" | "out_of_process" | "remote_peer";
   controllerSessionKey: string;
   requesterSessionKey: string;
   task: string;

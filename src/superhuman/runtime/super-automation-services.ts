@@ -12,8 +12,8 @@ import {
   type SuperRemoteScheduleRuntime,
 } from "../super-remote-schedule-runtime.js";
 import type {
+  ExecutionEnvironmentRegistry,
   SessionRegistry,
-  ShellCapabilityRegistry,
   StateStore,
 } from "../super-runtime-seams.js";
 import {
@@ -33,7 +33,7 @@ export function startSuperAutomationServices(params: {
   workspaceDir: string;
   stateStore: StateStore;
   sessionRegistry: SessionRegistry;
-  shellCapabilityRegistry: ShellCapabilityRegistry;
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
   cron?: CronService;
   broadcastAutomationChange?: (payload: Record<string, unknown>) => void;
 }): SuperAutomationServices {
@@ -54,7 +54,7 @@ export function startSuperAutomationServices(params: {
     workspaceDir: params.workspaceDir,
     stateStore: params.stateStore,
     sessionRegistry: params.sessionRegistry,
-    shellCapabilityRegistry: params.shellCapabilityRegistry,
+    executionEnvironmentRegistry: params.executionEnvironmentRegistry,
     notificationCenter,
     cron: params.cron,
   });

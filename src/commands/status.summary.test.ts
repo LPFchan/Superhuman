@@ -81,6 +81,7 @@ vi.mock("../tasks/task-registry.maintenance.js", () => ({
     byRuntime: {
       subagent: 0,
       acp: 0,
+      remote: 0,
       cli: 0,
       cron: 0,
     },

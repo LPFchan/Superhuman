@@ -15,9 +15,11 @@ function resolveTaskDisplayTitle(task: TaskRecord): string {
     task.label?.trim() ||
     (task.runtime === "acp"
       ? "ACP background task"
-      : task.runtime === "subagent"
-        ? "Subagent task"
-        : task.task.trim() || "Background task")
+      : task.runtime === "remote"
+        ? "Remote background task"
+        : task.runtime === "subagent"
+          ? "Subagent task"
+          : task.task.trim() || "Background task")
   );
 }
 

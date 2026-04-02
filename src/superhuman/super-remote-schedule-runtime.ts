@@ -11,9 +11,10 @@ import {
   type SuperNotificationCenter,
 } from "./super-notification-center.js";
 import type {
+  ExecutionEnvironmentRegistry,
   SessionRegistry,
-  ShellCapabilityRegistry,
   StateStore,
+  SuperExecutionEnvironmentSnapshot,
   SuperShellCapabilityMode,
 } from "./super-runtime-seams.js";
 import { resolveSuperhumanStateDir } from "./super-state-store.js";
@@ -100,15 +101,15 @@ function persistSnapshot(storePath: string, snapshot: RemoteScheduleStoreSnapsho
 
 function supportsCapability(
   required: SuperShellCapabilityMode,
-  capabilitySnapshot: ReturnType<ShellCapabilityRegistry["getSnapshot"]>,
+  environment: SuperExecutionEnvironmentSnapshot,
 ): boolean {
   switch (required) {
     case "semantic_rename":
-      return capabilitySnapshot.supportsSemanticRename;
+      return environment.capabilities.supportsSemanticRename;
     case "symbol_references":
-      return capabilitySnapshot.supportsSymbolReferences;
+      return environment.capabilities.supportsSymbolReferences;
     case "workspace_search_only":
-      return capabilitySnapshot.supportsWorkspaceSearchOnly;
+      return environment.capabilities.supportsWorkspaceSearchFallback;
     default:
       return false;
   }
@@ -198,7 +199,7 @@ export function startSuperRemoteScheduleRuntime(params: {
   workspaceDir: string;
   stateStore: StateStore;
   sessionRegistry: SessionRegistry;
-  shellCapabilityRegistry: ShellCapabilityRegistry;
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
   notificationCenter?: SuperNotificationCenter;
   cron?: CronService;
 }): SuperRemoteScheduleRuntime {
@@ -344,9 +345,24 @@ export function startSuperRemoteScheduleRuntime(params: {
         return { status: "blocked" as const, reason: "job is paused" };
       }
       const sessionKey = job.sessionKey?.trim() || params.sessionRegistry.resolveMainSession();
-      const capabilitySnapshot = params.shellCapabilityRegistry.getSnapshot({ sessionKey });
+      const environment =
+        params.executionEnvironmentRegistry.getSnapshot({
+          sessionKey,
+          kind: "scheduled_remote",
+        }) ??
+        params.executionEnvironmentRegistry.getSnapshot({
+          sessionKey,
+          kind: "local",
+        });
+      if (!environment) {
+        return {
+          status: "blocked",
+          sessionKey,
+          reason: "missing execution environment",
+        };
+      }
       const missingCapabilities = job.requiredCapabilities.filter(
-        (required) => !supportsCapability(required, capabilitySnapshot),
+        (required) => !supportsCapability(required, environment),
       );
       const createdAt = Date.now();
       if (missingCapabilities.length > 0) {
@@ -364,12 +380,12 @@ export function startSuperRemoteScheduleRuntime(params: {
             evidenceSources: ["scheduler_state", "runtime_state"],
             verificationPosture: "unknown",
             capabilityPosture: "blocked",
-            capabilityMode: capabilitySnapshot.mode,
+            capabilityMode: environment.capabilityMode,
           }),
           details: {
             jobId: job.jobId,
             missingCapabilities,
-            capabilityMode: capabilitySnapshot.mode,
+            capabilityMode: environment.capabilityMode,
           },
           createdAt,
         });
@@ -384,7 +400,7 @@ export function startSuperRemoteScheduleRuntime(params: {
             evidenceSources: ["scheduler_state", "runtime_state"],
             verificationPosture: "unknown",
             capabilityPosture: "blocked",
-            capabilityMode: capabilitySnapshot.mode,
+            capabilityMode: environment.capabilityMode,
           }),
           metadata: {
             jobId: job.jobId,
@@ -427,7 +443,7 @@ export function startSuperRemoteScheduleRuntime(params: {
           evidenceSources: ["scheduler_state", "runtime_state"],
           verificationPosture: "unknown",
           capabilityPosture: job.requiredCapabilities.length > 0 ? "satisfied" : "not_required",
-          capabilityMode: capabilitySnapshot.mode,
+          capabilityMode: environment.capabilityMode,
         }),
         details: {
           jobId: job.jobId,
@@ -452,7 +468,7 @@ export function startSuperRemoteScheduleRuntime(params: {
           evidenceSources: ["scheduler_state", "runtime_state"],
           verificationPosture: "unknown",
           capabilityPosture: job.requiredCapabilities.length > 0 ? "satisfied" : "not_required",
-          capabilityMode: capabilitySnapshot.mode,
+          capabilityMode: environment.capabilityMode,
         }),
         metadata: {
           jobId: job.jobId,

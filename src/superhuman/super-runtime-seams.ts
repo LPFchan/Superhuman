@@ -99,6 +99,55 @@ export type SuperShellCapabilityMode =
   | "symbol_references"
   | "semantic_rename";
 
+export type SuperExecutionEnvironmentKind =
+  | "local"
+  | "remote"
+  | "scheduled_remote"
+  | "computer_use";
+
+export type SuperExecutionCapabilityBundleId =
+  | "workspace_navigation"
+  | "semantic_code"
+  | "verification"
+  | "artifact_replay"
+  | "provenance_replay"
+  | "computer_control";
+
+export type SuperExecutionCapabilityBundle = {
+  id: SuperExecutionCapabilityBundleId;
+  label: string;
+  required: boolean;
+  available: boolean;
+  details?: string;
+};
+
+export type SuperExecutionEnvironmentCapabilities = {
+  supportsWorkspaceSearchFallback: boolean;
+  supportsSymbolReferences: boolean;
+  supportsSemanticRename: boolean;
+  supportsVerificationReplay: boolean;
+  supportsArtifactReplay: boolean;
+  supportsProvenanceReplay: boolean;
+  supportsComputerUse: boolean;
+  workspaceSearchFallbackToolKinds: string[];
+  semanticToolProviderIds: string[];
+  bundles: SuperExecutionCapabilityBundle[];
+};
+
+export type SuperExecutionEnvironmentSnapshot = {
+  environmentId: string;
+  sessionKey?: string;
+  workerId?: string;
+  label: string;
+  kind: SuperExecutionEnvironmentKind;
+  backendId: string;
+  providerId?: string;
+  createdAt: number;
+  updatedAt: number;
+  capabilityMode: SuperShellCapabilityMode;
+  capabilities: SuperExecutionEnvironmentCapabilities;
+};
+
 export type SuperShellCapabilitySnapshot = {
   sessionKey: string;
   agentId: string;
@@ -756,9 +805,103 @@ export interface ShellCapabilityRegistry {
   getSnapshot(params: { sessionKey: string }): SuperShellCapabilitySnapshot;
 }
 
+export interface ExecutionEnvironmentRegistry {
+  getSnapshot(params: {
+    sessionKey?: string;
+    workerId?: string;
+    kind?: SuperExecutionEnvironmentKind;
+  }): SuperExecutionEnvironmentSnapshot | null;
+  listSnapshots(): SuperExecutionEnvironmentSnapshot[];
+  upsertSnapshot(snapshot: SuperExecutionEnvironmentSnapshot): void;
+}
+
 export interface SandboxRuntimeRegistry {
   getSnapshot(params: { sessionKey?: string }): SuperSandboxRuntimeSnapshot;
   evaluateTool(params: { sessionKey?: string; toolName: string }): SuperSandboxToolDecision;
+}
+
+export type SuperExecutionLaunchCapabilityRequirement =
+  | SuperShellCapabilityMode
+  | "verification_replay"
+  | "artifact_replay"
+  | "provenance_replay"
+  | "computer_use";
+
+export type SuperExecutionCapabilityRequirementResult = {
+  satisfied: boolean;
+  missing: SuperExecutionLaunchCapabilityRequirement[];
+};
+
+export type SuperExecutionBackendDescriptor = {
+  id: string;
+  label: string;
+  environmentKinds: SuperExecutionEnvironmentKind[];
+  supportsRemoteSessions: boolean;
+  supportsReconnect: boolean;
+  supportsComputerUse: boolean;
+};
+
+export type SuperExecutionProviderDescriptor = {
+  id: string;
+  label: string;
+  supportsReasoning: boolean;
+  supportsToolCalling: boolean;
+  supportsVision: boolean;
+};
+
+export interface ExecutionBackendRegistry {
+  listBackends(): SuperExecutionBackendDescriptor[];
+  getBackend(backendId: string): SuperExecutionBackendDescriptor | null;
+}
+
+export interface ExecutionProviderRegistry {
+  listProviders(): SuperExecutionProviderDescriptor[];
+  getProvider(providerId: string): SuperExecutionProviderDescriptor | null;
+}
+
+export type SuperComputerUsePermissionRequest = {
+  requestId: string;
+  sessionKey: string;
+  workerId?: string;
+  action: string;
+  details?: Record<string, unknown>;
+};
+
+export type SuperComputerUsePermissionResolution = {
+  granted: boolean;
+  scope: "once" | "session";
+  reason?: string;
+};
+
+export type SuperComputerUseSessionSnapshot = {
+  sessionKey: string;
+  workerId?: string;
+  interactive: boolean;
+  enabled: boolean;
+  lockOwnerSessionKey?: string;
+  selectedDisplayId?: string;
+  pendingApproval?: SuperComputerUsePermissionRequest;
+  updatedAt: number;
+};
+
+export interface SuperComputerUseRuntime {
+  isEnabled(): boolean;
+  canUseInMode(mode: RuntimeInvocationMode): boolean;
+  getSessionSnapshot(params: {
+    sessionKey: string;
+    workerId?: string;
+  }): SuperComputerUseSessionSnapshot;
+  acquireSessionLock(params: { sessionKey: string; workerId?: string }): boolean;
+  releaseSessionLock(params: { sessionKey: string; workerId?: string }): void;
+  setSelectedDisplay(params: { sessionKey: string; displayId?: string }): void;
+  requestPermission(
+    request: SuperComputerUsePermissionRequest,
+  ): SuperComputerUsePermissionResolution | null;
+  resolvePermission(params: {
+    requestId: string;
+    resolution: SuperComputerUsePermissionResolution;
+  }): boolean;
+  cleanupSessionTurn(params: { sessionKey: string; workerId?: string }): void;
 }
 
 export interface CompactionManager {
@@ -860,5 +1003,136 @@ export function createSuperPluginCapabilityRegistry(
         hasConfigSchema: Boolean(entry.configSchema),
       })),
     getShellContracts: () => shellContracts,
+  };
+}
+
+export function buildSuperExecutionCapabilityBundles(params: {
+  capabilityMode: SuperShellCapabilityMode;
+  supportsArtifactReplay?: boolean;
+  supportsProvenanceReplay?: boolean;
+  supportsVerificationReplay?: boolean;
+  supportsComputerUse?: boolean;
+  workspaceSearchFallbackToolKinds?: string[];
+  semanticToolProviderIds?: string[];
+}): SuperExecutionCapabilityBundle[] {
+  const workspaceFallbackKinds = params.workspaceSearchFallbackToolKinds ?? [];
+  const semanticProviders = params.semanticToolProviderIds ?? [];
+  return [
+    {
+      id: "workspace_navigation",
+      label: "Workspace navigation",
+      required: true,
+      available: workspaceFallbackKinds.length > 0,
+      details:
+        workspaceFallbackKinds.length > 0
+          ? `Fallback tools: ${workspaceFallbackKinds.join(", ")}`
+          : "No workspace-search fallback declared.",
+    },
+    {
+      id: "semantic_code",
+      label: "Semantic code operations",
+      required: params.capabilityMode !== "workspace_search_only",
+      available: params.capabilityMode !== "workspace_search_only",
+      details:
+        semanticProviders.length > 0
+          ? `Providers: ${semanticProviders.join(", ")}`
+          : "Semantic tooling unavailable; search-only fallback remains.",
+    },
+    {
+      id: "verification",
+      label: "Verification replay",
+      required: false,
+      available: params.supportsVerificationReplay !== false,
+      details:
+        params.supportsVerificationReplay === false
+          ? "Verification metadata cannot be replayed in this environment."
+          : "Verification metadata is preserved across this environment.",
+    },
+    {
+      id: "artifact_replay",
+      label: "Artifact replay",
+      required: false,
+      available: params.supportsArtifactReplay !== false,
+      details:
+        params.supportsArtifactReplay === false
+          ? "Artifacts degrade to plain text only."
+          : "Artifacts remain reopenable and provenance-linked.",
+    },
+    {
+      id: "provenance_replay",
+      label: "Provenance replay",
+      required: false,
+      available: params.supportsProvenanceReplay !== false,
+      details:
+        params.supportsProvenanceReplay === false
+          ? "Structured provenance cannot be replayed."
+          : "Structured provenance is preserved.",
+    },
+    {
+      id: "computer_control",
+      label: "Computer use",
+      required: false,
+      available: params.supportsComputerUse === true,
+      details:
+        params.supportsComputerUse === true
+          ? "Interactive computer-use dispatch is available."
+          : "Computer-use dispatch is unavailable.",
+    },
+  ];
+}
+
+export function toSuperExecutionEnvironmentCapabilities(params: {
+  capabilityMode: SuperShellCapabilityMode;
+  supportsArtifactReplay?: boolean;
+  supportsProvenanceReplay?: boolean;
+  supportsVerificationReplay?: boolean;
+  supportsComputerUse?: boolean;
+  workspaceSearchFallbackToolKinds?: string[];
+  semanticToolProviderIds?: string[];
+}): SuperExecutionEnvironmentCapabilities {
+  const workspaceSearchFallbackToolKinds = params.workspaceSearchFallbackToolKinds ?? [];
+  const semanticToolProviderIds = params.semanticToolProviderIds ?? [];
+  return {
+    supportsWorkspaceSearchFallback: workspaceSearchFallbackToolKinds.length > 0,
+    supportsSymbolReferences:
+      params.capabilityMode === "symbol_references" || params.capabilityMode === "semantic_rename",
+    supportsSemanticRename: params.capabilityMode === "semantic_rename",
+    supportsVerificationReplay: params.supportsVerificationReplay !== false,
+    supportsArtifactReplay: params.supportsArtifactReplay !== false,
+    supportsProvenanceReplay: params.supportsProvenanceReplay !== false,
+    supportsComputerUse: params.supportsComputerUse === true,
+    workspaceSearchFallbackToolKinds: [...workspaceSearchFallbackToolKinds],
+    semanticToolProviderIds: [...semanticToolProviderIds],
+    bundles: buildSuperExecutionCapabilityBundles(params),
+  };
+}
+
+export function evaluateSuperExecutionCapabilityRequirements(params: {
+  environment: SuperExecutionEnvironmentSnapshot;
+  required: SuperExecutionLaunchCapabilityRequirement[];
+}): SuperExecutionCapabilityRequirementResult {
+  const missing = params.required.filter((requirement) => {
+    switch (requirement) {
+      case "semantic_rename":
+        return !params.environment.capabilities.supportsSemanticRename;
+      case "symbol_references":
+        return !params.environment.capabilities.supportsSymbolReferences;
+      case "workspace_search_only":
+        return !params.environment.capabilities.supportsWorkspaceSearchFallback;
+      case "verification_replay":
+        return !params.environment.capabilities.supportsVerificationReplay;
+      case "artifact_replay":
+        return !params.environment.capabilities.supportsArtifactReplay;
+      case "provenance_replay":
+        return !params.environment.capabilities.supportsProvenanceReplay;
+      case "computer_use":
+        return !params.environment.capabilities.supportsComputerUse;
+      default:
+        return true;
+    }
+  });
+  return {
+    satisfied: missing.length === 0,
+    missing,
   };
 }

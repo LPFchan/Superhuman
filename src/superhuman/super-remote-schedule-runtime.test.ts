@@ -16,6 +16,7 @@ vi.mock("../infra/heartbeat-wake.js", () => ({
 }));
 
 const { createSuperhumanStateStore } = await import("./super-state-store.js");
+const { createSuperExecutionEnvironmentRegistry } = await import("./super-execution-surfaces.js");
 const { startSuperRemoteScheduleRuntime } = await import("./super-remote-schedule-runtime.js");
 
 const cleanupPaths = new Set<string>();
@@ -31,6 +32,27 @@ afterEach(() => {
 });
 
 describe("SuperRemoteScheduleRuntime", () => {
+  function createEnvironmentRegistry(
+    mode: "workspace_search_only" | "symbol_references" | "semantic_rename",
+  ) {
+    return createSuperExecutionEnvironmentRegistry({
+      shellCapabilityRegistry: {
+        getSnapshot: () => ({
+          sessionKey: "main",
+          agentId: "main",
+          mainSessionKey: "main",
+          createdAt: Date.now(),
+          mode,
+          supportsSymbolReferences: mode !== "workspace_search_only",
+          supportsSemanticRename: mode === "semantic_rename",
+          supportsWorkspaceSearchOnly: true,
+          semanticToolProviderIds: mode === "workspace_search_only" ? [] : ["local"],
+          workspaceSearchFallbackToolKinds: ["rg"],
+        }),
+      },
+    });
+  }
+
   it("queues a remote scheduled run when required capabilities are available", async () => {
     const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "super-remote-schedule-"));
     cleanupPaths.add(workspaceDir);
@@ -48,20 +70,7 @@ describe("SuperRemoteScheduleRuntime", () => {
         resolveSession: () => ({ sessionKey: "main", agentId: "main", mainSessionKey: "main" }),
         isMainSession: () => true,
       },
-      shellCapabilityRegistry: {
-        getSnapshot: () => ({
-          sessionKey: "main",
-          agentId: "main",
-          mainSessionKey: "main",
-          createdAt: Date.now(),
-          mode: "semantic_rename",
-          supportsSymbolReferences: true,
-          supportsSemanticRename: true,
-          supportsWorkspaceSearchOnly: true,
-          semanticToolProviderIds: ["local"],
-          workspaceSearchFallbackToolKinds: ["rg"],
-        }),
-      },
+      executionEnvironmentRegistry: createEnvironmentRegistry("semantic_rename"),
       notificationCenter: {
         publish,
         publishArtifact: vi.fn(),
@@ -138,20 +147,7 @@ describe("SuperRemoteScheduleRuntime", () => {
         resolveSession: () => ({ sessionKey: "main", agentId: "main", mainSessionKey: "main" }),
         isMainSession: () => true,
       },
-      shellCapabilityRegistry: {
-        getSnapshot: () => ({
-          sessionKey: "main",
-          agentId: "main",
-          mainSessionKey: "main",
-          createdAt: Date.now(),
-          mode: "workspace_search_only",
-          supportsSymbolReferences: false,
-          supportsSemanticRename: false,
-          supportsWorkspaceSearchOnly: true,
-          semanticToolProviderIds: [],
-          workspaceSearchFallbackToolKinds: ["rg"],
-        }),
-      },
+      executionEnvironmentRegistry: createEnvironmentRegistry("workspace_search_only"),
       notificationCenter: {
         publish,
         publishArtifact: vi.fn(),
@@ -219,20 +215,7 @@ describe("SuperRemoteScheduleRuntime", () => {
         resolveSession: () => ({ sessionKey: "main", agentId: "main", mainSessionKey: "main" }),
         isMainSession: () => true,
       },
-      shellCapabilityRegistry: {
-        getSnapshot: () => ({
-          sessionKey: "main",
-          agentId: "main",
-          mainSessionKey: "main",
-          createdAt: Date.now(),
-          mode: "workspace_search_only",
-          supportsSymbolReferences: true,
-          supportsSemanticRename: false,
-          supportsWorkspaceSearchOnly: true,
-          semanticToolProviderIds: [],
-          workspaceSearchFallbackToolKinds: ["rg"],
-        }),
-      },
+      executionEnvironmentRegistry: createEnvironmentRegistry("workspace_search_only"),
       cron: cron as never,
     });
 
@@ -257,20 +240,7 @@ describe("SuperRemoteScheduleRuntime", () => {
         resolveSession: () => ({ sessionKey: "main", agentId: "main", mainSessionKey: "main" }),
         isMainSession: () => true,
       },
-      shellCapabilityRegistry: {
-        getSnapshot: () => ({
-          sessionKey: "main",
-          agentId: "main",
-          mainSessionKey: "main",
-          createdAt: Date.now(),
-          mode: "workspace_search_only",
-          supportsSymbolReferences: true,
-          supportsSemanticRename: false,
-          supportsWorkspaceSearchOnly: true,
-          semanticToolProviderIds: [],
-          workspaceSearchFallbackToolKinds: ["rg"],
-        }),
-      },
+      executionEnvironmentRegistry: createEnvironmentRegistry("workspace_search_only"),
       cron: cron as never,
     });
 

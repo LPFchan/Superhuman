@@ -1,6 +1,6 @@
 import type { DeliveryContext } from "../utils/delivery-context.js";
 
-export type TaskRuntime = "subagent" | "acp" | "cli" | "cron";
+export type TaskRuntime = "subagent" | "acp" | "remote" | "cli" | "cron";
 
 export type TaskStatus =
   | "queued"
@@ -24,7 +24,7 @@ export type TaskNotifyPolicy = "done_only" | "state_changes" | "silent";
 export type TaskTerminalOutcome = "succeeded" | "blocked";
 export type TaskScopeKind = "session" | "system";
 export type TaskExecutionRole = "lead" | "worker" | "subagent" | "remote_peer";
-export type TaskWorkerBackend = "in_process" | "out_of_process";
+export type TaskWorkerBackend = "in_process" | "out_of_process" | "remote_peer";
 export type TaskQueueState = "queued" | "launching" | "running" | "refused" | "terminal";
 export type TaskNotificationMode = "direct" | "mailbox";
 export type TaskQueueDrainPolicy = "oldest_first";

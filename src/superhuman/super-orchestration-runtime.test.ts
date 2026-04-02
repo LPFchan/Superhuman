@@ -7,7 +7,9 @@ import {
   resetTaskRegistryForTests,
 } from "../tasks/task-registry.js";
 import { withTempDir } from "../test-helpers/temp-dir.js";
+import { createSuperExecutionEnvironmentRegistry } from "./super-execution-surfaces.js";
 import { startSuperOrchestrationRuntime } from "./super-orchestration-runtime.js";
+import { createSuperhumanStateStore } from "./super-state-store.js";
 
 const ORIGINAL_STATE_DIR = process.env.OPENCLAW_STATE_DIR;
 
@@ -46,6 +48,30 @@ async function waitForAssertion(assertion: () => void, timeoutMs = 2_000, stepMs
       await new Promise((resolve) => setTimeout(resolve, stepMs));
     }
   }
+}
+
+function createRuntimeDeps(workspaceDir: string) {
+  const stateStore = createSuperhumanStateStore({ workspaceDir });
+  const executionEnvironmentRegistry = createSuperExecutionEnvironmentRegistry({
+    shellCapabilityRegistry: {
+      getSnapshot: ({ sessionKey }) => ({
+        sessionKey,
+        agentId: "main",
+        mainSessionKey: "main",
+        createdAt: Date.now(),
+        mode: "semantic_rename",
+        supportsSymbolReferences: true,
+        supportsSemanticRename: true,
+        supportsWorkspaceSearchOnly: true,
+        semanticToolProviderIds: ["local"],
+        workspaceSearchFallbackToolKinds: ["rg"],
+      }),
+    },
+  });
+  return {
+    stateStore,
+    executionEnvironmentRegistry,
+  };
 }
 
 describe("orchestration-runtime", () => {
@@ -95,6 +121,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
+      const deps = createRuntimeDeps(root);
       const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
@@ -106,6 +133,7 @@ describe("orchestration-runtime", () => {
           },
         } as never,
         workspaceDir: root,
+        ...deps,
       });
 
       try {
@@ -161,6 +189,7 @@ describe("orchestration-runtime", () => {
         expect(mailbox.some((message) => message.text.includes("<task-notification>"))).toBe(true);
       } finally {
         runtime.stop();
+        deps.stateStore.close();
       }
     });
   });
@@ -199,6 +228,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
+      const deps = createRuntimeDeps(root);
       const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
@@ -210,6 +240,7 @@ describe("orchestration-runtime", () => {
           },
         } as never,
         workspaceDir: root,
+        ...deps,
       });
 
       try {
@@ -263,6 +294,7 @@ describe("orchestration-runtime", () => {
         });
       } finally {
         runtime.stop();
+        deps.stateStore.close();
       }
     });
   });
@@ -301,6 +333,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
+      const deps = createRuntimeDeps(root);
       const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
@@ -312,6 +345,7 @@ describe("orchestration-runtime", () => {
           },
         } as never,
         workspaceDir: root,
+        ...deps,
       });
 
       try {
@@ -387,6 +421,7 @@ describe("orchestration-runtime", () => {
         );
       } finally {
         runtime.stop();
+        deps.stateStore.close();
       }
     });
   });
@@ -421,6 +456,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
+      const deps = createRuntimeDeps(root);
       const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
@@ -432,6 +468,7 @@ describe("orchestration-runtime", () => {
           },
         } as never,
         workspaceDir: root,
+        ...deps,
       });
 
       try {
@@ -506,6 +543,7 @@ describe("orchestration-runtime", () => {
         expect(approval?.history.map((entry) => entry.status)).toEqual(["requested", "approved"]);
       } finally {
         runtime.stop();
+        deps.stateStore.close();
       }
     });
   });
@@ -540,6 +578,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
+      const deps = createRuntimeDeps(root);
       const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
@@ -551,6 +590,7 @@ describe("orchestration-runtime", () => {
           },
         } as never,
         workspaceDir: root,
+        ...deps,
       });
 
       try {
@@ -610,6 +650,7 @@ describe("orchestration-runtime", () => {
         });
       } finally {
         runtime.stop();
+        deps.stateStore.close();
       }
     });
   });
@@ -644,6 +685,7 @@ describe("orchestration-runtime", () => {
         },
       );
 
+      const deps = createRuntimeDeps(root);
       const runtime = startSuperOrchestrationRuntime({
         cfg: {
           agents: {
@@ -655,6 +697,7 @@ describe("orchestration-runtime", () => {
           },
         } as never,
         workspaceDir: root,
+        ...deps,
       });
 
       try {
@@ -706,6 +749,7 @@ describe("orchestration-runtime", () => {
         );
       } finally {
         runtime.stop();
+        deps.stateStore.close();
       }
     });
   });

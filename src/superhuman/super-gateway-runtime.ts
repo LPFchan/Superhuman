@@ -10,14 +10,19 @@ import type { SuperAutomationRuntime } from "./super-automation-runtime.js";
 import type { SuperNotificationCenter } from "./super-notification-center.js";
 import type { OrchestrationRuntime } from "./super-orchestration-runtime.js";
 import type { SuperRemoteScheduleRuntime } from "./super-remote-schedule-runtime.js";
+import type { SuperRemoteSessionManager } from "./super-remote-session-manager.js";
 import type {
   ChannelRegistry,
   CompactionManager,
+  ExecutionBackendRegistry,
+  ExecutionEnvironmentRegistry,
+  ExecutionProviderRegistry,
   PluginRegistry,
   SandboxRuntimeRegistry,
   ShellCapabilityRegistry,
   SessionRegistry,
   StateStore,
+  SuperComputerUseRuntime,
   WorkspaceBootstrap,
 } from "./super-runtime-seams.js";
 import type { SuperSubscriptionManager } from "./super-subscription-manager.js";
@@ -33,7 +38,12 @@ export type SuperhumanGatewayRuntime = {
   channelRegistry: ChannelRegistry;
   pluginRegistry: PluginRegistry;
   shellCapabilityRegistry: ShellCapabilityRegistry;
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
+  executionBackendRegistry: ExecutionBackendRegistry;
+  executionProviderRegistry: ExecutionProviderRegistry;
   sandboxRuntimeRegistry: SandboxRuntimeRegistry;
+  computerUseRuntime: SuperComputerUseRuntime;
+  remoteSessionManager: SuperRemoteSessionManager;
   workspaceBootstrap: WorkspaceBootstrap;
   compactionManager: CompactionManager;
   stop: () => void;
@@ -63,12 +73,14 @@ export function startSuperhumanGatewayRuntime(params: {
   const orchestrationServices = startSuperOrchestrationServices({
     cfg: params.cfg,
     workspaceDir: params.workspaceDir,
+    stateStore: shellRuntime.stateStore,
+    executionEnvironmentRegistry: shellRuntime.executionEnvironmentRegistry,
   });
   const automationServices = startSuperAutomationServices({
     workspaceDir: params.workspaceDir,
     stateStore: shellRuntime.stateStore,
     sessionRegistry: shellRuntime.sessionRegistry,
-    shellCapabilityRegistry: shellRuntime.shellCapabilityRegistry,
+    executionEnvironmentRegistry: shellRuntime.executionEnvironmentRegistry,
     cron: params.cron,
     broadcastAutomationChange: params.broadcastAutomationChange,
   });
@@ -84,7 +96,12 @@ export function startSuperhumanGatewayRuntime(params: {
     channelRegistry: shellRuntime.channelRegistry,
     pluginRegistry: shellRuntime.pluginRegistry,
     shellCapabilityRegistry: shellRuntime.shellCapabilityRegistry,
+    executionEnvironmentRegistry: shellRuntime.executionEnvironmentRegistry,
+    executionBackendRegistry: shellRuntime.executionBackendRegistry,
+    executionProviderRegistry: shellRuntime.executionProviderRegistry,
     sandboxRuntimeRegistry: shellRuntime.sandboxRuntimeRegistry,
+    computerUseRuntime: shellRuntime.computerUseRuntime,
+    remoteSessionManager: orchestrationServices.remoteSessionManager,
     workspaceBootstrap: shellRuntime.workspaceBootstrap,
     compactionManager: contextServices.compactionManager,
     stop: () => {
