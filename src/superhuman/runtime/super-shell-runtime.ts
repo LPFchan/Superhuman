@@ -169,8 +169,27 @@ export function startSuperShellRuntime(params: {
     pluginRegistry: params.pluginRegistry,
   });
   adapter.start();
+  const executionProviderRegistry = createSuperExecutionProviderRegistry({
+    cfg: params.cfg,
+    workspaceDir: params.workspaceDir,
+    pluginRegistry: params.pluginRegistry,
+  });
   const executionEnvironmentRegistry = createSuperExecutionEnvironmentRegistry({
     shellCapabilityRegistry,
+    resolveProviderId: ({ sessionKey }) => {
+      const { agentId } = sessionRegistry.resolveSession({ sessionKey });
+      return executionProviderRegistry.getPreferredProvider({ agentId })?.id;
+    },
+  });
+  const sandboxRuntimeRegistry = createSandboxRuntimeRegistry({
+    cfg: params.cfg,
+    stateStore,
+  });
+  const computerUseRuntime = startSuperComputerUseRuntime({
+    enabled: true,
+    stateStore,
+    executionEnvironmentRegistry,
+    sandboxRuntimeRegistry,
   });
 
   return {
@@ -184,12 +203,9 @@ export function startSuperShellRuntime(params: {
     shellCapabilityRegistry,
     executionEnvironmentRegistry,
     executionBackendRegistry: createSuperExecutionBackendRegistry(),
-    executionProviderRegistry: createSuperExecutionProviderRegistry(),
-    sandboxRuntimeRegistry: createSandboxRuntimeRegistry({
-      cfg: params.cfg,
-      stateStore,
-    }),
-    computerUseRuntime: startSuperComputerUseRuntime(),
+    executionProviderRegistry,
+    sandboxRuntimeRegistry,
+    computerUseRuntime,
     workspaceBootstrap: createWorkspaceBootstrap({
       cfg: params.cfg,
       deps: params.deps,

@@ -98,9 +98,14 @@ describe("startSuperhumanGatewayRuntime", () => {
       kind: "local",
       backendId: "local",
     });
+    expect(runtime.executionProviderRegistry.getPreferredProvider()).toMatchObject({
+      id: "default",
+    });
     expect(runtime.executionBackendRegistry.getBackend("remote_peer")).toMatchObject({
       supportsRemoteSessions: true,
     });
+    expect(runtime.computerUseRuntime.isEnabled()).toBe(true);
+    expect(runtime.computerUseRuntime.canUseInMode("interactive")).toBe(true);
     expect(runtime.computerUseRuntime.canUseInMode("scheduled")).toBe(false);
     expect(
       runtime.sandboxRuntimeRegistry.evaluateTool({

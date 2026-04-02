@@ -1,5 +1,15 @@
+import type { StreamFn } from "@mariozechner/pi-agent-core";
+import type { ProviderCapabilities } from "../agents/provider-capabilities.js";
 import type { BootRunResult } from "../gateway/boot.js";
 import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
+import type {
+  ProviderCreateStreamFnContext,
+  ProviderDefaultThinkingPolicyContext,
+  ProviderNormalizeTransportContext,
+  ProviderPreparedRuntimeAuth,
+  ProviderPrepareRuntimeAuthContext,
+  ProviderThinkingPolicyContext,
+} from "../plugins/types.js";
 
 export type StateEvidenceSource =
   | "original"
@@ -844,10 +854,27 @@ export type SuperExecutionBackendDescriptor = {
 export type SuperExecutionProviderDescriptor = {
   id: string;
   label: string;
+  configured: boolean;
+  pluginBacked: boolean;
+  providerFamily: ProviderCapabilities["providerFamily"];
   supportsReasoning: boolean;
   supportsToolCalling: boolean;
   supportsVision: boolean;
 };
+
+export interface SuperExecutionProviderAdapter {
+  describe(): SuperExecutionProviderDescriptor;
+  resolveCapabilities(): ProviderCapabilities;
+  normalizeTransport(
+    context: ProviderNormalizeTransportContext,
+  ): { api?: string | null; baseUrl?: string } | undefined;
+  resolveStreamFn(context: ProviderCreateStreamFnContext): StreamFn | undefined;
+  prepareRuntimeAuth(
+    context: ProviderPrepareRuntimeAuthContext,
+  ): Promise<ProviderPreparedRuntimeAuth | null | undefined>;
+  supportsXHighThinking(context: ProviderThinkingPolicyContext): boolean | undefined;
+  resolveDefaultThinkingLevel(context: ProviderDefaultThinkingPolicyContext): string | undefined;
+}
 
 export interface ExecutionBackendRegistry {
   listBackends(): SuperExecutionBackendDescriptor[];
@@ -857,6 +884,8 @@ export interface ExecutionBackendRegistry {
 export interface ExecutionProviderRegistry {
   listProviders(): SuperExecutionProviderDescriptor[];
   getProvider(providerId: string): SuperExecutionProviderDescriptor | null;
+  getAdapter(providerId: string): SuperExecutionProviderAdapter | null;
+  getPreferredProvider(params?: { agentId?: string }): SuperExecutionProviderDescriptor | null;
 }
 
 export type SuperComputerUsePermissionRequest = {
@@ -876,24 +905,110 @@ export type SuperComputerUsePermissionResolution = {
 export type SuperComputerUseSessionSnapshot = {
   sessionKey: string;
   workerId?: string;
+  adapterId?: string;
+  adapterSessionId?: string;
   interactive: boolean;
   enabled: boolean;
   lockOwnerSessionKey?: string;
   selectedDisplayId?: string;
+  availableDisplays: SuperComputerUseDisplayDescriptor[];
+  startedAt?: number;
+  actionCount: number;
+  lastActionAt?: number;
+  lastAction?: string;
+  lastResultStatus?: SuperComputerUseActionResult["status"];
   pendingApproval?: SuperComputerUsePermissionRequest;
   updatedAt: number;
 };
 
+export type SuperComputerUseDisplayDescriptor = {
+  id: string;
+  label: string;
+  primary?: boolean;
+};
+
+export type SuperComputerUseAdapterDescriptor = {
+  id: string;
+  label: string;
+  supportsApprovals: boolean;
+  supportsShellGating: boolean;
+  supportsMultipleDisplays: boolean;
+};
+
+export type SuperComputerUseActionRequest = {
+  requestId: string;
+  sessionKey: string;
+  workerId?: string;
+  action: string;
+  toolName?: string;
+  mode: RuntimeInvocationMode;
+  displayId?: string;
+  requiresApproval?: boolean;
+  payload?: Record<string, unknown>;
+};
+
+export type SuperComputerUseActionResult =
+  | {
+      status: "completed";
+      output?: Record<string, unknown>;
+      details?: Record<string, unknown>;
+    }
+  | {
+      status: "approval_required";
+      permission: SuperComputerUsePermissionResolution;
+      details?: Record<string, unknown>;
+    }
+  | {
+      status: "blocked";
+      reason: string;
+      details?: Record<string, unknown>;
+    };
+
+export interface SuperComputerUseAdapter {
+  describe(): SuperComputerUseAdapterDescriptor;
+  startSession(params: { sessionKey: string; workerId?: string; displayId?: string }):
+    | Promise<{
+        sessionId: string;
+        displays: SuperComputerUseDisplayDescriptor[];
+        selectedDisplayId?: string;
+        details?: Record<string, unknown>;
+      }>
+    | {
+        sessionId: string;
+        displays: SuperComputerUseDisplayDescriptor[];
+        selectedDisplayId?: string;
+        details?: Record<string, unknown>;
+      };
+  dispatchAction(
+    request: SuperComputerUseActionRequest,
+  ): Promise<SuperComputerUseActionResult> | SuperComputerUseActionResult;
+  stopSession(params: {
+    sessionKey: string;
+    workerId?: string;
+    adapterSessionId?: string;
+  }): Promise<void> | void;
+}
+
 export interface SuperComputerUseRuntime {
   isEnabled(): boolean;
   canUseInMode(mode: RuntimeInvocationMode): boolean;
+  listAdapters(): SuperComputerUseAdapterDescriptor[];
+  getAdapter(adapterId: string): SuperComputerUseAdapterDescriptor | null;
   getSessionSnapshot(params: {
     sessionKey: string;
     workerId?: string;
   }): SuperComputerUseSessionSnapshot;
+  startSession(params: {
+    sessionKey: string;
+    workerId?: string;
+    mode: RuntimeInvocationMode;
+    adapterId?: string;
+    displayId?: string;
+  }): Promise<SuperComputerUseSessionSnapshot>;
   acquireSessionLock(params: { sessionKey: string; workerId?: string }): boolean;
   releaseSessionLock(params: { sessionKey: string; workerId?: string }): void;
   setSelectedDisplay(params: { sessionKey: string; displayId?: string }): void;
+  dispatchAction(request: SuperComputerUseActionRequest): Promise<SuperComputerUseActionResult>;
   requestPermission(
     request: SuperComputerUsePermissionRequest,
   ): SuperComputerUsePermissionResolution | null;
@@ -901,6 +1016,7 @@ export interface SuperComputerUseRuntime {
     requestId: string;
     resolution: SuperComputerUsePermissionResolution;
   }): boolean;
+  stopSession(params: { sessionKey: string; workerId?: string }): Promise<void>;
   cleanupSessionTurn(params: { sessionKey: string; workerId?: string }): void;
 }
 
