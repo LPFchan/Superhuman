@@ -19,6 +19,13 @@ Repo-local target areas:
 - `src/sessions/`
 - local state tables and adapters introduced in Phase 1
 
+Primary module ownership after shell modularization:
+
+- Own `src/superhuman/state/super-state-runtime.ts` as the durable store surface for runtime invocations, stage events, iteration budgets, and abort state.
+- Own the Superhuman runtime-core modules that project into that store, including `src/superhuman/super-agent-runtime.ts`, `src/superhuman/super-tool-batch-planner.ts`, `src/superhuman/super-command-risk-classifier.ts`, `src/superhuman/super-runtime-verification.ts`, and `src/superhuman/super-transcript-hygiene.ts`.
+- Extend Phase 1 composition seams additively; do not move runtime-core behavior back into `src/superhuman/super-state-store.ts` or `src/superhuman/super-gateway-runtime.ts`.
+- If Phase 2 needs more durable state, add it to `src/superhuman/state/super-state-runtime.ts` or a new Phase 2-owned sibling module first. Do not widen `src/superhuman/state/super-state-db.ts` back into a mixed schema-plus-runtime file.
+
 Implementation scope:
 
 1. Replace the ad hoc agent loop contract with an explicit runtime loop API.

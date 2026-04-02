@@ -18,6 +18,14 @@ Repo-local target areas:
 - `src/bootstrap/`
 - new local state area under `.superhuman/` or equivalent project-local path
 
+Primary module ownership after shell modularization:
+
+- Own `src/superhuman/state/super-state-db.ts` as the durable SQLite substrate and schema/bootstrap boundary.
+- Own `src/superhuman/state/super-state-sessions.ts` as the canonical home for session, message, action, and artifact persistence.
+- Own `src/superhuman/runtime/super-shell-runtime.ts` as the shell-facing composition layer for registries, boot checks, and persistence wiring.
+- Keep `src/superhuman/super-state-store.ts` and `src/superhuman/super-gateway-runtime.ts` thin. They are composition surfaces, not the place to re-centralize later-phase behavior.
+- Keep the substrate split intact too: schema/bootstrap belongs in `src/superhuman/state/super-state-schema.ts`, prepared statements in `src/superhuman/state/super-state-statements.ts`, and shared row or JSON helpers in `src/superhuman/state/super-state-shared.ts`.
+
 Implementation scope:
 
 1. Freeze the OpenClaw shell as the initial compatibility target.

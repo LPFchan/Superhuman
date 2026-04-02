@@ -73,6 +73,8 @@ describe("SuperSessionPersistenceAdapter", () => {
     expect(session?.startedAt).toBe(100);
     expect(session?.endedAt).toBe(120);
     expect(session?.messageCount).toBe(1);
+    expect(session?.assistantMessageCount).toBe(1);
+    expect(session?.outputTokenCount).toBeGreaterThan(0);
     expect(window.messages).toHaveLength(1);
     expect(window.messages[0]?.contentText).toBe("hello from adapter");
     expect(pressureSnapshots).toHaveLength(1);
@@ -88,6 +90,7 @@ describe("SuperSessionPersistenceAdapter", () => {
         kind: "transcript-file",
       }),
     ]);
+    expect(stateStore.getSessionSnapshot("main")?.artifactCount).toBeGreaterThan(0);
 
     adapter.stop();
     stateStore.close();

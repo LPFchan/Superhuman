@@ -35,10 +35,38 @@ describe("startSuperhumanGatewayRuntime", () => {
     cleanupPaths.add(workspaceDir);
 
     const runtime = startSuperhumanGatewayRuntime({
-      cfg: {},
+      cfg: {
+        agents: {
+          defaults: {
+            sandbox: { mode: "all", scope: "agent" },
+          },
+        },
+        tools: {
+          sandbox: {
+            tools: {
+              allow: ["read"],
+              deny: ["browser"],
+            },
+          },
+        },
+      },
       deps: {} as never,
       workspaceDir,
-      pluginRegistry: {} as never,
+      pluginRegistry: {
+        plugins: [
+          {
+            id: "lsp-demo",
+            name: "LSP Demo",
+            description: "semantic tools",
+            kind: ["tool"],
+            channelIds: [],
+            commands: [],
+            services: [],
+            toolNames: ["lsp_references_typescript", "symbol_rename"],
+            bundleCapabilities: [],
+          },
+        ],
+      } as never,
     });
 
     expect(runtime.automationRuntime).toBeDefined();
@@ -46,6 +74,23 @@ describe("startSuperhumanGatewayRuntime", () => {
     expect(runtime.subscriptionManager).toBeDefined();
     expect(runtime.remoteScheduleRuntime).toBeDefined();
     expect(getActiveSuperAutomationRuntime()).toBe(runtime.automationRuntime);
+    expect(runtime.pluginRegistry.getShellContracts()).toEqual([
+      expect.objectContaining({
+        id: "lsp-demo",
+        providesSymbolReferences: true,
+        providesSemanticRename: true,
+      }),
+    ]);
+    expect(
+      runtime.sandboxRuntimeRegistry.evaluateTool({
+        sessionKey: "main",
+        toolName: "browser",
+      }),
+    ).toMatchObject({
+      allowed: false,
+      reason: "blocked_by_deny",
+      blockedBy: "deny",
+    });
 
     runtime.stop();
 

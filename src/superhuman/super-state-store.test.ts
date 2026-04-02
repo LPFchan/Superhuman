@@ -69,8 +69,13 @@ describe("createSuperhumanStateStore", () => {
     });
 
     expect(snapshot?.messageCount).toBe(2);
+    expect(snapshot?.userMessageCount).toBe(1);
+    expect(snapshot?.assistantMessageCount).toBe(1);
+    expect(snapshot?.inputTokenCount).toBeGreaterThan(0);
+    expect(snapshot?.outputTokenCount).toBeGreaterThan(0);
     expect(snapshot?.lastUserTurnId).toBe("main:m1");
     expect(snapshot?.lastAssistantTurnId).toBe("main:m2");
+    expect(snapshot?.latestActivityAt).toBe(20);
     expect(window.messages.map((message) => message.messageId)).toEqual(["main:m1", "main:m2"]);
     expect(window.messages[1]?.provenance).toMatchObject({
       source: "partial_read",

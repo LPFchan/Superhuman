@@ -21,6 +21,12 @@ Repo-local target areas:
 - `src/runtime.ts`
 - local state, permission, scheduling, and orchestration services from earlier phases
 
+Primary module ownership after shell modularization:
+
+- This split does not assign a new Phase 6-specific shell file. Extend the earlier phase-owned modules additively instead of reclaiming them into one new monolith.
+- Treat `src/superhuman/super-gateway-runtime.ts` as a shared composition root that should stay thin while Phase 6 work lands in explicit remote, environment, and high-autonomy modules.
+- Treat `src/superhuman/state/super-state-db.ts` the same way: it remains substrate plumbing, while new autonomy state should land in explicit phase-owned modules rather than re-centralizing schema, mapping, and policy together.
+
 Implementation scope:
 
 1. Port the remote session protocol into a first-class execution plane.

@@ -20,6 +20,33 @@ Repo-local target areas:
 - `src/polls.ts`
 - local state and notification surfaces introduced earlier
 
+Primary module ownership after shell modularization:
+
+- Own `src/superhuman/state/super-state-automation.ts` as the durable state surface for automation loop state and automation-event logs.
+- Own `src/superhuman/runtime/super-automation-services.ts` as the gateway-facing composition layer for automation, notifications, subscriptions, and remote scheduling startup.
+- Own the supporting Superhuman automation modules that now plug into that layer, including `src/superhuman/super-automation-runtime.ts`, `src/superhuman/super-notification-center.ts`, `src/superhuman/super-subscription-manager.ts`, `src/superhuman/super-remote-schedule-runtime.ts`, and `src/superhuman/super-proactive-loop.ts`.
+- Keep automation-specific state and startup logic in those phase-owned modules. Do not push scheduling behavior back into `src/superhuman/super-gateway-runtime.ts` or widen `src/superhuman/state/super-state-db.ts` into an automation monolith.
+
+Phase 5 cut line against existing cron:
+
+- Reuse the existing OpenClaw cron substrate as the durable local scheduling base instead of rewriting it.
+- Treat `src/cron/` scheduling, persistence, wake modes, delivery, CLI, and run-log surfaces as shared host infrastructure that Superhuman builds on.
+- Keep generic cron contracts generic when they are intentionally host-wide or plugin-facing.
+- Add new Superhuman-owned policy and orchestration layers around that substrate using explicit `super-*` / `Super*` naming.
+- The minimum reuse set for this phase is:
+  - durable job storage and migration in `src/cron/store.ts`, `src/cron/service.store.ts`, and related migration helpers
+  - scheduler lifecycle and enqueue mechanics in `src/cron/service.ts`, `src/cron/service/ops.ts`, `src/cron/service/jobs.ts`, and timer helpers
+  - job shape, wake-mode, payload, delivery, and failure-alert contracts in `src/cron/types.ts` and `src/cron/types-shared.ts`
+  - existing CLI and gateway control surfaces for create/list/status/run/edit flows
+  - existing cron run logs as a host-level audit feed, not the only Superhuman observability surface
+- The minimum new Superhuman-owned work for this phase is:
+  - a proactive loop manager with explicit `active`, `paused`, `sleeping`, and `disabled` state
+  - a sleep or defer mechanism that decides when not to act and when to wake again
+  - Superhuman automation policy that routes scheduled work through the same runtime, verification, provenance, and capability gates as interactive work
+  - automation-event logging in the Superhuman state model so trigger source, reason, plan, actions taken, and result are queryable alongside other runtime state
+  - remote scheduled-agent surfaces and structured external subscription ingestion when they are not already provided by the shared host
+- Non-goal: do not fork or duplicate the generic cron scheduler just to make it look Superhuman-specific. Phase 5 should wrap and extend the host scheduler where possible, then add only the missing autonomy-specific behavior.
+
 Implementation scope:
 
 1. Add a proactive loop manager.

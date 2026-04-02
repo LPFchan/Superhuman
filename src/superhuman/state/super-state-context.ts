@@ -223,21 +223,23 @@ export function createContextStateStoreApi(params: {
           blockingBufferTokens: paramsIn.blockingBufferTokens,
         }),
       });
-      opened.statements.insertContextPressureSnapshot.run({
-        sessionKey: snapshot.sessionKey,
-        runId: snapshot.runId ?? null,
-        createdAt: snapshot.createdAt ?? paramsIn.createdAt,
-        estimatedInputTokens: snapshot.estimatedInputTokens,
-        configuredContextLimit: snapshot.configuredContextLimit,
-        reservedOutputTokens: snapshot.reservedOutputTokens,
-        effectiveContextLimit: snapshot.effectiveContextLimit,
-        autocompactBufferTokens: snapshot.autocompactBufferTokens,
-        blockingBufferTokens: snapshot.blockingBufferTokens,
-        autocompactThreshold: snapshot.autocompactThreshold,
-        blockingThreshold: snapshot.blockingThreshold,
-        remainingBudget: snapshot.remainingBudget,
-        overflowRisk: snapshot.overflowRisk ? 1 : 0,
-        compactionActionRefsJson: JSON.stringify(snapshot.persistedCompactionEventRefs),
+      opened.write(() => {
+        opened.statements.insertContextPressureSnapshot.run({
+          sessionKey: snapshot.sessionKey,
+          runId: snapshot.runId ?? null,
+          createdAt: snapshot.createdAt ?? paramsIn.createdAt,
+          estimatedInputTokens: snapshot.estimatedInputTokens,
+          configuredContextLimit: snapshot.configuredContextLimit,
+          reservedOutputTokens: snapshot.reservedOutputTokens,
+          effectiveContextLimit: snapshot.effectiveContextLimit,
+          autocompactBufferTokens: snapshot.autocompactBufferTokens,
+          blockingBufferTokens: snapshot.blockingBufferTokens,
+          autocompactThreshold: snapshot.autocompactThreshold,
+          blockingThreshold: snapshot.blockingThreshold,
+          remainingBudget: snapshot.remainingBudget,
+          overflowRisk: snapshot.overflowRisk ? 1 : 0,
+          compactionActionRefsJson: JSON.stringify(snapshot.persistedCompactionEventRefs),
+        });
       });
       return snapshot;
     },
@@ -258,25 +260,27 @@ export function createContextStateStoreApi(params: {
     },
 
     upsertContextCollapseLedger(ledger: StateContextCollapseLedgerUpsert): void {
-      ensureSessionForContext({
-        opened,
-        sessionKey: ledger.sessionKey,
-        workspaceDir,
+      opened.write(() => {
+        ensureSessionForContext({
+          opened,
+          sessionKey: ledger.sessionKey,
+          workspaceDir,
+        });
+        opened.statements.upsertContextCollapseLedger.run(
+          ledger.sessionKey,
+          ledger.runId ?? null,
+          ledger.updatedAt,
+          stringifyJson(ledger.committedSpans),
+          stringifyJson(ledger.stagedSpans),
+          stringifyJson(ledger.droppedSpans),
+          stringifyJson(ledger.restoredArtifacts),
+          ledger.recoveryMode ?? null,
+          ledger.visibleContextState ?? null,
+          ledger.tokensBefore ?? null,
+          ledger.tokensAfter ?? null,
+          ledger.operatorSummary ?? null,
+        );
       });
-      opened.statements.upsertContextCollapseLedger.run(
-        ledger.sessionKey,
-        ledger.runId ?? null,
-        ledger.updatedAt,
-        stringifyJson(ledger.committedSpans),
-        stringifyJson(ledger.stagedSpans),
-        stringifyJson(ledger.droppedSpans),
-        stringifyJson(ledger.restoredArtifacts),
-        ledger.recoveryMode ?? null,
-        ledger.visibleContextState ?? null,
-        ledger.tokensBefore ?? null,
-        ledger.tokensAfter ?? null,
-        ledger.operatorSummary ?? null,
-      );
     },
 
     getContextCollapseLedger(sessionKey: string): StateContextCollapseLedgerRecord | null {
@@ -287,32 +291,34 @@ export function createContextStateStoreApi(params: {
     },
 
     appendMemoryWriteAudit(audit: StateMemoryWriteAuditAppend): void {
-      if (audit.sessionKey) {
-        ensureSessionForContext({
-          opened,
-          sessionKey: audit.sessionKey,
-          workspaceDir,
-        });
-      }
-      opened.statements.insertMemoryWriteAudit.run(
-        audit.auditId,
-        audit.sessionKey ?? null,
-        audit.runId ?? null,
-        audit.operationKind,
-        audit.memoryPath,
-        audit.status,
-        audit.beforeHash ?? null,
-        audit.afterHash ?? null,
-        audit.beforeLineCount,
-        audit.afterLineCount,
-        stringifyJson(audit.sourceSessionKeys),
-        stringifyJson(audit.evidenceCounts),
-        stringifyJson(audit.evidenceRefs),
-        stringifyJson(audit.addedEntries),
-        stringifyJson(audit.removedEntries),
-        audit.changedAt,
-        audit.operatorSummary ?? null,
-      );
+      opened.write(() => {
+        if (audit.sessionKey) {
+          ensureSessionForContext({
+            opened,
+            sessionKey: audit.sessionKey,
+            workspaceDir,
+          });
+        }
+        opened.statements.insertMemoryWriteAudit.run(
+          audit.auditId,
+          audit.sessionKey ?? null,
+          audit.runId ?? null,
+          audit.operationKind,
+          audit.memoryPath,
+          audit.status,
+          audit.beforeHash ?? null,
+          audit.afterHash ?? null,
+          audit.beforeLineCount,
+          audit.afterLineCount,
+          stringifyJson(audit.sourceSessionKeys),
+          stringifyJson(audit.evidenceCounts),
+          stringifyJson(audit.evidenceRefs),
+          stringifyJson(audit.addedEntries),
+          stringifyJson(audit.removedEntries),
+          audit.changedAt,
+          audit.operatorSummary ?? null,
+        );
+      });
     },
 
     listMemoryWriteAudits(paramsIn?: {
@@ -333,21 +339,23 @@ export function createContextStateStoreApi(params: {
     },
 
     upsertFrozenMemorySnapshot(snapshot: StateFrozenMemorySnapshotUpsert): void {
-      ensureSessionForContext({
-        opened,
-        sessionKey: snapshot.sessionKey,
-        workspaceDir,
+      opened.write(() => {
+        ensureSessionForContext({
+          opened,
+          sessionKey: snapshot.sessionKey,
+          workspaceDir,
+        });
+        opened.statements.upsertFrozenMemorySnapshot.run(
+          snapshot.sessionKey,
+          snapshot.snapshotPath,
+          snapshot.createdAt,
+          snapshot.updatedAt,
+          snapshot.safeLineCount,
+          snapshot.removedLineCount,
+          snapshot.blocked ? 1 : 0,
+          stringifyJson(snapshot.blockedLines),
+        );
       });
-      opened.statements.upsertFrozenMemorySnapshot.run(
-        snapshot.sessionKey,
-        snapshot.snapshotPath,
-        snapshot.createdAt,
-        snapshot.updatedAt,
-        snapshot.safeLineCount,
-        snapshot.removedLineCount,
-        snapshot.blocked ? 1 : 0,
-        stringifyJson(snapshot.blockedLines),
-      );
     },
 
     getFrozenMemorySnapshot(sessionKey: string): StateFrozenMemorySnapshotRecord | null {
@@ -358,16 +366,18 @@ export function createContextStateStoreApi(params: {
     },
 
     appendTeamMemorySyncEvent(event: StateTeamMemorySyncEventAppend): void {
-      opened.statements.insertTeamMemorySyncEvent.run(
-        event.eventId,
-        event.repoRoot,
-        event.direction,
-        event.status,
-        event.fileCount,
-        event.transferHash ?? null,
-        event.details ?? null,
-        event.createdAt,
-      );
+      opened.write(() => {
+        opened.statements.insertTeamMemorySyncEvent.run(
+          event.eventId,
+          event.repoRoot,
+          event.direction,
+          event.status,
+          event.fileCount,
+          event.transferHash ?? null,
+          event.details ?? null,
+          event.createdAt,
+        );
+      });
     },
 
     listTeamMemorySyncEvents(paramsIn?: {
@@ -388,25 +398,27 @@ export function createContextStateStoreApi(params: {
     },
 
     upsertTeamMemorySyncState(state: StateTeamMemorySyncStateUpsert): void {
-      opened.statements.upsertTeamMemorySyncState.run(
-        state.repoRoot,
-        state.remoteRoot ?? null,
-        state.lastPulledHash ?? null,
-        state.lastPushedHash ?? null,
-        state.lastSyncAt ?? null,
-        state.lastPullAt ?? null,
-        state.lastPushAt ?? null,
-        state.lastRetryAt ?? null,
-        state.conflictRetryCount,
-        stringifyJson(state.blockedFiles),
-        stringifyJson(state.blockedFileReasons),
-        stringifyJson(state.uploadedFiles),
-        stringifyJson(state.withheldFiles),
-        stringifyJson(state.checksumState),
-        state.lastStatus ?? null,
-        state.lastDecision ?? null,
-        state.updatedAt,
-      );
+      opened.write(() => {
+        opened.statements.upsertTeamMemorySyncState.run(
+          state.repoRoot,
+          state.remoteRoot ?? null,
+          state.lastPulledHash ?? null,
+          state.lastPushedHash ?? null,
+          state.lastSyncAt ?? null,
+          state.lastPullAt ?? null,
+          state.lastPushAt ?? null,
+          state.lastRetryAt ?? null,
+          state.conflictRetryCount,
+          stringifyJson(state.blockedFiles),
+          stringifyJson(state.blockedFileReasons),
+          stringifyJson(state.uploadedFiles),
+          stringifyJson(state.withheldFiles),
+          stringifyJson(state.checksumState),
+          state.lastStatus ?? null,
+          state.lastDecision ?? null,
+          state.updatedAt,
+        );
+      });
     },
 
     getTeamMemorySyncState(repoRoot: string): StateTeamMemorySyncStateRecord | null {

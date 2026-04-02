@@ -20,6 +20,13 @@ Repo-local target areas:
 - local state and runtime contracts from earlier phases
 - new mailbox and coordinator services if no existing package owns them cleanly
 
+Primary module ownership after shell modularization:
+
+- Own `src/superhuman/runtime/super-orchestration-services.ts` as the gateway-facing composition layer for orchestration startup and teardown.
+- Own the orchestration surfaces that hang off that layer, including `src/superhuman/super-orchestration-runtime.ts` and `src/superhuman/super-orchestration-store.ts`.
+- Extend earlier shell and state seams by adding role-aware and mailbox-aware behavior through your domain modules rather than re-centralizing orchestration logic inside `src/superhuman/super-gateway-runtime.ts`.
+- Route orchestration durability through the phase-owned state modules. Do not turn `src/superhuman/state/super-state-db.ts` or `src/superhuman/super-state-store.ts` back into catch-all homes for mailbox or worker behavior.
+
 Implementation scope:
 
 1. Introduce explicit execution roles.

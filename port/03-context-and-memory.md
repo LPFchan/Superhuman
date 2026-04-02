@@ -19,6 +19,13 @@ Repo-local target areas:
 - local state store introduced in Phase 1
 - new context-compaction and collapse services if the existing tree has no natural home yet
 
+Primary module ownership after shell modularization:
+
+- Own `src/superhuman/state/super-state-context.ts` as the durable home for context-pressure snapshots, compaction or collapse diagnostics, and team-memory sync state.
+- Own `src/superhuman/runtime/super-context-services.ts` as the gateway-facing assembly point for context and compaction services.
+- Own the surrounding context and memory modules, including `src/superhuman/super-compaction-manager.ts`, `src/superhuman/super-context-pressure.ts`, and the Superhuman context-engine integrations that sit above the Phase 1 shell seam.
+- Add new context durability through `src/superhuman/state/super-state-context.ts` or a new Phase 3-owned sibling module, not by stuffing more mixed concerns back into `src/superhuman/state/super-state-db.ts`.
+
 Implementation scope:
 
 1. Implement real context-pressure accounting.

@@ -2,14 +2,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../agents/agent-scope.js";
-import { resolveSandboxRuntimeStatus } from "../agents/sandbox/runtime-status.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveSessionKeyForTranscriptFile } from "../gateway/session-transcript-key.js";
 import { loadGatewaySessionRow, loadSessionEntry } from "../gateway/session-utils.js";
 import { loadCombinedSessionStoreForGateway } from "../gateway/session-utils.js";
 import type { AgentEventPayload } from "../infra/agent-events.js";
 import { onAgentEvent } from "../infra/agent-events.js";
-import { inspectBundleLspRuntimeSupport } from "../plugins/bundle-lsp.js";
 import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
 import { normalizeInputProvenance } from "../sessions/input-provenance.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
@@ -19,6 +17,10 @@ import {
   onSessionTranscriptUpdate,
 } from "../sessions/transcript-events.js";
 import {
+  resolveSuperSandboxRuntimeSnapshot,
+  resolveSuperShellCapabilitySnapshot,
+} from "./runtime/super-shell-contracts.js";
+import {
   resolveSuperContextPressureOptionsFromConfig,
   type ContextPressureSnapshotOptions,
 } from "./super-context-pressure.js";
@@ -27,8 +29,6 @@ import type {
   StateArtifactAppend,
   StateEvidenceProvenance,
   SuperArtifactRelationship,
-  SuperShellCapabilitySnapshot,
-  SuperSandboxRuntimeSnapshot,
   StateStore,
   StateStructuredDetails,
   StateSessionUpsert,
@@ -46,17 +46,6 @@ function normalizePathForComparison(input: string): string {
 
 function isLifecycleStream(event: AgentEventPayload): boolean {
   return event.stream === "lifecycle";
-}
-
-function hasUnsafeControlChars(value: string): boolean {
-  return Array.from(value).some((char) => {
-    const codePoint = char.codePointAt(0) ?? 0;
-    return codePoint < 0x20 || codePoint === 0x7f;
-  });
-}
-
-function shellEscapeSingleArg(value: string): string {
-  return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
 function resolveLifecyclePhase(event: AgentEventPayload): "start" | "end" | "error" | null {
@@ -297,118 +286,16 @@ function buildTranscriptArtifactMetadata(update: SessionTranscriptUpdate): State
   };
 }
 
-function resolveSemanticToolProviderIds(registry?: OpenClawPluginRegistry): string[] {
-  if (!registry) {
-    return [];
-  }
-  const providerIds = new Set<string>();
-  for (const plugin of registry.plugins) {
-    if (
-      plugin.format === "bundle" &&
-      plugin.bundleFormat &&
-      plugin.rootDir &&
-      (plugin.bundleCapabilities ?? []).includes("lspServers")
-    ) {
-      const support = inspectBundleLspRuntimeSupport({
-        pluginId: plugin.id,
-        rootDir: plugin.rootDir,
-        bundleFormat: plugin.bundleFormat,
-      });
-      if (support.hasStdioServer) {
-        providerIds.add(plugin.id);
-      }
-    }
-    if (
-      plugin.toolNames.some((toolName) => {
-        const normalized = toolName.trim().toLowerCase();
-        return normalized.startsWith("lsp_references_");
-      })
-    ) {
-      providerIds.add(plugin.id);
-    }
-  }
-  return [...providerIds].toSorted();
-}
-
-function resolveSupportsSemanticRename(registry?: OpenClawPluginRegistry): boolean {
-  if (!registry) {
-    return false;
-  }
-  return registry.plugins.some((plugin) =>
-    plugin.toolNames.some((toolName) => {
-      const normalized = toolName.trim().toLowerCase();
-      return normalized === "symbol_rename" || normalized === "vscode_renamesymbol";
-    }),
-  );
-}
-
 function resolveShellCapabilitySnapshot(params: {
   cfg: OpenClawConfig;
   sessionKey: string;
   pluginRegistry?: OpenClawPluginRegistry;
-}): SuperShellCapabilitySnapshot {
-  const sessionKey = params.sessionKey.trim();
-  const agentId = resolveSessionAgentId({ sessionKey, config: params.cfg });
-  const mainSessionKey = resolveSandboxRuntimeStatus({
-    cfg: params.cfg,
-    sessionKey,
-  }).mainSessionKey;
-  const semanticToolProviderIds = resolveSemanticToolProviderIds(params.pluginRegistry);
-  const supportsSymbolReferences = semanticToolProviderIds.length > 0;
-  const supportsSemanticRename = resolveSupportsSemanticRename(params.pluginRegistry);
-  const mode = supportsSemanticRename
-    ? "semantic_rename"
-    : supportsSymbolReferences
-      ? "symbol_references"
-      : "workspace_search_only";
-  return {
-    sessionKey,
-    agentId,
-    mainSessionKey,
-    createdAt: Date.now(),
-    mode,
-    supportsSymbolReferences,
-    supportsSemanticRename,
-    supportsWorkspaceSearchOnly: mode === "workspace_search_only",
-    semanticToolProviderIds,
-    workspaceSearchFallbackToolKinds: ["read", "exec"],
-  };
+}) {
+  return resolveSuperShellCapabilitySnapshot(params);
 }
 
-function resolveSandboxRuntimeSnapshot(params: {
-  cfg: OpenClawConfig;
-  sessionKey: string;
-}): SuperSandboxRuntimeSnapshot {
-  const runtime = resolveSandboxRuntimeStatus({
-    cfg: params.cfg,
-    sessionKey: params.sessionKey,
-  });
-  const explainCommand = runtime.sessionKey
-    ? hasUnsafeControlChars(runtime.sessionKey)
-      ? `openclaw sandbox explain --agent ${runtime.agentId}`
-      : `openclaw sandbox explain --session ${shellEscapeSingleArg(runtime.sessionKey)}`
-    : "openclaw sandbox explain";
-  return {
-    sessionKey: runtime.sessionKey,
-    agentId: runtime.agentId,
-    mainSessionKey: runtime.mainSessionKey,
-    createdAt: Date.now(),
-    mode: runtime.mode,
-    sandboxed: runtime.sandboxed,
-    toolPolicy: {
-      allow: [...runtime.toolPolicy.allow],
-      deny: [...runtime.toolPolicy.deny],
-      sourceKeys: {
-        allow: runtime.toolPolicy.sources.allow.key,
-        deny: runtime.toolPolicy.sources.deny.key,
-      },
-    },
-    remediation: {
-      explainCommand,
-      disableSandboxConfigKey: "agents.defaults.sandbox.mode=off",
-      suggestMainSession: runtime.mode === "non-main",
-    },
-  };
+function resolveSandboxRuntimeSnapshot(params: { cfg: OpenClawConfig; sessionKey: string }) {
+  return resolveSuperSandboxRuntimeSnapshot(params);
 }
 
 function buildProvenanceArtifacts(params: {

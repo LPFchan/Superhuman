@@ -354,6 +354,7 @@ export type StateSessionRecord = {
   startedAt?: number;
   endedAt?: number;
   updatedAt?: number;
+  latestActivityAt?: number;
   displayName?: string;
   label?: string;
   parentSessionKey?: string;
@@ -363,10 +364,31 @@ export type StateSessionRecord = {
   capabilitySnapshot?: SuperShellCapabilitySnapshot;
   sandboxRuntime?: SuperSandboxRuntimeSnapshot;
   messageCount: number;
+  userMessageCount: number;
+  assistantMessageCount: number;
+  actionCount: number;
+  artifactCount: number;
+  inputTokenCount: number;
+  outputTokenCount: number;
 };
 
-export type StateSessionUpsert = Omit<StateSessionRecord, "messageCount"> & {
+export type StateSessionUpsert = Omit<
+  StateSessionRecord,
+  | "messageCount"
+  | "userMessageCount"
+  | "assistantMessageCount"
+  | "actionCount"
+  | "artifactCount"
+  | "inputTokenCount"
+  | "outputTokenCount"
+> & {
   messageCount?: number;
+  userMessageCount?: number;
+  assistantMessageCount?: number;
+  actionCount?: number;
+  artifactCount?: number;
+  inputTokenCount?: number;
+  outputTokenCount?: number;
 };
 
 export type StateMessageAppend = {
@@ -660,10 +682,40 @@ export type SuperPluginCapabilitySummary = {
   hasConfigSchema: boolean;
 };
 
+export type SuperPluginShellContract = {
+  id: string;
+  name: string;
+  providesWorkspaceSearchFallback: boolean;
+  providesSymbolReferences: boolean;
+  providesSemanticRename: boolean;
+  semanticToolProviderIds: string[];
+  toolNames: string[];
+  bundleCapabilities: string[];
+  hasConfigSchema: boolean;
+};
+
+export type SuperSandboxToolDecision = {
+  sessionKey: string;
+  agentId: string;
+  mainSessionKey: string;
+  toolName: string;
+  sandboxed: boolean;
+  allowed: boolean;
+  reason: "sandbox_disabled" | "allowed" | "blocked_by_deny" | "blocked_by_allow";
+  blockedBy?: "deny" | "allow";
+  policySourceKey?: string;
+  remediation: {
+    explainCommand: string;
+    disableSandboxConfigKey: string;
+    suggestMainSession: boolean;
+  };
+};
+
 export interface PluginRegistry {
   listLoadedPlugins(): string[];
   hasPlugin(pluginId: string): boolean;
   getCapabilitySummary(): SuperPluginCapabilitySummary[];
+  getShellContracts(): SuperPluginShellContract[];
 }
 
 export interface WorkspaceBootstrap {
@@ -676,6 +728,7 @@ export interface ShellCapabilityRegistry {
 
 export interface SandboxRuntimeRegistry {
   getSnapshot(params: { sessionKey?: string }): SuperSandboxRuntimeSnapshot;
+  evaluateTool(params: { sessionKey?: string; toolName: string }): SuperSandboxToolDecision;
 }
 
 export interface CompactionManager {
@@ -737,11 +790,34 @@ function toKinds(kind: OpenClawPluginRegistry["plugins"][number]["kind"]): strin
 export function createSuperPluginCapabilityRegistry(
   registry: OpenClawPluginRegistry,
 ): PluginRegistry {
+  const plugins = registry?.plugins ?? [];
+  const shellContracts = plugins.map((entry) => {
+    const normalizedToolNames = entry.toolNames.map((toolName) => toolName.trim().toLowerCase());
+    const providesSemanticRename = normalizedToolNames.some(
+      (toolName) => toolName === "symbol_rename" || toolName === "vscode_renamesymbol",
+    );
+    const semanticToolProviderIds = normalizedToolNames.some((toolName) =>
+      toolName.startsWith("lsp_references_"),
+    )
+      ? [entry.id]
+      : [];
+    return {
+      id: entry.id,
+      name: entry.name,
+      providesWorkspaceSearchFallback: true,
+      providesSymbolReferences: semanticToolProviderIds.length > 0,
+      providesSemanticRename,
+      semanticToolProviderIds,
+      toolNames: [...entry.toolNames],
+      bundleCapabilities: [...(entry.bundleCapabilities ?? [])],
+      hasConfigSchema: Boolean(entry.configSchema),
+    };
+  });
   return {
-    listLoadedPlugins: () => registry.plugins.map((entry) => entry.id),
-    hasPlugin: (pluginId) => registry.plugins.some((entry) => entry.id === pluginId),
+    listLoadedPlugins: () => plugins.map((entry) => entry.id),
+    hasPlugin: (pluginId) => plugins.some((entry) => entry.id === pluginId),
     getCapabilitySummary: () =>
-      registry.plugins.map((entry) => ({
+      plugins.map((entry) => ({
         id: entry.id,
         name: entry.name,
         description: entry.description,
@@ -753,5 +829,6 @@ export function createSuperPluginCapabilityRegistry(
         bundleCapabilities: [...(entry.bundleCapabilities ?? [])],
         hasConfigSchema: Boolean(entry.configSchema),
       })),
+    getShellContracts: () => shellContracts,
   };
 }
