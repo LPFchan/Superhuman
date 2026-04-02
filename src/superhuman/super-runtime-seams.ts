@@ -115,6 +115,8 @@ export type SuperExecutionEnvironmentKind =
   | "scheduled_remote"
   | "computer_use";
 
+export type SuperExecutionBackendId = "local" | "acp" | "remote_peer" | "computer_use";
+
 export type SuperExecutionCapabilityBundleId =
   | "workspace_navigation"
   | "semantic_code"
@@ -150,7 +152,7 @@ export type SuperExecutionEnvironmentSnapshot = {
   workerId?: string;
   label: string;
   kind: SuperExecutionEnvironmentKind;
-  backendId: string;
+  backendId: SuperExecutionBackendId;
   providerId?: string;
   createdAt: number;
   updatedAt: number;
@@ -843,7 +845,7 @@ export type SuperExecutionCapabilityRequirementResult = {
 };
 
 export type SuperExecutionBackendDescriptor = {
-  id: string;
+  id: SuperExecutionBackendId;
   label: string;
   environmentKinds: SuperExecutionEnvironmentKind[];
   supportsRemoteSessions: boolean;
@@ -1158,31 +1160,37 @@ export function buildSuperExecutionCapabilityBundles(params: {
       id: "verification",
       label: "Verification replay",
       required: false,
-      available: params.supportsVerificationReplay !== false,
+      available: params.supportsVerificationReplay === true,
       details:
-        params.supportsVerificationReplay === false
-          ? "Verification metadata cannot be replayed in this environment."
-          : "Verification metadata is preserved across this environment.",
+        params.supportsVerificationReplay === true
+          ? "Verification metadata is preserved across this environment."
+          : params.supportsVerificationReplay === false
+            ? "Verification metadata cannot be replayed in this environment."
+            : "Verification replay support is undeclared for this environment.",
     },
     {
       id: "artifact_replay",
       label: "Artifact replay",
       required: false,
-      available: params.supportsArtifactReplay !== false,
+      available: params.supportsArtifactReplay === true,
       details:
-        params.supportsArtifactReplay === false
-          ? "Artifacts degrade to plain text only."
-          : "Artifacts remain reopenable and provenance-linked.",
+        params.supportsArtifactReplay === true
+          ? "Artifacts remain reopenable and provenance-linked."
+          : params.supportsArtifactReplay === false
+            ? "Artifacts degrade to plain text only."
+            : "Artifact replay support is undeclared for this environment.",
     },
     {
       id: "provenance_replay",
       label: "Provenance replay",
       required: false,
-      available: params.supportsProvenanceReplay !== false,
+      available: params.supportsProvenanceReplay === true,
       details:
-        params.supportsProvenanceReplay === false
-          ? "Structured provenance cannot be replayed."
-          : "Structured provenance is preserved.",
+        params.supportsProvenanceReplay === true
+          ? "Structured provenance is preserved."
+          : params.supportsProvenanceReplay === false
+            ? "Structured provenance cannot be replayed."
+            : "Structured provenance replay support is undeclared.",
     },
     {
       id: "computer_control",
@@ -1213,14 +1221,29 @@ export function toSuperExecutionEnvironmentCapabilities(params: {
     supportsSymbolReferences:
       params.capabilityMode === "symbol_references" || params.capabilityMode === "semantic_rename",
     supportsSemanticRename: params.capabilityMode === "semantic_rename",
-    supportsVerificationReplay: params.supportsVerificationReplay !== false,
-    supportsArtifactReplay: params.supportsArtifactReplay !== false,
-    supportsProvenanceReplay: params.supportsProvenanceReplay !== false,
+    supportsVerificationReplay: params.supportsVerificationReplay === true,
+    supportsArtifactReplay: params.supportsArtifactReplay === true,
+    supportsProvenanceReplay: params.supportsProvenanceReplay === true,
     supportsComputerUse: params.supportsComputerUse === true,
     workspaceSearchFallbackToolKinds: [...workspaceSearchFallbackToolKinds],
     semanticToolProviderIds: [...semanticToolProviderIds],
     bundles: buildSuperExecutionCapabilityBundles(params),
   };
+}
+
+export function resolveCanonicalBackendIdForEnvironmentKind(
+  kind: SuperExecutionEnvironmentKind,
+): SuperExecutionBackendId {
+  switch (kind) {
+    case "remote":
+    case "scheduled_remote":
+      return "remote_peer";
+    case "computer_use":
+      return "computer_use";
+    case "local":
+    default:
+      return "local";
+  }
 }
 
 export function evaluateSuperExecutionCapabilityRequirements(params: {

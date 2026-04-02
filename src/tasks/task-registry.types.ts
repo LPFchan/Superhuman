@@ -25,6 +25,7 @@ export type TaskTerminalOutcome = "succeeded" | "blocked";
 export type TaskScopeKind = "session" | "system";
 export type TaskExecutionRole = "lead" | "worker" | "subagent" | "remote_peer";
 export type TaskWorkerBackend = "in_process" | "out_of_process" | "remote_peer";
+export type TaskExecutionEnvironmentKind = "local" | "remote" | "scheduled_remote" | "computer_use";
 export type TaskQueueState = "queued" | "launching" | "running" | "refused" | "terminal";
 export type TaskNotificationMode = "direct" | "mailbox";
 export type TaskQueueDrainPolicy = "oldest_first";
@@ -52,6 +53,7 @@ export type TaskLaunchRequest = {
 export type TaskOrchestrationMetadata = {
   executionRole?: TaskExecutionRole;
   workerBackend?: TaskWorkerBackend;
+  environmentKind?: TaskExecutionEnvironmentKind;
   controllerSessionKey?: string;
   queueState?: TaskQueueState;
   notificationMode?: TaskNotificationMode;

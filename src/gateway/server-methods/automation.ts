@@ -288,7 +288,9 @@ export const automationHandlers: GatewayRequestHandlers = {
       jobId,
       name,
       schedule,
+      scheduleTimezone: asString(params.scheduleTimezone) ?? "UTC",
       sessionKey: asString(params.sessionKey),
+      executionEnvironmentId: asString(params.executionEnvironmentId),
       repoRoot: asString(params.repoRoot),
       prompt,
       model: asString(params.model),
@@ -298,6 +300,10 @@ export const automationHandlers: GatewayRequestHandlers = {
         "workspace_search_only" | "symbol_references" | "semantic_rename"
       >,
       status,
+      capabilityAuthority:
+        asString(params.capabilityAuthority) === "allow_local_fallback"
+          ? "allow_local_fallback"
+          : "scheduled_remote_only",
       lastRunAt:
         typeof params.lastRunAt === "number" && Number.isFinite(params.lastRunAt)
           ? params.lastRunAt

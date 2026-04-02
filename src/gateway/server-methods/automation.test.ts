@@ -33,7 +33,12 @@ function createContext() {
       remoteScheduleRuntime: {
         listJobs: vi.fn(() => [{ jobId: "r1" }]),
         upsertJob: vi.fn(async (job) => ({ ...job, createdAt: 1, updatedAt: 1 })),
-        runJob: vi.fn(() => ({ status: "queued", sessionKey: "main" })),
+        runJob: vi.fn(() => ({
+          status: "queued",
+          sessionKey: "main",
+          environmentId: "scheduled_remote:main",
+          environmentKind: "scheduled_remote",
+        })),
       },
     },
   };
@@ -117,8 +122,11 @@ describe("automationHandlers", () => {
         jobId: "job-1",
         name: "Nightly audit",
         schedule: "0 9 * * *",
+        scheduleTimezone: "Asia/Seoul",
+        executionEnvironmentId: "scheduled_remote:main",
         prompt: "Run the nightly audit.",
         requiredCapabilities: ["semantic_rename"],
+        capabilityAuthority: "scheduled_remote_only",
       },
       respond,
       context: context as never,
@@ -132,6 +140,9 @@ describe("automationHandlers", () => {
         job: expect.objectContaining({
           jobId: "job-1",
           name: "Nightly audit",
+          scheduleTimezone: "Asia/Seoul",
+          executionEnvironmentId: "scheduled_remote:main",
+          capabilityAuthority: "scheduled_remote_only",
           requiredCapabilities: ["semantic_rename"],
         }),
       },

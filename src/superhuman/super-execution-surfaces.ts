@@ -36,7 +36,15 @@ import type {
   SuperExecutionProviderAdapter,
   SuperExecutionProviderDescriptor,
 } from "./super-runtime-seams.js";
-import { toSuperExecutionEnvironmentCapabilities } from "./super-runtime-seams.js";
+import {
+  resolveCanonicalBackendIdForEnvironmentKind,
+  toSuperExecutionEnvironmentCapabilities,
+} from "./super-runtime-seams.js";
+
+const COMPUTER_USE_ROLLOUT_ENV_KEYS = [
+  "OPENCLAW_SUPERHUMAN_COMPUTER_USE",
+  "OPENCLAW_EXPERIMENTAL_COMPUTER_USE",
+] as const;
 
 function cloneEnvironmentSnapshot(
   snapshot: SuperExecutionEnvironmentSnapshot,
@@ -84,6 +92,7 @@ export function createSuperExecutionEnvironmentRegistry(params: {
   resolveProviderId?: (params: { sessionKey: string }) => string | undefined;
 }): ExecutionEnvironmentRegistry {
   const remoteSnapshots = new Map<string, SuperExecutionEnvironmentSnapshot>();
+  const workerSnapshotIndex = new Map<string, string>();
 
   const buildLocalSnapshot = (
     sessionKey: string,
@@ -102,7 +111,7 @@ export function createSuperExecutionEnvironmentRegistry(params: {
               ? `Computer use (${sessionKey})`
               : `Local (${sessionKey})`,
       kind,
-      backendId: kind === "local" ? "local" : kind,
+      backendId: resolveCanonicalBackendIdForEnvironmentKind(kind),
       providerId: params.resolveProviderId?.({ sessionKey }),
       createdAt: shellSnapshot.createdAt,
       updatedAt: Date.now(),
@@ -122,20 +131,25 @@ export function createSuperExecutionEnvironmentRegistry(params: {
   return {
     getSnapshot({ sessionKey, workerId, kind }) {
       if (workerId?.trim()) {
-        return remoteSnapshots.get(workerId.trim())
-          ? cloneEnvironmentSnapshot(remoteSnapshots.get(workerId.trim())!)
-          : null;
+        const environmentId = workerSnapshotIndex.get(workerId.trim());
+        const snapshot = environmentId ? remoteSnapshots.get(environmentId) : undefined;
+        return snapshot ? cloneEnvironmentSnapshot(snapshot) : null;
       }
       if (sessionKey?.trim()) {
         const resolvedKind = kind ?? "local";
         if (resolvedKind === "local" || resolvedKind === "scheduled_remote") {
-          return buildLocalSnapshot(sessionKey.trim(), resolvedKind);
+          if (resolvedKind === "local") {
+            return buildLocalSnapshot(sessionKey.trim(), resolvedKind);
+          }
+          const scheduledRemote = remoteSnapshots.get(`scheduled_remote:${sessionKey.trim()}`);
+          return scheduledRemote ? cloneEnvironmentSnapshot(scheduledRemote) : null;
         }
-        const remoteKey = `${resolvedKind}:${sessionKey.trim()}`;
-        const remote = remoteSnapshots.get(remoteKey);
-        return remote
-          ? cloneEnvironmentSnapshot(remote)
-          : buildLocalSnapshot(sessionKey.trim(), resolvedKind);
+        // Remote authority must come from an explicit persisted declaration, not a synthesized
+        // local fallback, or capability truth can silently drift after restart.
+        const remote = [...remoteSnapshots.values()].find(
+          (snapshot) => snapshot.sessionKey === sessionKey.trim() && snapshot.kind === resolvedKind,
+        );
+        return remote ? cloneEnvironmentSnapshot(remote) : null;
       }
       return null;
     },
@@ -145,12 +159,59 @@ export function createSuperExecutionEnvironmentRegistry(params: {
     },
 
     upsertSnapshot(snapshot) {
-      remoteSnapshots.set(snapshot.workerId?.trim() || snapshot.environmentId, {
+      const cloned = {
         ...cloneEnvironmentSnapshot(snapshot),
         updatedAt: snapshot.updatedAt || Date.now(),
-      });
+      };
+      remoteSnapshots.set(snapshot.environmentId, cloned);
+      const workerId = snapshot.workerId?.trim();
+      if (workerId) {
+        workerSnapshotIndex.set(workerId, snapshot.environmentId);
+      }
     },
   };
+}
+
+function parseRolloutBoolean(raw: unknown): boolean | undefined {
+  if (typeof raw === "boolean") {
+    return raw;
+  }
+  if (typeof raw !== "string") {
+    return undefined;
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
+export function resolveSuperComputerUseRolloutEnabled(params: {
+  cfg?: OpenClawConfig;
+  env?: NodeJS.ProcessEnv;
+}): boolean {
+  const toolsRecord =
+    params.cfg?.tools && typeof params.cfg.tools === "object"
+      ? (params.cfg.tools as Record<string, unknown>)
+      : undefined;
+  const computerUseRecord =
+    toolsRecord?.computerUse && typeof toolsRecord.computerUse === "object"
+      ? (toolsRecord.computerUse as Record<string, unknown>)
+      : undefined;
+  const configEnabled = parseRolloutBoolean(computerUseRecord?.enabled);
+  if (typeof configEnabled === "boolean") {
+    return configEnabled;
+  }
+  for (const key of COMPUTER_USE_ROLLOUT_ENV_KEYS) {
+    const envEnabled = parseRolloutBoolean(params.env?.[key]);
+    if (typeof envEnabled === "boolean") {
+      return envEnabled;
+    }
+  }
+  return false;
 }
 
 export function createSuperExecutionBackendRegistry(): ExecutionBackendRegistry {

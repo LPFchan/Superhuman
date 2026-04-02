@@ -30,6 +30,7 @@ export type OrchestrationWorkerRecord = {
   workerId: string;
   runtime: "subagent" | "acp" | "remote";
   backend: "in_process" | "out_of_process" | "remote_peer";
+  environmentKind: "local" | "remote";
   controllerSessionKey: string;
   requesterSessionKey: string;
   task: string;
@@ -98,9 +99,24 @@ function resolveOrchestrationStorePath(workspaceDir: string): string {
   return path.join(resolveSuperhumanStateDir(workspaceDir), "orchestration.json");
 }
 
+function resolveWorkerEnvironmentKind(record: {
+  runtime?: OrchestrationWorkerRecord["runtime"];
+  backend?: OrchestrationWorkerRecord["backend"];
+  environmentKind?: OrchestrationWorkerRecord["environmentKind"];
+}): OrchestrationWorkerRecord["environmentKind"] {
+  if (record.environmentKind === "remote" || record.environmentKind === "local") {
+    return record.environmentKind;
+  }
+  if (record.runtime === "remote" || record.backend === "remote_peer") {
+    return "remote";
+  }
+  return "local";
+}
+
 function cloneWorker(record: OrchestrationWorkerRecord): OrchestrationWorkerRecord {
   return {
     ...record,
+    environmentKind: resolveWorkerEnvironmentKind(record),
     launchRequest: { ...record.launchRequest },
   };
 }

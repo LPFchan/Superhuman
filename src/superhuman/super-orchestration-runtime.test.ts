@@ -161,10 +161,16 @@ describe("orchestration-runtime", () => {
             (message) => message.workerId === worker2.workerId && message.kind === "worker_queued",
           );
         expect(queuedMessage?.text).toContain("<status>queued</status>");
+        expect(queuedMessage?.payload).toMatchObject({
+          workerBackend: "in_process",
+          environmentKind: "local",
+        });
 
         const firstTask = findTaskByRunId("run-1");
         expect(firstTask?.orchestration?.stableWorkerId).toBe(worker1.workerId);
         expect(firstTask?.orchestration).toMatchObject({
+          workerBackend: "in_process",
+          environmentKind: "local",
           queueDelayMs: expect.any(Number),
           spawnCount: 1,
           budgetUsed: 0,
@@ -411,6 +417,10 @@ describe("orchestration-runtime", () => {
         expect(collected?.worker.lastControlAction).toBe("collect");
         expect(collected?.worker.lastCollectedAt).toEqual(expect.any(Number));
         expect(collected?.terminalMessage?.text).toContain("<status>killed</status>");
+        expect(collected?.terminalMessage?.payload).toMatchObject({
+          workerBackend: "in_process",
+          environmentKind: "local",
+        });
 
         const mailbox = runtime.listMailboxMessages("agent:main:main");
         const controlActions = mailbox

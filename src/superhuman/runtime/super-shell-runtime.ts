@@ -10,6 +10,7 @@ import {
   createSuperExecutionBackendRegistry,
   createSuperExecutionEnvironmentRegistry,
   createSuperExecutionProviderRegistry,
+  resolveSuperComputerUseRolloutEnabled,
   startSuperComputerUseRuntime,
 } from "../super-execution-surfaces.js";
 import {
@@ -186,7 +187,10 @@ export function startSuperShellRuntime(params: {
     stateStore,
   });
   const computerUseRuntime = startSuperComputerUseRuntime({
-    enabled: true,
+    enabled: resolveSuperComputerUseRolloutEnabled({
+      cfg: params.cfg,
+      env: process.env,
+    }),
     stateStore,
     executionEnvironmentRegistry,
     sandboxRuntimeRegistry,

@@ -9,6 +9,7 @@ import type {
 } from "./super-runtime-seams.js";
 import {
   evaluateSuperExecutionCapabilityRequirements,
+  resolveCanonicalBackendIdForEnvironmentKind,
   toSuperExecutionEnvironmentCapabilities,
   type SuperExecutionLaunchCapabilityRequirement,
 } from "./super-runtime-seams.js";
@@ -212,6 +213,9 @@ export type SuperRemoteSessionManager = {
     supportsArtifactReplay?: boolean;
     supportsProvenanceReplay?: boolean;
     supportsVerificationReplay?: boolean;
+    supportsComputerUse?: boolean;
+    workspaceSearchFallbackToolKinds?: string[];
+    semanticToolProviderIds?: string[];
   }) => Promise<SuperRemoteSessionRecord>;
   listSessions: () => SuperRemoteSessionRecord[];
   getSession: (workerId: string) => SuperRemoteSessionRecord | null;
@@ -246,6 +250,15 @@ function createEmptySnapshot(): RemoteSessionStoreSnapshot {
   };
 }
 
+function normalizeEnvironmentSnapshot(
+  environment: SuperExecutionEnvironmentSnapshot,
+): SuperExecutionEnvironmentSnapshot {
+  return {
+    ...environment,
+    backendId: resolveCanonicalBackendIdForEnvironmentKind(environment.kind),
+  };
+}
+
 function loadSnapshot(storePath: string): RemoteSessionStoreSnapshot {
   if (!fs.existsSync(storePath)) {
     return createEmptySnapshot();
@@ -256,7 +269,12 @@ function loadSnapshot(storePath: string): RemoteSessionStoreSnapshot {
     ) as Partial<RemoteSessionStoreSnapshot>;
     return {
       version: 1,
-      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      sessions: Array.isArray(parsed.sessions)
+        ? parsed.sessions.map((record) => ({
+            ...record,
+            environment: normalizeEnvironmentSnapshot(record.environment),
+          }))
+        : [],
       events: Array.isArray(parsed.events)
         ? (parsed.events as Array<SuperRemoteSessionEvent & { eventId: string }>)
         : [],
@@ -299,7 +317,7 @@ function cloneRecord(record: SuperRemoteSessionRecord): SuperRemoteSessionRecord
   return {
     ...record,
     environment: {
-      ...record.environment,
+      ...normalizeEnvironmentSnapshot(record.environment),
       capabilities: {
         ...record.environment.capabilities,
         workspaceSearchFallbackToolKinds: [
@@ -321,6 +339,11 @@ export function startSuperRemoteSessionManager(params: {
 }): SuperRemoteSessionManager {
   const storePath = resolveStorePath(params.workspaceDir);
   let snapshot = loadSnapshot(storePath);
+  // The JSON sidecar still carries the only full remote session record today, so startup must
+  // rehydrate its environment declarations before any runtime asks the registry for capability truth.
+  for (const record of snapshot.sessions) {
+    params.environmentRegistry.upsertSnapshot(record.environment);
+  }
   const transports = new Map<string, SuperRemoteSessionTransport>();
   const factories = new Map<string, SuperRemoteSessionTransportFactory>();
   let eventHandler = params.onEvent;
@@ -583,19 +606,19 @@ export function startSuperRemoteSessionManager(params: {
         sessionKey: launchParams.sessionKey,
         label: launchParams.label?.trim() || `Remote peer ${launchParams.sessionKey}`,
         kind: "remote",
-        backendId: adapterId,
+        backendId: "remote_peer",
         providerId: launchParams.providerId?.trim() || undefined,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         capabilityMode: launchParams.capabilityMode,
         capabilities: toSuperExecutionEnvironmentCapabilities({
           capabilityMode: launchParams.capabilityMode,
-          supportsArtifactReplay: launchParams.supportsArtifactReplay,
-          supportsProvenanceReplay: launchParams.supportsProvenanceReplay,
-          supportsVerificationReplay: launchParams.supportsVerificationReplay,
-          workspaceSearchFallbackToolKinds: ["read", "exec"],
-          semanticToolProviderIds:
-            launchParams.capabilityMode === "workspace_search_only" ? [] : [adapterId],
+          supportsArtifactReplay: launchParams.supportsArtifactReplay === true,
+          supportsProvenanceReplay: launchParams.supportsProvenanceReplay === true,
+          supportsVerificationReplay: launchParams.supportsVerificationReplay === true,
+          supportsComputerUse: launchParams.supportsComputerUse === true,
+          workspaceSearchFallbackToolKinds: launchParams.workspaceSearchFallbackToolKinds,
+          semanticToolProviderIds: launchParams.semanticToolProviderIds,
         }),
       };
       const capabilityCheck = evaluateSuperExecutionCapabilityRequirements({
@@ -650,7 +673,8 @@ export function startSuperRemoteSessionManager(params: {
         completedAt: record.createdAt,
         details: {
           workerId: record.workerId,
-          backendId: record.adapterId,
+          backendId: record.environment.backendId,
+          adapterId: record.adapterId,
           providerId: record.providerId,
           environment: record.environment,
           requiredCapabilities: record.capabilityRequirements,

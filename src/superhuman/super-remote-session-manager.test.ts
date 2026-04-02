@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { withTempDir } from "../test-helpers/temp-dir.js";
 import { createSuperExecutionEnvironmentRegistry } from "./super-execution-surfaces.js";
@@ -112,6 +114,7 @@ describe("super-remote-session-manager", () => {
         requesterSessionKey: "agent:main:main",
         capabilityMode: "semantic_rename",
         capabilityRequirements: ["semantic_rename", "artifact_replay"],
+        supportsArtifactReplay: true,
       });
 
       expect(manager.getSession("worker-1")).toMatchObject({
@@ -184,6 +187,58 @@ describe("super-remote-session-manager", () => {
     });
   });
 
+  it("fails closed for replay capabilities when the remote launch did not declare them", async () => {
+    await withTempDir({ prefix: "openclaw-super-remote-manager-" }, async (workspaceDir) => {
+      const stateStore = createSuperhumanStateStore({ workspaceDir });
+      const environmentRegistry = createEnvironmentRegistry();
+      let emit: ((event: SuperRemoteTransportEnvelope) => void) | undefined;
+      const control: TransportControl = {
+        emit(event) {
+          emit?.(event);
+        },
+        approvals: [],
+        inputs: [],
+        interrupted: 0,
+        stopped: 0,
+      };
+      const manager = startSuperRemoteSessionManager({
+        workspaceDir,
+        stateStore,
+        environmentRegistry,
+      });
+      manager.registerTransportFactory("remote_peer", (params) => {
+        emit = params.emit;
+        return createFakeTransport(control);
+      });
+
+      try {
+        await manager.launchSession({
+          workerId: "worker-1",
+          sessionKey: "remote:session-1",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          capabilityMode: "workspace_search_only",
+          capabilityRequirements: [],
+          workspaceSearchFallbackToolKinds: ["read", "exec"],
+        });
+
+        expect(manager.getSession("worker-1")).toMatchObject({
+          environment: {
+            capabilities: {
+              supportsArtifactReplay: false,
+              supportsProvenanceReplay: false,
+              supportsVerificationReplay: false,
+              supportsComputerUse: false,
+            },
+          },
+        });
+      } finally {
+        manager.stop();
+        stateStore.close();
+      }
+    });
+  });
+
   it("lets orchestration treat remote_peer like another worker backend", async () => {
     await withTempDir({ prefix: "openclaw-super-remote-orchestration-" }, async (workspaceDir) => {
       process.env.OPENCLAW_STATE_DIR = workspaceDir;
@@ -227,6 +282,7 @@ describe("super-remote-session-manager", () => {
           remoteSessionKey: "remote:worker-session",
           remoteCapabilityMode: "semantic_rename",
           remoteCapabilityRequirements: ["semantic_rename", "artifact_replay"],
+          remoteSupportsArtifactReplay: true,
         });
 
         await waitForAssertion(() => {
@@ -290,8 +346,11 @@ describe("super-remote-session-manager", () => {
 
         const collected = runtime.collectWorker({ workerId: worker.workerId });
         expect(collected?.worker.backend).toBe("remote_peer");
+        expect(collected?.worker.environmentKind).toBe("remote");
         expect(collected?.terminalMessage?.payload).toMatchObject({
           result: "Done",
+          workerBackend: "remote_peer",
+          environmentKind: "remote",
           remote: true,
         });
       } finally {
@@ -299,5 +358,141 @@ describe("super-remote-session-manager", () => {
         stateStore.close();
       }
     });
+  });
+
+  it("rehydrates persisted remote environments into the execution registry on restart", async () => {
+    await withTempDir({ prefix: "openclaw-super-remote-rehydrate-" }, async (workspaceDir) => {
+      const stateStore = createSuperhumanStateStore({ workspaceDir });
+      const firstRegistry = createEnvironmentRegistry();
+      let emit: ((event: SuperRemoteTransportEnvelope) => void) | undefined;
+      const first = startSuperRemoteSessionManager({
+        workspaceDir,
+        stateStore,
+        environmentRegistry: firstRegistry,
+      });
+      first.registerTransportFactory("remote_peer", (params) => {
+        emit = params.emit;
+        return createFakeTransport({
+          emit(event) {
+            emit?.(event);
+          },
+          approvals: [],
+          inputs: [],
+          interrupted: 0,
+          stopped: 0,
+        });
+      });
+
+      await first.launchSession({
+        workerId: "worker-rehydrate",
+        sessionKey: "remote:rehydrate-session",
+        controllerSessionKey: "agent:main:main",
+        requesterSessionKey: "agent:main:main",
+        capabilityMode: "semantic_rename",
+        capabilityRequirements: ["semantic_rename"],
+      });
+      first.stop();
+
+      const resumedRegistry = createEnvironmentRegistry();
+      const resumed = startSuperRemoteSessionManager({
+        workspaceDir,
+        stateStore,
+        environmentRegistry: resumedRegistry,
+      });
+
+      expect(
+        resumedRegistry.getSnapshot({
+          sessionKey: "remote:rehydrate-session",
+          kind: "remote",
+        }),
+      ).toMatchObject({
+        kind: "remote",
+        backendId: "remote_peer",
+        capabilityMode: "semantic_rename",
+      });
+      expect(resumed.listSessions()).toEqual([
+        expect.objectContaining({
+          workerId: "worker-rehydrate",
+          sessionKey: "remote:rehydrate-session",
+          environment: expect.objectContaining({
+            backendId: "remote_peer",
+          }),
+        }),
+      ]);
+
+      resumed.stop();
+      stateStore.close();
+    });
+  });
+
+  it("canonicalizes persisted remote backend ids when older snapshots stored adapter ids", async () => {
+    await withTempDir(
+      { prefix: "openclaw-super-remote-backend-migrate-" },
+      async (workspaceDir) => {
+        const stateStore = createSuperhumanStateStore({ workspaceDir });
+        const firstRegistry = createEnvironmentRegistry();
+        let emit: ((event: SuperRemoteTransportEnvelope) => void) | undefined;
+        const first = startSuperRemoteSessionManager({
+          workspaceDir,
+          stateStore,
+          environmentRegistry: firstRegistry,
+        });
+        first.registerTransportFactory("ssh_bridge", (params) => {
+          emit = params.emit;
+          return createFakeTransport({
+            emit(event) {
+              emit?.(event);
+            },
+            approvals: [],
+            inputs: [],
+            interrupted: 0,
+            stopped: 0,
+          });
+        });
+
+        await first.launchSession({
+          workerId: "worker-migrate",
+          sessionKey: "remote:migrate-session",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          adapterId: "ssh_bridge",
+          capabilityMode: "workspace_search_only",
+          capabilityRequirements: [],
+        });
+        first.stop();
+
+        const storePath = path.join(workspaceDir, ".superhuman", "remote-sessions.json");
+        const snapshot = JSON.parse(fs.readFileSync(storePath, "utf8")) as {
+          sessions: Array<{ environment: { backendId: string } }>;
+        };
+        snapshot.sessions[0].environment.backendId = "ssh_bridge";
+        fs.writeFileSync(storePath, JSON.stringify(snapshot, null, 2));
+
+        const resumedRegistry = createEnvironmentRegistry();
+        const resumed = startSuperRemoteSessionManager({
+          workspaceDir,
+          stateStore,
+          environmentRegistry: resumedRegistry,
+        });
+
+        expect(resumed.getSession("worker-migrate")).toMatchObject({
+          adapterId: "ssh_bridge",
+          environment: {
+            backendId: "remote_peer",
+          },
+        });
+        expect(
+          resumedRegistry.getSnapshot({
+            sessionKey: "remote:migrate-session",
+            kind: "remote",
+          }),
+        ).toMatchObject({
+          backendId: "remote_peer",
+        });
+
+        resumed.stop();
+        stateStore.close();
+      },
+    );
   });
 });

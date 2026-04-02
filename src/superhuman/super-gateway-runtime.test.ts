@@ -40,6 +40,7 @@ afterEach(() => {
     fs.rmSync(target, { recursive: true, force: true });
   }
   cleanupPaths.clear();
+  vi.unstubAllEnvs();
 });
 
 describe("startSuperhumanGatewayRuntime", () => {
@@ -104,8 +105,8 @@ describe("startSuperhumanGatewayRuntime", () => {
     expect(runtime.executionBackendRegistry.getBackend("remote_peer")).toMatchObject({
       supportsRemoteSessions: true,
     });
-    expect(runtime.computerUseRuntime.isEnabled()).toBe(true);
-    expect(runtime.computerUseRuntime.canUseInMode("interactive")).toBe(true);
+    expect(runtime.computerUseRuntime.isEnabled()).toBe(false);
+    expect(runtime.computerUseRuntime.canUseInMode("interactive")).toBe(false);
     expect(runtime.computerUseRuntime.canUseInMode("scheduled")).toBe(false);
     expect(
       runtime.sandboxRuntimeRegistry.evaluateTool({
@@ -121,5 +122,31 @@ describe("startSuperhumanGatewayRuntime", () => {
     runtime.stop();
 
     expect(getActiveSuperAutomationRuntime()).toBeNull();
+  });
+
+  it("enables computer-use only when the rollout gate is set", () => {
+    vi.stubEnv("OPENCLAW_SUPERHUMAN_COMPUTER_USE", "true");
+    const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "super-gateway-runtime-cu-"));
+    cleanupPaths.add(workspaceDir);
+
+    const runtime = startSuperhumanGatewayRuntime({
+      cfg: {
+        agents: {
+          defaults: {
+            sandbox: { mode: "all", scope: "agent" },
+          },
+        },
+      } as never,
+      deps: {} as never,
+      workspaceDir,
+      pluginRegistry: {
+        plugins: [],
+      } as never,
+    });
+
+    expect(runtime.computerUseRuntime.isEnabled()).toBe(true);
+    expect(runtime.computerUseRuntime.canUseInMode("interactive")).toBe(true);
+
+    runtime.stop();
   });
 });

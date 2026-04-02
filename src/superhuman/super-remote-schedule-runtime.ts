@@ -23,19 +23,31 @@ export type SuperRemoteScheduleRecord = {
   jobId: string;
   name: string;
   schedule: string;
+  scheduleTimezone: string;
   sessionKey?: string;
+  executionEnvironmentId?: string;
   repoRoot?: string;
   prompt: string;
   model?: string;
   connectorIds: string[];
   pluginIds: string[];
   requiredCapabilities: SuperShellCapabilityMode[];
+  capabilityAuthority: "scheduled_remote_only" | "allow_local_fallback";
   status: "active" | "paused";
   cronJobId?: string;
   nextRunAtMs?: number;
   createdAt: number;
   updatedAt: number;
   lastRunAt?: number;
+  lastBlockedAt?: number;
+  lastBlockedCode?:
+    | "paused"
+    | "missing_execution_environment"
+    | "invalid_execution_environment"
+    | "missing_capabilities";
+  lastBlockedReason?: string;
+  lastResolvedEnvironmentId?: string;
+  lastResolvedEnvironmentKind?: SuperExecutionEnvironmentSnapshot["kind"];
 };
 
 type RemoteScheduleStoreSnapshot = {
@@ -51,7 +63,16 @@ export type SuperRemoteScheduleRuntime = {
   runJob: (params: { jobId: string }) => {
     status: "queued" | "blocked" | "missing";
     sessionKey?: string;
+    code?:
+      | "paused"
+      | "missing_execution_environment"
+      | "invalid_execution_environment"
+      | "missing_capabilities";
     reason?: string;
+    environmentId?: string;
+    environmentKind?: SuperExecutionEnvironmentSnapshot["kind"];
+    capabilityMode?: SuperExecutionEnvironmentSnapshot["capabilityMode"];
+    missingCapabilities?: SuperShellCapabilityMode[];
   };
   stop: () => void;
 };
@@ -81,6 +102,14 @@ function loadSnapshot(storePath: string): RemoteScheduleStoreSnapshot {
             requiredCapabilities: Array.isArray(record.requiredCapabilities)
               ? [...record.requiredCapabilities]
               : [],
+            scheduleTimezone:
+              typeof record.scheduleTimezone === "string" && record.scheduleTimezone.trim()
+                ? record.scheduleTimezone.trim()
+                : "UTC",
+            capabilityAuthority:
+              record.capabilityAuthority === "allow_local_fallback"
+                ? "allow_local_fallback"
+                : "scheduled_remote_only",
           }))
         : [],
     };
@@ -115,7 +144,12 @@ function supportsCapability(
   }
 }
 
-function buildJobMessage(job: SuperRemoteScheduleRecord, sessionKey: string): string {
+function buildJobMessage(
+  job: SuperRemoteScheduleRecord,
+  sessionKey: string,
+  resolvedEnvironment?: SuperExecutionEnvironmentSnapshot,
+  usedLocalFallback?: boolean,
+): string {
   return [
     "<super-remote-scheduled-run>",
     `job_id: ${job.jobId}`,
@@ -123,6 +157,21 @@ function buildJobMessage(job: SuperRemoteScheduleRecord, sessionKey: string): st
     `session_key: ${sessionKey}`,
     "trigger_source: remote_schedule",
     `schedule_expr: ${job.schedule}`,
+    `schedule_timezone: ${job.scheduleTimezone}`,
+    `capability_authority: ${job.capabilityAuthority}`,
+    ...(job.executionEnvironmentId
+      ? [`execution_environment_id: ${job.executionEnvironmentId}`]
+      : []),
+    ...(resolvedEnvironment
+      ? [`resolved_environment_id: ${resolvedEnvironment.environmentId}`]
+      : []),
+    ...(resolvedEnvironment ? [`resolved_environment_kind: ${resolvedEnvironment.kind}`] : []),
+    ...(resolvedEnvironment
+      ? [`resolved_capability_mode: ${resolvedEnvironment.capabilityMode}`]
+      : []),
+    ...(typeof usedLocalFallback === "boolean"
+      ? [`used_local_fallback: ${usedLocalFallback ? "true" : "false"}`]
+      : []),
     ...(job.repoRoot ? [`repo_root: ${job.repoRoot}`] : []),
     ...(job.model ? [`model: ${job.model}`] : []),
     ...(job.connectorIds.length > 0 ? [`connector_ids: ${job.connectorIds.join(",")}`] : []),
@@ -145,12 +194,74 @@ function cloneJob(record: SuperRemoteScheduleRecord): SuperRemoteScheduleRecord 
   };
 }
 
+function resolveEnvironmentForJob(params: {
+  record: SuperRemoteScheduleRecord;
+  sessionKey: string;
+  executionEnvironmentRegistry: ExecutionEnvironmentRegistry;
+}): {
+  environment: SuperExecutionEnvironmentSnapshot;
+  usedLocalFallback: boolean;
+  invalidReason?: string;
+} | null {
+  const explicitEnvironmentId = params.record.executionEnvironmentId?.trim();
+  if (explicitEnvironmentId) {
+    const matched = params.executionEnvironmentRegistry
+      .listSnapshots()
+      .find((snapshot) => snapshot.environmentId === explicitEnvironmentId);
+    if (!matched) {
+      return null;
+    }
+    if (matched.kind !== "scheduled_remote" && matched.kind !== "remote") {
+      return {
+        environment: matched,
+        usedLocalFallback: false,
+        invalidReason: `environment ${matched.environmentId} is ${matched.kind}, not a remote execution surface`,
+      };
+    }
+    return {
+      environment: matched,
+      usedLocalFallback: false,
+    };
+  }
+
+  const scheduledRemote = params.executionEnvironmentRegistry.getSnapshot({
+    sessionKey: params.sessionKey,
+    kind: "scheduled_remote",
+  });
+  if (scheduledRemote) {
+    return {
+      environment: scheduledRemote,
+      usedLocalFallback: false,
+    };
+  }
+
+  if (params.record.capabilityAuthority === "allow_local_fallback") {
+    const local = params.executionEnvironmentRegistry.getSnapshot({
+      sessionKey: params.sessionKey,
+      kind: "local",
+    });
+    if (local) {
+      return {
+        environment: local,
+        usedLocalFallback: true,
+      };
+    }
+  }
+
+  return null;
+}
+
 function buildCronDescription(job: SuperRemoteScheduleRecord): string {
   const details = [
     job.repoRoot ? `repo=${job.repoRoot}` : undefined,
+    `tz=${job.scheduleTimezone}`,
+    job.executionEnvironmentId ? `env=${job.executionEnvironmentId}` : undefined,
     job.model ? `model=${job.model}` : undefined,
     job.connectorIds.length > 0 ? `connectors=${job.connectorIds.join(",")}` : undefined,
     job.pluginIds.length > 0 ? `plugins=${job.pluginIds.join(",")}` : undefined,
+    job.capabilityAuthority === "allow_local_fallback"
+      ? "authority=local-fallback"
+      : "authority=remote-only",
   ].filter((entry): entry is string => Boolean(entry));
   return details.length > 0
     ? `Superhuman remote schedule (${details.join(" ")})`
@@ -173,7 +284,7 @@ async function syncMirroredCronJob(params: {
     schedule: {
       kind: "cron" as const,
       expr: params.record.schedule,
-      tz: "UTC",
+      tz: params.record.scheduleTimezone,
     },
     sessionTarget: "main" as const,
     wakeMode: "now" as const,
@@ -296,11 +407,22 @@ export function startSuperRemoteScheduleRuntime(params: {
       const nextBase: SuperRemoteScheduleRecord = {
         ...job,
         sessionKey: resolvedSessionKey,
+        scheduleTimezone: job.scheduleTimezone?.trim() || "UTC",
+        capabilityAuthority:
+          job.capabilityAuthority === "allow_local_fallback"
+            ? "allow_local_fallback"
+            : "scheduled_remote_only",
+        executionEnvironmentId: job.executionEnvironmentId?.trim() || undefined,
         connectorIds: [...job.connectorIds],
         pluginIds: [...job.pluginIds],
         requiredCapabilities: [...job.requiredCapabilities],
         cronJobId: existing?.cronJobId,
         nextRunAtMs: existing?.nextRunAtMs,
+        lastBlockedAt: existing?.lastBlockedAt,
+        lastBlockedCode: existing?.lastBlockedCode,
+        lastBlockedReason: existing?.lastBlockedReason,
+        lastResolvedEnvironmentId: existing?.lastResolvedEnvironmentId,
+        lastResolvedEnvironmentKind: existing?.lastResolvedEnvironmentKind,
         createdAt: now,
         updatedAt: now,
       };
@@ -320,6 +442,44 @@ export function startSuperRemoteScheduleRuntime(params: {
             createdAt: existing.createdAt,
           }
         : nextBase;
+      params.stateStore.appendAutomationEvent({
+        eventId: `remote-schedule-config:${crypto.randomUUID()}`,
+        sessionKey: resolvedSessionKey,
+        automationKind: "remote_schedule_config",
+        triggerSource: "operator",
+        reason:
+          existing?.status === "paused" && next.status === "active"
+            ? "remote schedule resumed"
+            : existing?.status === "active" && next.status === "paused"
+              ? "remote schedule paused"
+              : existing
+                ? "remote schedule updated"
+                : "remote schedule created",
+        actionSummary:
+          existing?.status === "paused" && next.status === "active"
+            ? `Resumed remote schedule ${next.name}`
+            : existing?.status === "active" && next.status === "paused"
+              ? `Paused remote schedule ${next.name}`
+              : existing
+                ? `Updated remote schedule ${next.name}`
+                : `Created remote schedule ${next.name}`,
+        resultStatus: next.status,
+        ...createTrustedStateAutomationPolicy({
+          policySummary:
+            "Remote schedule configuration is operator-authored metadata; actual remote execution still depends on declared environment authority and capability gating at run time.",
+          evidenceSources: ["scheduler_state"],
+          verificationPosture: "not_required",
+        }),
+        details: {
+          jobId: next.jobId,
+          schedule: next.schedule,
+          scheduleTimezone: next.scheduleTimezone,
+          executionEnvironmentId: next.executionEnvironmentId,
+          capabilityAuthority: next.capabilityAuthority,
+          requiredCapabilities: next.requiredCapabilities,
+        },
+        createdAt: now,
+      });
       if (!params.cron) {
         return applyNext(next);
       }
@@ -341,31 +501,200 @@ export function startSuperRemoteScheduleRuntime(params: {
         return { status: "missing" as const };
       }
       const job = snapshot.jobs[index];
-      if (job.status !== "active") {
-        return { status: "blocked" as const, reason: "job is paused" };
-      }
       const sessionKey = job.sessionKey?.trim() || params.sessionRegistry.resolveMainSession();
-      const environment =
-        params.executionEnvironmentRegistry.getSnapshot({
-          sessionKey,
-          kind: "scheduled_remote",
-        }) ??
-        params.executionEnvironmentRegistry.getSnapshot({
-          sessionKey,
-          kind: "local",
+      const createdAt = Date.now();
+      const setBlockedState = (blocked: {
+        code:
+          | "paused"
+          | "missing_execution_environment"
+          | "invalid_execution_environment"
+          | "missing_capabilities";
+        reason: string;
+        environmentId?: string;
+        environmentKind?: SuperExecutionEnvironmentSnapshot["kind"];
+      }) => {
+        snapshot.jobs[index] = {
+          ...job,
+          updatedAt: createdAt,
+          lastBlockedAt: createdAt,
+          lastBlockedCode: blocked.code,
+          lastBlockedReason: blocked.reason,
+          lastResolvedEnvironmentId: blocked.environmentId,
+          lastResolvedEnvironmentKind: blocked.environmentKind,
+        };
+        save();
+      };
+      if (job.status !== "active") {
+        setBlockedState({
+          code: "paused",
+          reason: "job is paused",
         });
-      if (!environment) {
+        params.stateStore.appendAutomationEvent({
+          eventId: `remote-schedule:${crypto.randomUUID()}`,
+          sessionKey,
+          automationKind: "remote_scheduled_job",
+          triggerSource: "remote_schedule",
+          reason: "remote schedule is paused",
+          actionSummary: `Blocked remote scheduled job ${job.name}`,
+          resultStatus: "blocked",
+          ...createTrustedStateAutomationPolicy({
+            policySummary:
+              "Remote scheduled work was blocked by explicit operator pause state before any execution environment was consulted.",
+            evidenceSources: ["scheduler_state"],
+            verificationPosture: "not_required",
+            capabilityPosture: "not_required",
+          }),
+          details: {
+            jobId: job.jobId,
+            blockedCode: "paused",
+            scheduleTimezone: job.scheduleTimezone,
+          },
+          createdAt,
+        });
+        return { status: "blocked" as const, sessionKey, code: "paused", reason: "job is paused" };
+      }
+      const resolvedEnvironment = resolveEnvironmentForJob({
+        record: job,
+        sessionKey,
+        executionEnvironmentRegistry: params.executionEnvironmentRegistry,
+      });
+      if (!resolvedEnvironment) {
+        const reason = job.executionEnvironmentId
+          ? `missing declared execution environment: ${job.executionEnvironmentId}`
+          : job.capabilityAuthority === "allow_local_fallback"
+            ? "missing declared remote environment and no local fallback environment was available"
+            : "missing declared scheduled remote environment";
+        setBlockedState({
+          code: "missing_execution_environment",
+          reason,
+        });
+        params.stateStore.appendAutomationEvent({
+          eventId: `remote-schedule:${crypto.randomUUID()}`,
+          sessionKey,
+          automationKind: "remote_scheduled_job",
+          triggerSource: "remote_schedule",
+          reason: "scheduled remote execution environment was not available",
+          actionSummary: `Blocked remote scheduled job ${job.name}`,
+          resultStatus: "blocked",
+          ...createTrustedStateAutomationPolicy({
+            policySummary:
+              "Remote scheduled work was blocked because the declared execution authority could not be resolved to an available remote execution surface.",
+            evidenceSources: ["scheduler_state"],
+            verificationPosture: "unknown",
+            capabilityPosture: "blocked",
+          }),
+          details: {
+            jobId: job.jobId,
+            blockedCode: "missing_execution_environment",
+            missingEnvironmentKind: "scheduled_remote",
+            executionEnvironmentId: job.executionEnvironmentId,
+            capabilityAuthority: job.capabilityAuthority,
+            scheduleTimezone: job.scheduleTimezone,
+          },
+          createdAt,
+        });
+        notify?.publish({
+          kind: "remote_run_failed",
+          title: `Remote run blocked: ${job.name}`,
+          message: reason,
+          sessionKey,
+          audit: createTrustedStateAutomationPolicy({
+            policySummary:
+              "This failure notification exists because scheduled remote capability truth must be declared through explicit execution-environment authority rather than inferred from ambient local state.",
+            evidenceSources: ["scheduler_state"],
+            verificationPosture: "unknown",
+            capabilityPosture: "blocked",
+          }),
+          metadata: {
+            jobId: job.jobId,
+            missingEnvironmentKind: "scheduled_remote",
+            blockedCode: "missing_execution_environment",
+            executionEnvironmentId: job.executionEnvironmentId,
+            capabilityAuthority: job.capabilityAuthority,
+          },
+        });
         return {
           status: "blocked",
           sessionKey,
-          reason: "missing execution environment",
+          code: "missing_execution_environment",
+          reason,
+        };
+      }
+      const environment = resolvedEnvironment.environment;
+      if (resolvedEnvironment.invalidReason) {
+        setBlockedState({
+          code: "invalid_execution_environment",
+          reason: resolvedEnvironment.invalidReason,
+          environmentId: environment.environmentId,
+          environmentKind: environment.kind,
+        });
+        params.stateStore.appendAutomationEvent({
+          eventId: `remote-schedule:${crypto.randomUUID()}`,
+          sessionKey,
+          automationKind: "remote_scheduled_job",
+          triggerSource: "remote_schedule",
+          reason: "declared execution environment was invalid",
+          actionSummary: `Blocked remote scheduled job ${job.name}`,
+          resultStatus: "blocked",
+          ...createTrustedStateAutomationPolicy({
+            policySummary:
+              "Remote scheduled work was blocked because the operator-targeted execution environment resolved to a non-remote surface and therefore could not be trusted as scheduled-remote authority.",
+            evidenceSources: ["scheduler_state", "runtime_state"],
+            verificationPosture: "unknown",
+            capabilityPosture: "blocked",
+            capabilityMode: environment.capabilityMode,
+          }),
+          details: {
+            jobId: job.jobId,
+            blockedCode: "invalid_execution_environment",
+            executionEnvironmentId: job.executionEnvironmentId,
+            resolvedEnvironmentId: environment.environmentId,
+            resolvedEnvironmentKind: environment.kind,
+          },
+          createdAt,
+        });
+        notify?.publish({
+          kind: "remote_run_failed",
+          title: `Remote run blocked: ${job.name}`,
+          message: resolvedEnvironment.invalidReason,
+          sessionKey,
+          audit: createTrustedStateAutomationPolicy({
+            policySummary:
+              "This failure notification exists because remote schedules must target an explicitly remote execution surface when an environment id is declared.",
+            evidenceSources: ["scheduler_state", "runtime_state"],
+            verificationPosture: "unknown",
+            capabilityPosture: "blocked",
+            capabilityMode: environment.capabilityMode,
+          }),
+          metadata: {
+            jobId: job.jobId,
+            blockedCode: "invalid_execution_environment",
+            executionEnvironmentId: job.executionEnvironmentId,
+            resolvedEnvironmentId: environment.environmentId,
+            resolvedEnvironmentKind: environment.kind,
+          },
+        });
+        return {
+          status: "blocked",
+          sessionKey,
+          code: "invalid_execution_environment",
+          reason: resolvedEnvironment.invalidReason,
+          environmentId: environment.environmentId,
+          environmentKind: environment.kind,
+          capabilityMode: environment.capabilityMode,
         };
       }
       const missingCapabilities = job.requiredCapabilities.filter(
         (required) => !supportsCapability(required, environment),
       );
-      const createdAt = Date.now();
       if (missingCapabilities.length > 0) {
+        const reason = `missing capabilities: ${missingCapabilities.join(", ")}`;
+        setBlockedState({
+          code: "missing_capabilities",
+          reason,
+          environmentId: environment.environmentId,
+          environmentKind: environment.kind,
+        });
         params.stateStore.appendAutomationEvent({
           eventId: `remote-schedule:${crypto.randomUUID()}`,
           sessionKey,
@@ -386,6 +715,10 @@ export function startSuperRemoteScheduleRuntime(params: {
             jobId: job.jobId,
             missingCapabilities,
             capabilityMode: environment.capabilityMode,
+            blockedCode: "missing_capabilities",
+            executionEnvironmentId: environment.environmentId,
+            executionEnvironmentKind: environment.kind,
+            usedLocalFallback: resolvedEnvironment.usedLocalFallback,
           },
           createdAt,
         });
@@ -405,19 +738,31 @@ export function startSuperRemoteScheduleRuntime(params: {
           metadata: {
             jobId: job.jobId,
             missingCapabilities,
+            blockedCode: "missing_capabilities",
+            executionEnvironmentId: environment.environmentId,
+            executionEnvironmentKind: environment.kind,
+            usedLocalFallback: resolvedEnvironment.usedLocalFallback,
           },
         });
         return {
           status: "blocked" as const,
           sessionKey,
-          reason: `missing capabilities: ${missingCapabilities.join(", ")}`,
+          code: "missing_capabilities",
+          reason,
+          environmentId: environment.environmentId,
+          environmentKind: environment.kind,
+          capabilityMode: environment.capabilityMode,
+          missingCapabilities,
         };
       }
-      enqueueSystemEvent(buildJobMessage(job, sessionKey), {
-        sessionKey,
-        contextKey: `super-remote-schedule:${job.jobId}:${createdAt}`,
-        trusted: true,
-      });
+      enqueueSystemEvent(
+        buildJobMessage(job, sessionKey, environment, resolvedEnvironment.usedLocalFallback),
+        {
+          sessionKey,
+          contextKey: `super-remote-schedule:${job.jobId}:${createdAt}`,
+          trusted: true,
+        },
+      );
       requestHeartbeatNow({
         reason: "super-remote-schedule",
         sessionKey,
@@ -426,6 +771,11 @@ export function startSuperRemoteScheduleRuntime(params: {
         ...job,
         updatedAt: createdAt,
         lastRunAt: createdAt,
+        lastBlockedAt: undefined,
+        lastBlockedCode: undefined,
+        lastBlockedReason: undefined,
+        lastResolvedEnvironmentId: environment.environmentId,
+        lastResolvedEnvironmentKind: environment.kind,
         nextRunAtMs: job.nextRunAtMs,
       };
       save();
@@ -454,6 +804,11 @@ export function startSuperRemoteScheduleRuntime(params: {
           requiredCapabilities: job.requiredCapabilities,
           cronJobId: job.cronJobId,
           nextRunAtMs: job.nextRunAtMs,
+          scheduleTimezone: job.scheduleTimezone,
+          capabilityAuthority: job.capabilityAuthority,
+          executionEnvironmentId: environment.environmentId,
+          executionEnvironmentKind: environment.kind,
+          usedLocalFallback: resolvedEnvironment.usedLocalFallback,
         },
         createdAt,
       });
@@ -473,9 +828,18 @@ export function startSuperRemoteScheduleRuntime(params: {
         metadata: {
           jobId: job.jobId,
           remote: true,
+          executionEnvironmentId: environment.environmentId,
+          executionEnvironmentKind: environment.kind,
+          usedLocalFallback: resolvedEnvironment.usedLocalFallback,
         },
       });
-      return { status: "queued" as const, sessionKey };
+      return {
+        status: "queued" as const,
+        sessionKey,
+        environmentId: environment.environmentId,
+        environmentKind: environment.kind,
+        capabilityMode: environment.capabilityMode,
+      };
     },
 
     stop() {},

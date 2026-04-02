@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createSuperExecutionEnvironmentRegistry,
   createSuperExecutionProviderRegistry,
+  resolveSuperComputerUseRolloutEnabled,
   startSuperComputerUseRuntime,
 } from "./super-execution-surfaces.js";
 
@@ -39,11 +40,141 @@ describe("super-execution-surfaces", () => {
         supportsArtifactReplay: true,
       },
     });
+    expect(registry.getSnapshot({ sessionKey: "main", kind: "scheduled_remote" })).toBeNull();
+    expect(registry.getSnapshot({ sessionKey: "main", kind: "remote" })).toBeNull();
+  });
+
+  it("treats undeclared replay capabilities as unavailable until a remote snapshot declares them", () => {
+    const registry = createSuperExecutionEnvironmentRegistry({
+      shellCapabilityRegistry: {
+        getSnapshot: ({ sessionKey }) => ({
+          sessionKey,
+          agentId: "main",
+          mainSessionKey: "main",
+          createdAt: 1,
+          mode: "workspace_search_only",
+          supportsSymbolReferences: false,
+          supportsSemanticRename: false,
+          supportsWorkspaceSearchOnly: true,
+          semanticToolProviderIds: [],
+          workspaceSearchFallbackToolKinds: ["rg"],
+        }),
+      },
+    });
+
+    registry.upsertSnapshot({
+      environmentId: "remote:worker-1",
+      workerId: "worker-1",
+      sessionKey: "remote:session-1",
+      label: "Remote peer",
+      kind: "remote",
+      backendId: "remote_peer",
+      createdAt: 1,
+      updatedAt: 1,
+      capabilityMode: "workspace_search_only",
+      capabilities: {
+        supportsWorkspaceSearchFallback: true,
+        supportsSymbolReferences: false,
+        supportsSemanticRename: false,
+        supportsVerificationReplay: false,
+        supportsArtifactReplay: false,
+        supportsProvenanceReplay: false,
+        supportsComputerUse: false,
+        workspaceSearchFallbackToolKinds: ["read"],
+        semanticToolProviderIds: [],
+        bundles: [],
+      },
+    });
+
+    expect(registry.getSnapshot({ workerId: "worker-1" })).toMatchObject({
+      kind: "remote",
+      capabilities: {
+        supportsVerificationReplay: false,
+        supportsArtifactReplay: false,
+        supportsProvenanceReplay: false,
+      },
+    });
+    expect(registry.getSnapshot({ sessionKey: "remote:session-1", kind: "remote" })).toMatchObject({
+      kind: "remote",
+      sessionKey: "remote:session-1",
+      capabilities: {
+        supportsVerificationReplay: false,
+        supportsArtifactReplay: false,
+        supportsProvenanceReplay: false,
+      },
+    });
+  });
+
+  it("keeps scheduled_remote as an environment kind while canonicalizing its backend to remote_peer", () => {
+    const registry = createSuperExecutionEnvironmentRegistry({
+      shellCapabilityRegistry: {
+        getSnapshot: ({ sessionKey }) => ({
+          sessionKey,
+          agentId: "main",
+          mainSessionKey: "main",
+          createdAt: 1,
+          mode: "workspace_search_only",
+          supportsSymbolReferences: false,
+          supportsSemanticRename: false,
+          supportsWorkspaceSearchOnly: true,
+          semanticToolProviderIds: [],
+          workspaceSearchFallbackToolKinds: ["rg"],
+        }),
+      },
+    });
+
+    registry.upsertSnapshot({
+      environmentId: "scheduled_remote:main",
+      sessionKey: "main",
+      label: "Scheduled remote (main)",
+      kind: "scheduled_remote",
+      backendId: "remote_peer",
+      createdAt: 1,
+      updatedAt: 1,
+      capabilityMode: "workspace_search_only",
+      capabilities: {
+        supportsWorkspaceSearchFallback: true,
+        supportsSymbolReferences: false,
+        supportsSemanticRename: false,
+        supportsVerificationReplay: true,
+        supportsArtifactReplay: true,
+        supportsProvenanceReplay: true,
+        supportsComputerUse: false,
+        workspaceSearchFallbackToolKinds: ["rg"],
+        semanticToolProviderIds: [],
+        bundles: [],
+      },
+    });
+
     expect(registry.getSnapshot({ sessionKey: "main", kind: "scheduled_remote" })).toMatchObject({
       kind: "scheduled_remote",
-      backendId: "scheduled_remote",
-      providerId: "anthropic",
+      backendId: "remote_peer",
     });
+  });
+
+  it("keeps computer-use behind an explicit rollout gate", () => {
+    expect(resolveSuperComputerUseRolloutEnabled({ env: {} })).toBe(false);
+    expect(
+      resolveSuperComputerUseRolloutEnabled({
+        env: {
+          OPENCLAW_SUPERHUMAN_COMPUTER_USE: "true",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      resolveSuperComputerUseRolloutEnabled({
+        cfg: {
+          tools: {
+            computerUse: {
+              enabled: false,
+            },
+          },
+        } as never,
+        env: {
+          OPENCLAW_SUPERHUMAN_COMPUTER_USE: "true",
+        },
+      }),
+    ).toBe(false);
   });
 
   it("builds provider adapters from configured and plugin-backed providers", async () => {

@@ -181,6 +181,17 @@ function resolveWorkerBackend(
   return runtime === "acp" ? "out_of_process" : runtime === "remote" ? "remote_peer" : "in_process";
 }
 
+function resolveWorkerEnvironmentKind(runtime: LaunchWorkerParams["runtime"]): "local" | "remote" {
+  return runtime === "remote" ? "remote" : "local";
+}
+
+function buildWorkerIdentityPayload(worker: OrchestrationWorkerRecord): Record<string, unknown> {
+  return {
+    workerBackend: worker.backend,
+    environmentKind: worker.environmentKind,
+  };
+}
+
 function isActiveWorkerState(state: OrchestrationWorkerRecord["state"]): boolean {
   return state === "launching" || state === "running";
 }
@@ -463,6 +474,7 @@ function createOrchestrationTaskRecord(params: {
             ? "worker"
             : "subagent",
       workerBackend: params.worker.backend,
+      environmentKind: params.worker.environmentKind,
       controllerSessionKey: params.worker.controllerSessionKey,
       queueState: params.queueState,
       notificationMode: "mailbox",
@@ -652,6 +664,7 @@ export function startSuperOrchestrationRuntime(params: {
           },
         }),
         payload: {
+          ...buildWorkerIdentityPayload(updatedWorker),
           taskId: task.taskId,
           runId: task.runId,
           status: task.status,
@@ -698,6 +711,7 @@ export function startSuperOrchestrationRuntime(params: {
           },
         }),
         payload: {
+          ...buildWorkerIdentityPayload(updatedWorker),
           taskId: task.taskId,
           runId: task.runId,
           childSessionKey: task.childSessionKey,
@@ -783,6 +797,7 @@ export function startSuperOrchestrationRuntime(params: {
           summary: buildStartedMessage(worker),
         }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           childSessionKey: worker.childSessionKey,
           backend: worker.backend,
           remote: true,
@@ -806,6 +821,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_control",
         text: `Worker reconnecting: ${worker.label?.trim() || worker.task.trim() || worker.workerId}.`,
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           action: "reconnecting",
           reason: event.reason,
           remote: true,
@@ -826,6 +842,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_control",
         text: event.summary,
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           action: "progress",
           stage: event.stage,
           details: event.details,
@@ -864,6 +881,7 @@ export function startSuperOrchestrationRuntime(params: {
               ? "approved"
               : "denied",
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           resolution: event.resolution,
           remote: true,
         },
@@ -877,6 +895,7 @@ export function startSuperOrchestrationRuntime(params: {
         sessionKey: worker.childSessionKey,
         status: "expired",
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           toolCallId: event.toolCallId,
           cancelled: true,
           remote: true,
@@ -925,6 +944,7 @@ export function startSuperOrchestrationRuntime(params: {
           result: event.result ?? event.error,
         }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           result: event.result,
           verificationOutcome: event.verificationOutcome,
           provenance: event.provenance,
@@ -1045,9 +1065,17 @@ export function startSuperOrchestrationRuntime(params: {
                     ? launchRequest.remoteCapabilityRequirements
                     : [],
                   supportsVerificationReplay:
-                    launchRequest.remoteSupportsVerificationReplay !== false,
-                  supportsArtifactReplay: launchRequest.remoteSupportsArtifactReplay !== false,
-                  supportsProvenanceReplay: launchRequest.remoteSupportsProvenanceReplay !== false,
+                    typeof launchRequest.remoteSupportsVerificationReplay === "boolean"
+                      ? launchRequest.remoteSupportsVerificationReplay
+                      : undefined,
+                  supportsArtifactReplay:
+                    typeof launchRequest.remoteSupportsArtifactReplay === "boolean"
+                      ? launchRequest.remoteSupportsArtifactReplay
+                      : undefined,
+                  supportsProvenanceReplay:
+                    typeof launchRequest.remoteSupportsProvenanceReplay === "boolean"
+                      ? launchRequest.remoteSupportsProvenanceReplay
+                      : undefined,
                 })
                 .then((record) => ({
                   status: "accepted" as const,
@@ -1268,6 +1296,7 @@ export function startSuperOrchestrationRuntime(params: {
                     ? "worker"
                     : "subagent",
               workerBackend: current.backend,
+              environmentKind: current.environmentKind,
               controllerSessionKey: current.controllerSessionKey,
               queueState: "running",
               notificationMode: "mailbox",
@@ -1382,6 +1411,7 @@ export function startSuperOrchestrationRuntime(params: {
             summary,
           }),
           payload: {
+            ...buildWorkerIdentityPayload(patchedWorker),
             childSessionKey: patchedWorker.childSessionKey,
             runId: patchedWorker.runId,
           },
@@ -1431,6 +1461,7 @@ export function startSuperOrchestrationRuntime(params: {
           result: error instanceof Error ? error.message : String(error),
         }),
         payload: {
+          ...buildWorkerIdentityPayload(current),
           error: error instanceof Error ? error.message : String(error),
           refusalReason,
         },
@@ -1465,6 +1496,7 @@ export function startSuperOrchestrationRuntime(params: {
         workerId,
         runtime: launchParams.runtime,
         backend: resolveWorkerBackend(launchParams.runtime),
+        environmentKind: resolveWorkerEnvironmentKind(launchParams.runtime),
         controllerSessionKey: launchParams.controllerSessionKey,
         requesterSessionKey: launchParams.requesterSessionKey,
         task: launchParams.task,
@@ -1559,6 +1591,7 @@ export function startSuperOrchestrationRuntime(params: {
             result: "queue_cap_reached",
           }),
           payload: {
+            ...buildWorkerIdentityPayload(saved),
             refusalReason: "queue_cap_reached",
             maxConcurrentWorkersPerLead: queuePolicy.maxConcurrentWorkersPerLead,
             maxQueuedWorkersPerLead: queuePolicy.maxQueuedWorkersPerLead,
@@ -1587,6 +1620,7 @@ export function startSuperOrchestrationRuntime(params: {
             },
           }),
           payload: {
+            ...buildWorkerIdentityPayload(saved),
             queueState: "queued",
             queuePosition: saved.queuePosition,
             queueDrainPolicy: queuePolicy.queueDrainPolicy,
@@ -1632,6 +1666,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_control",
         text: buildWorkerControlAuditText({ action: "continue", worker }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           action: "continue",
           childSessionKey,
           interrupt: params.interrupt === true,
@@ -1684,6 +1719,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_control",
         text: buildWorkerControlAuditText({ action: "interrupt", worker }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           action: "interrupt",
           childSessionKey,
           runId: worker.runId,
@@ -1755,6 +1791,7 @@ export function startSuperOrchestrationRuntime(params: {
             result: "stopped",
           }),
           payload: {
+            ...buildWorkerIdentityPayload(worker),
             status: "cancelled",
             taskId: worker.taskId,
             stoppedBeforeLaunch: true,
@@ -1768,6 +1805,7 @@ export function startSuperOrchestrationRuntime(params: {
           kind: "worker_control",
           text: buildWorkerControlAuditText({ action: "stop", worker }),
           payload: {
+            ...buildWorkerIdentityPayload(worker),
             action: "stop",
             stoppedBeforeLaunch: true,
           },
@@ -1798,6 +1836,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_control",
         text: buildWorkerControlAuditText({ action: "stop", worker }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           action: "stop",
           childSessionKey,
           runId: worker.runId,
@@ -1851,6 +1890,7 @@ export function startSuperOrchestrationRuntime(params: {
         kind: "worker_control",
         text: buildWorkerControlAuditText({ action: "collect", worker: updatedWorker }),
         payload: {
+          ...buildWorkerIdentityPayload(updatedWorker),
           action: "collect",
           state: updatedWorker.state,
         },
@@ -1948,6 +1988,7 @@ export function startSuperOrchestrationRuntime(params: {
             approvalId: approval.approvalId,
             requestId: approval.requestId,
             decision: resolveParams.decision,
+            ...buildWorkerIdentityPayload(worker),
             remote: true,
           },
         });
@@ -1998,6 +2039,7 @@ export function startSuperOrchestrationRuntime(params: {
           requestId: approval.requestId,
           decision: resolveParams.decision,
           status: mapApprovalDecisionStatus(resolveParams.decision),
+          ...buildWorkerIdentityPayload(worker),
           resolvedBySessionKey: resolveParams.resolvedBySessionKey ?? approval.controllerSessionKey,
           note: resolveParams.note,
           ...(typeof resolveParams.command === "string" ? { command: resolveParams.command } : {}),
@@ -2045,6 +2087,8 @@ export function startSuperOrchestrationRuntime(params: {
         metadata: {
           requestId: approvalParams.requestId,
           workerId: worker.workerId,
+          workerBackend: worker.backend,
+          environmentKind: worker.environmentKind,
         },
       });
       queueMailboxMessage({
@@ -2059,6 +2103,7 @@ export function startSuperOrchestrationRuntime(params: {
           sessionKey: worker.childSessionKey,
         }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           requestId: approvalParams.requestId,
           ...approvalParams.payload,
         },
@@ -2111,6 +2156,7 @@ export function startSuperOrchestrationRuntime(params: {
           status: approvalParams.status,
         }),
         payload: {
+          ...buildWorkerIdentityPayload(worker),
           requestId: approvalParams.requestId,
           status: approvalParams.status,
           ...approvalParams.payload,
