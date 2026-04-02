@@ -52,7 +52,7 @@ describe("requestExecApprovalDecision", () => {
       turnSourceThreadId: "1739201675.123",
     });
 
-    expect(result).toBe("allow-once");
+    expect(result).toEqual({ decision: "allow-once" });
     expect(callGatewayTool).toHaveBeenCalledWith(
       "exec.approval.request",
       { timeoutMs: DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS },
@@ -98,7 +98,7 @@ describe("requestExecApprovalDecision", () => {
         security: "allowlist",
         ask: "on-miss",
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ decision: null });
 
     vi.mocked(callGatewayTool)
       .mockResolvedValueOnce({ status: "accepted", id: "approval-id-2", expiresAtMs: 1234 })
@@ -113,7 +113,7 @@ describe("requestExecApprovalDecision", () => {
         security: "allowlist",
         ask: "on-miss",
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ decision: null });
   });
 
   it("uses registration response id when waiting for decision", async () => {
@@ -134,7 +134,7 @@ describe("requestExecApprovalDecision", () => {
         security: "allowlist",
         ask: "on-miss",
       }),
-    ).resolves.toBe("allow-once");
+    ).resolves.toEqual({ decision: "allow-once" });
 
     expect(callGatewayTool).toHaveBeenNthCalledWith(
       2,
@@ -162,7 +162,7 @@ describe("requestExecApprovalDecision", () => {
         security: "allowlist",
         ask: "on-miss",
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ decision: null });
   });
 
   it("returns final decision directly when gateway already replies with decision", async () => {
@@ -177,7 +177,38 @@ describe("requestExecApprovalDecision", () => {
       ask: "on-miss",
     });
 
-    expect(result).toBe("deny");
+    expect(result).toEqual({ decision: "deny" });
     expect(vi.mocked(callGatewayTool).mock.calls).toHaveLength(1);
+  });
+
+  it("returns bounded exec adjustments from the approval resolution", async () => {
+    vi.mocked(callGatewayTool)
+      .mockResolvedValueOnce({
+        status: "accepted",
+        id: "approval-id",
+        expiresAtMs: DEFAULT_APPROVAL_TIMEOUT_MS,
+      })
+      .mockResolvedValueOnce({
+        decision: "allow-once",
+        command: "pwd",
+        cwd: "/safe",
+        feedback: "Run the safer command in the sandbox directory.",
+      });
+
+    await expect(
+      requestExecApprovalDecision({
+        id: "approval-id",
+        command: "ls -la",
+        cwd: "/tmp",
+        host: "gateway",
+        security: "allowlist",
+        ask: "always",
+      }),
+    ).resolves.toEqual({
+      decision: "allow-once",
+      command: "pwd",
+      cwd: "/safe",
+      feedback: "Run the safer command in the sandbox directory.",
+    });
   });
 });

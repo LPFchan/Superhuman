@@ -88,6 +88,7 @@ export type ExecApprovalRequestPayload = {
   turnSourceTo?: string | null;
   turnSourceAccountId?: string | null;
   turnSourceThreadId?: string | number | null;
+  allowedResolutionKeys?: Array<"command" | "cwd"> | null;
 };
 
 export type ExecApprovalRequest = {
@@ -103,6 +104,9 @@ export type ExecApprovalResolved = {
   resolvedBy?: string | null;
   ts: number;
   request?: ExecApprovalRequest["request"];
+  command?: string | null;
+  cwd?: string | null;
+  feedback?: string | null;
 };
 
 export type ExecApprovalsDefaults = {

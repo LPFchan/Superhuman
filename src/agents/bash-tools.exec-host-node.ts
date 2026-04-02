@@ -21,6 +21,7 @@ import {
   buildExecApprovalTurnSourceContext,
   registerExecApprovalRequestForHostOrThrow,
 } from "./bash-tools.exec-approval-request.js";
+import { applyExecApprovalResolution } from "./bash-tools.exec-host-shared.js";
 import * as execHostShared from "./bash-tools.exec-host-shared.js";
 import {
   DEFAULT_NOTIFY_TAIL_CHARS,
@@ -254,6 +255,7 @@ export async function executeNodeHostCommand(
           agentId: runAgentId,
           sessionKey: runSessionKey,
         }),
+        allowedResolutionKeys: ["command", "cwd"],
         ...buildExecApprovalTurnSourceContext(params),
       });
     const {
@@ -261,7 +263,7 @@ export async function executeNodeHostCommand(
       approvalSlug,
       warningText,
       expiresAtMs,
-      preResolvedDecision,
+      preResolvedResolution,
       initiatingSurface,
       sentApproverDms,
       unavailableReason,
@@ -279,18 +281,25 @@ export async function executeNodeHostCommand(
     });
 
     void (async () => {
-      const decision = await execHostShared.resolveApprovalDecisionOrUndefined({
+      const resolution = await execHostShared.resolveApprovalDecisionOrUndefined({
         approvalId,
-        preResolvedDecision,
+        preResolvedResolution: preResolvedResolution,
         onFailure: () =>
           void execHostShared.sendExecApprovalFollowupResult(
             followupTarget,
             `Exec denied (node=${nodeId} id=${approvalId}, approval-request-failed): ${params.command}`,
           ),
       });
-      if (decision === undefined) {
+      if (resolution === undefined) {
         return;
       }
+      const decision = resolution.decision;
+      const adjusted = applyExecApprovalResolution({
+        command: runRawCommand,
+        cwd: runCwd,
+        resolution,
+      });
+      const adjustedArgv = buildNodeShellCommand(adjusted.command, nodeInfo?.platform);
 
       const {
         baseDecision,
@@ -318,7 +327,9 @@ export async function executeNodeHostCommand(
       if (deniedReason) {
         await execHostShared.sendExecApprovalFollowupResult(
           followupTarget,
-          `Exec denied (node=${nodeId} id=${approvalId}, ${deniedReason}): ${params.command}`,
+          resolution.feedback?.trim()
+            ? `Exec denied (node=${nodeId} id=${approvalId}): ${resolution.feedback.trim()}`
+            : `Exec denied (node=${nodeId} id=${approvalId}, ${deniedReason}): ${params.command}`,
         );
         return;
       }
@@ -335,7 +346,28 @@ export async function executeNodeHostCommand(
         }>(
           "node.invoke",
           { timeoutMs: invokeTimeoutMs },
-          buildInvokeParams(approvedByAsk, approvalDecision, approvalId, true),
+          {
+            nodeId,
+            command: "system.run",
+            params: {
+              command: adjustedArgv,
+              rawCommand: adjusted.command,
+              cwd: adjusted.cwd,
+              env: nodeEnv,
+              timeoutMs:
+                typeof params.timeoutSec === "number" ? params.timeoutSec * 1000 : undefined,
+              agentId: runAgentId,
+              sessionKey: runSessionKey,
+              approved: approvedByAsk,
+              approvalDecision:
+                approvalDecision === "allow-always" && inlineEvalHit !== null
+                  ? "allow-once"
+                  : (approvalDecision ?? undefined),
+              runId: approvalId,
+              suppressNotifyOnExit: true,
+            },
+            idempotencyKey: crypto.randomUUID(),
+          },
         );
         const payload =
           raw?.payload && typeof raw.payload === "object"

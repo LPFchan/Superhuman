@@ -129,6 +129,9 @@ export const ExecApprovalRequestParamsSchema = Type.Object(
     turnSourceTo: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     turnSourceAccountId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     turnSourceThreadId: Type.Optional(Type.Union([Type.String(), Type.Number(), Type.Null()])),
+    allowedResolutionKeys: Type.Optional(
+      Type.Array(Type.Union([Type.Literal("command"), Type.Literal("cwd")])),
+    ),
     timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
     twoPhase: Type.Optional(Type.Boolean()),
   },
@@ -139,6 +142,9 @@ export const ExecApprovalResolveParamsSchema = Type.Object(
   {
     id: NonEmptyString,
     decision: NonEmptyString,
+    command: Type.Optional(Type.String()),
+    cwd: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    feedback: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );

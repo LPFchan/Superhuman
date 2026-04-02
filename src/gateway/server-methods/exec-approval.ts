@@ -158,6 +158,10 @@ export function createExecApprovalHandlers(
         turnSourceAccountId:
           typeof p.turnSourceAccountId === "string" ? p.turnSourceAccountId.trim() || null : null,
         turnSourceThreadId: p.turnSourceThreadId ?? null,
+        allowedResolutionKeys: [
+          ...(effectiveCommandText ? (["command"] as const) : []),
+          ...(effectiveCwd !== undefined ? (["cwd"] as const) : []),
+        ],
       };
       const record = manager.create(request, timeoutMs, explicitId);
       record.requestedByConnId = client?.connId ?? null;
@@ -238,14 +242,16 @@ export function createExecApprovalHandlers(
       }
 
       const decision = await decisionPromise;
+      const resolvedSnapshot = manager.getSnapshot(record.id);
       // Send final response with decision for callers using expectFinal:true.
       respond(
         true,
         {
           id: record.id,
           decision,
-          createdAtMs: record.createdAtMs,
-          expiresAtMs: record.expiresAtMs,
+          createdAtMs: resolvedSnapshot?.createdAtMs ?? record.createdAtMs,
+          expiresAtMs: resolvedSnapshot?.expiresAtMs ?? record.expiresAtMs,
+          ...resolvedSnapshot?.resolutionPayload,
         },
         undefined,
       );
@@ -295,7 +301,13 @@ export function createExecApprovalHandlers(
         );
         return;
       }
-      const p = params as { id: string; decision: string };
+      const p = params as {
+        id: string;
+        decision: string;
+        command?: string;
+        cwd?: string | null;
+        feedback?: string;
+      };
       const decision = p.decision as ExecApprovalDecision;
       if (decision !== "allow-once" && decision !== "allow-always" && decision !== "deny") {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "invalid decision"));
@@ -327,8 +339,49 @@ export function createExecApprovalHandlers(
       }
       const approvalId = resolvedId.id;
       const snapshot = manager.getSnapshot(approvalId);
+      if (!snapshot) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "unknown or expired approval id", {
+            details: APPROVAL_NOT_FOUND_DETAILS,
+          }),
+        );
+        return;
+      }
+      const allowedResolutionKeys = new Set(snapshot.request.allowedResolutionKeys ?? []);
+      if (typeof p.command === "string" && !allowedResolutionKeys.has("command")) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            "command override is not allowed for this approval request",
+          ),
+        );
+        return;
+      }
+      if (Object.hasOwn(p, "cwd") && !allowedResolutionKeys.has("cwd")) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            "cwd override is not allowed for this approval request",
+          ),
+        );
+        return;
+      }
+      const resolutionPayload =
+        typeof p.command === "string" || Object.hasOwn(p, "cwd") || typeof p.feedback === "string"
+          ? {
+              ...(typeof p.command === "string" ? { command: p.command } : {}),
+              ...(Object.hasOwn(p, "cwd") ? { cwd: p.cwd ?? null } : {}),
+              ...(typeof p.feedback === "string" ? { feedback: p.feedback } : {}),
+            }
+          : null;
       const resolvedBy = client?.connect?.client?.displayName ?? client?.connect?.client?.id;
-      const ok = manager.resolve(approvalId, decision, resolvedBy ?? null);
+      const ok = manager.resolve(approvalId, decision, resolvedBy ?? null, resolutionPayload);
       if (!ok) {
         respond(
           false,
@@ -341,7 +394,14 @@ export function createExecApprovalHandlers(
       }
       context.broadcast(
         "exec.approval.resolved",
-        { id: approvalId, decision, resolvedBy, ts: Date.now(), request: snapshot?.request },
+        {
+          id: approvalId,
+          decision,
+          resolvedBy,
+          ts: Date.now(),
+          request: snapshot.request,
+          ...resolutionPayload,
+        },
         { dropIfSlow: true },
       );
       void opts?.forwarder
@@ -350,7 +410,8 @@ export function createExecApprovalHandlers(
           decision,
           resolvedBy,
           ts: Date.now(),
-          request: snapshot?.request,
+          request: snapshot.request,
+          ...resolutionPayload,
         })
         .catch((err) => {
           context.logGateway?.error?.(`exec approvals: forward resolve failed: ${String(err)}`);

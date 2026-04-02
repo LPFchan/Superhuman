@@ -613,4 +613,100 @@ describe("orchestration-runtime", () => {
       }
     });
   });
+
+  it("routes exec approval adjustments through orchestration", async () => {
+    await withTempDir({ prefix: "openclaw-orchestration-runtime-" }, async (root) => {
+      process.env.OPENCLAW_STATE_DIR = root;
+      hoisted.subagentSpawnMock.mockImplementation(
+        async (
+          params: { task: string },
+          ctx: {
+            agentSessionKey?: string;
+          },
+        ) => {
+          createTaskRecord({
+            runtime: "subagent",
+            ownerKey: ctx.agentSessionKey ?? "agent:main:main",
+            requesterSessionKey: ctx.agentSessionKey,
+            scopeKind: "session",
+            childSessionKey: "agent:main:subagent:child-exec",
+            runId: "run-exec-1",
+            task: params.task,
+            status: "running",
+            startedAt: Date.now(),
+          });
+          return {
+            status: "accepted",
+            childSessionKey: "agent:main:subagent:child-exec",
+            runId: "run-exec-1",
+            mode: "run",
+          };
+        },
+      );
+
+      const runtime = startSuperOrchestrationRuntime({
+        cfg: {
+          agents: {
+            defaults: {
+              subagents: {
+                maxChildrenPerAgent: 1,
+              },
+            },
+          },
+        } as never,
+        workspaceDir: root,
+      });
+
+      try {
+        const worker = await runtime.launchWorker({
+          runtime: "subagent",
+          controllerSessionKey: "agent:main:main",
+          requesterSessionKey: "agent:main:main",
+          task: "Exec approval delegated task",
+        });
+
+        await waitForAssertion(() => {
+          expect(runtime.getWorker(worker.workerId)?.state).toBe("running");
+        });
+
+        await runtime.recordApprovalRequested({
+          kind: "exec",
+          requestId: "req-exec-2",
+          sessionKey: "agent:main:subagent:child-exec",
+          payload: {
+            command: "rm -rf /tmp/demo",
+            cwd: "/tmp",
+            allowedResolutionKeys: ["command", "cwd"],
+          },
+        });
+
+        hoisted.callGatewayMock.mockClear();
+        expect(
+          await runtime.resolveApproval({
+            approvalId: "exec:req-exec-2",
+            decision: "allow-once",
+            resolvedBySessionKey: "agent:main:main",
+            command: "pwd",
+            cwd: "/safe",
+            feedback: "Use the safer command and cwd.",
+          }),
+        ).toBe(true);
+
+        expect(hoisted.callGatewayMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            method: "exec.approval.resolve",
+            params: {
+              id: "req-exec-2",
+              decision: "allow-once",
+              command: "pwd",
+              cwd: "/safe",
+              feedback: "Use the safer command and cwd.",
+            },
+          }),
+        );
+      } finally {
+        runtime.stop();
+      }
+    });
+  });
 });

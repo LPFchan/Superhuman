@@ -24,6 +24,7 @@ import {
   registerExecApprovalRequestForHostOrThrow,
 } from "./bash-tools.exec-approval-request.js";
 import {
+  applyExecApprovalResolution,
   buildDefaultExecApprovalRequestArgs,
   buildExecApprovalFollowupTarget,
   buildExecApprovalPendingToolResult,
@@ -189,6 +190,7 @@ export async function processGatewayAllowlist(
           allowlistEval.segments[0]?.resolution ?? null,
           params.workdir,
         ),
+        allowedResolutionKeys: ["command", "cwd"],
         ...buildExecApprovalTurnSourceContext(params),
       });
     const {
@@ -196,7 +198,7 @@ export async function processGatewayAllowlist(
       approvalSlug,
       warningText,
       expiresAtMs,
-      preResolvedDecision,
+      preResolvedResolution,
       initiatingSurface,
       sentApproverDms,
       unavailableReason,
@@ -220,18 +222,38 @@ export async function processGatewayAllowlist(
     });
 
     void (async () => {
-      const decision = await resolveApprovalDecisionOrUndefined({
+      const resolution = await resolveApprovalDecisionOrUndefined({
         approvalId,
-        preResolvedDecision,
+        preResolvedResolution: preResolvedResolution,
         onFailure: () =>
           void sendExecApprovalFollowupResult(
             followupTarget,
             `Exec denied (gateway id=${approvalId}, approval-request-failed): ${params.command}`,
           ),
       });
-      if (decision === undefined) {
+      if (resolution === undefined) {
         return;
       }
+      const decision = resolution.decision;
+      const adjusted = applyExecApprovalResolution({
+        command: params.command,
+        cwd: params.workdir,
+        resolution,
+      });
+      const adjustedAllowlistEval = evaluateShellAllowlist({
+        command: adjusted.command,
+        allowlist: approvals.allowlist,
+        safeBins: params.safeBins,
+        safeBinProfiles: params.safeBinProfiles,
+        cwd: adjusted.cwd,
+        env: params.env,
+        platform: process.platform,
+        trustedSafeBinDirs: params.trustedSafeBinDirs,
+      });
+      const adjustedResolvedPath = resolveApprovalAuditCandidatePath(
+        adjustedAllowlistEval.segments[0]?.resolution ?? null,
+        adjusted.cwd,
+      );
 
       const {
         baseDecision,
@@ -257,8 +279,8 @@ export async function processGatewayAllowlist(
         approvedByAsk = true;
         if (hostSecurity === "allowlist" && !requiresInlineEvalApproval) {
           const patterns = resolveAllowAlwaysPatterns({
-            segments: allowlistEval.segments,
-            cwd: params.workdir,
+            segments: adjustedAllowlistEval.segments,
+            cwd: adjusted.cwd,
             env: params.env,
             platform: process.platform,
             strictInlineEval: params.strictInlineEval === true,
@@ -278,19 +300,21 @@ export async function processGatewayAllowlist(
       if (deniedReason) {
         await sendExecApprovalFollowupResult(
           followupTarget,
-          `Exec denied (gateway id=${approvalId}, ${deniedReason}): ${params.command}`,
+          resolution.feedback?.trim()
+            ? `Exec denied (gateway id=${approvalId}): ${resolution.feedback.trim()}`
+            : `Exec denied (gateway id=${approvalId}, ${deniedReason}): ${params.command}`,
         );
         return;
       }
 
-      recordMatchedAllowlistUse(resolvedPath ?? undefined);
+      recordMatchedAllowlistUse(adjustedResolvedPath ?? resolvedPath ?? undefined);
 
       let run: Awaited<ReturnType<typeof runExecProcess>> | null = null;
       try {
         run = await runExecProcess({
-          command: params.command,
+          command: adjusted.command,
           execCommand: enforcedCommand,
-          workdir: params.workdir,
+          workdir: adjusted.cwd,
           env: params.env,
           sandbox: undefined,
           containerWorkdir: null,
@@ -307,7 +331,7 @@ export async function processGatewayAllowlist(
       } catch {
         await sendExecApprovalFollowupResult(
           followupTarget,
-          `Exec denied (gateway id=${approvalId}, spawn-failed): ${params.command}`,
+          `Exec denied (gateway id=${approvalId}, spawn-failed): ${adjusted.command}`,
         );
         return;
       }

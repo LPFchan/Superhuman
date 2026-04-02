@@ -127,6 +127,8 @@ export type OrchestrationRuntime = {
     note?: string;
     paramsOverride?: Record<string, unknown>;
     feedback?: string;
+    command?: string;
+    cwd?: string | null;
   }) => Promise<boolean>;
   recordApprovalRequested: (params: ApprovalMirrorRequestedParams) => Promise<void>;
   recordApprovalResolved: (params: ApprovalMirrorResolvedParams) => Promise<void>;
@@ -1589,6 +1591,15 @@ export function startSuperOrchestrationRuntime(params: {
         params: {
           id: approval.requestId,
           decision: resolveParams.decision,
+          ...(approval.kind === "exec" && typeof resolveParams.command === "string"
+            ? { command: resolveParams.command }
+            : {}),
+          ...(approval.kind === "exec" && Object.hasOwn(resolveParams, "cwd")
+            ? { cwd: resolveParams.cwd ?? null }
+            : {}),
+          ...(approval.kind === "exec" && typeof resolveParams.feedback === "string"
+            ? { feedback: resolveParams.feedback }
+            : {}),
           ...(approval.kind === "plugin" && resolveParams.paramsOverride
             ? { paramsOverride: resolveParams.paramsOverride }
             : {}),
@@ -1616,6 +1627,8 @@ export function startSuperOrchestrationRuntime(params: {
           status: mapApprovalDecisionStatus(resolveParams.decision),
           resolvedBySessionKey: resolveParams.resolvedBySessionKey ?? approval.controllerSessionKey,
           note: resolveParams.note,
+          ...(typeof resolveParams.command === "string" ? { command: resolveParams.command } : {}),
+          ...(Object.hasOwn(resolveParams, "cwd") ? { cwd: resolveParams.cwd ?? null } : {}),
           ...(resolveParams.paramsOverride ? { paramsOverride: resolveParams.paramsOverride } : {}),
           ...(typeof resolveParams.feedback === "string"
             ? { feedback: resolveParams.feedback }

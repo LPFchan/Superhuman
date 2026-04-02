@@ -18,6 +18,7 @@ import { logWarn } from "../logger.js";
 import { sendExecApprovalFollowup } from "./bash-tools.exec-approval-followup.js";
 import {
   type ExecApprovalRegistration,
+  type ExecApprovalResolution,
   resolveRegisteredExecApprovalDecision,
 } from "./bash-tools.exec-approval-request.js";
 import { buildApprovalPendingMessage } from "./bash-tools.exec-runtime.js";
@@ -53,7 +54,7 @@ export type ExecHostApprovalContext = {
 export type ExecApprovalPendingState = {
   warningText: string;
   expiresAtMs: number;
-  preResolvedDecision: string | null | undefined;
+  preResolvedResolution?: ExecApprovalResolution;
 };
 
 export type ExecApprovalRequestState = ExecApprovalPendingState & {
@@ -70,7 +71,7 @@ export type RegisteredExecApprovalRequestContext = {
   approvalSlug: string;
   warningText: string;
   expiresAtMs: number;
-  preResolvedDecision: string | null | undefined;
+  preResolvedResolution?: ExecApprovalResolution;
   initiatingSurface: ExecApprovalInitiatingSurfaceState;
   sentApproverDms: boolean;
   unavailableReason: ExecApprovalUnavailableReason | null;
@@ -83,6 +84,11 @@ export type ExecApprovalFollowupTarget = {
   turnSourceTo?: string;
   turnSourceAccountId?: string;
   turnSourceThreadId?: string | number;
+};
+
+export type ExecApprovalAdjustedRequest = {
+  command: string;
+  cwd: string;
 };
 
 export type DefaultExecApprovalRequestArgs = {
@@ -100,7 +106,7 @@ export function createExecApprovalPendingState(params: {
   return {
     warningText: params.warnings.length ? `${params.warnings.join("\n")}\n\n` : "",
     expiresAtMs: Date.now() + params.timeoutMs,
-    preResolvedDecision: undefined,
+    preResolvedResolution: undefined,
   };
 }
 
@@ -210,13 +216,13 @@ export function resolveExecHostApprovalContext(params: {
 
 export async function resolveApprovalDecisionOrUndefined(params: {
   approvalId: string;
-  preResolvedDecision: string | null | undefined;
+  preResolvedResolution?: ExecApprovalResolution;
   onFailure: () => void;
-}): Promise<string | null | undefined> {
+}): Promise<ExecApprovalResolution | undefined> {
   try {
     return await resolveRegisteredExecApprovalDecision({
       approvalId: params.approvalId,
-      preResolvedDecision: params.preResolvedDecision,
+      preResolvedResolution: params.preResolvedResolution,
     });
   } catch {
     params.onFailure();
@@ -268,19 +274,19 @@ export async function createAndRegisterDefaultExecApprovalRequest(params: {
     approvalSlug,
     warningText,
     expiresAtMs: defaultExpiresAtMs,
-    preResolvedDecision: defaultPreResolvedDecision,
+    preResolvedResolution: defaultPreResolvedResolution,
   } = createDefaultExecApprovalRequestContext({
     warnings: params.warnings,
     approvalRunningNoticeMs: params.approvalRunningNoticeMs,
     createApprovalSlug: params.createApprovalSlug,
   });
   const registration = await params.register(approvalId);
-  const preResolvedDecision = registration.finalDecision;
+  const preResolvedResolution = registration.finalResolution;
   const { initiatingSurface, sentApproverDms, unavailableReason } =
     resolveExecApprovalUnavailableState({
       turnSourceChannel: params.turnSourceChannel,
       turnSourceAccountId: params.turnSourceAccountId,
-      preResolvedDecision,
+      preResolvedDecision: preResolvedResolution?.decision,
     });
 
   return {
@@ -288,10 +294,10 @@ export async function createAndRegisterDefaultExecApprovalRequest(params: {
     approvalSlug,
     warningText,
     expiresAtMs: registration.expiresAtMs ?? defaultExpiresAtMs,
-    preResolvedDecision:
-      registration.finalDecision === undefined
-        ? defaultPreResolvedDecision
-        : registration.finalDecision,
+    preResolvedResolution:
+      registration.finalResolution === undefined
+        ? defaultPreResolvedResolution
+        : registration.finalResolution,
     initiatingSurface,
     sentApproverDms,
     unavailableReason,
@@ -337,6 +343,23 @@ export function createExecApprovalDecisionState(params: {
     baseDecision,
     approvedByAsk: baseDecision.approvedByAsk,
     deniedReason: baseDecision.deniedReason,
+  };
+}
+
+export function applyExecApprovalResolution(params: {
+  command: string;
+  cwd: string;
+  resolution?: ExecApprovalResolution;
+}): ExecApprovalAdjustedRequest {
+  return {
+    command:
+      typeof params.resolution?.command === "string" && params.resolution.command.trim()
+        ? params.resolution.command.trim()
+        : params.command,
+    cwd:
+      typeof params.resolution?.cwd === "string" && params.resolution.cwd.trim()
+        ? params.resolution.cwd.trim()
+        : params.cwd,
   };
 }
 

@@ -23,6 +23,14 @@ export type RequestExecApprovalDecisionParams = {
   turnSourceTo?: string;
   turnSourceAccountId?: string;
   turnSourceThreadId?: string | number;
+  allowedResolutionKeys?: Array<"command" | "cwd">;
+};
+
+export type ExecApprovalResolution = {
+  decision: string | null;
+  command?: string;
+  cwd?: string | null;
+  feedback?: string;
 };
 
 type ExecApprovalRequestToolParams = RequestExecApprovalDecisionParams & {
@@ -51,6 +59,7 @@ function buildExecApprovalRequestToolParams(
     turnSourceTo: params.turnSourceTo,
     turnSourceAccountId: params.turnSourceAccountId,
     turnSourceThreadId: params.turnSourceThreadId,
+    allowedResolutionKeys: params.allowedResolutionKeys,
     timeoutMs: DEFAULT_APPROVAL_TIMEOUT_MS,
     twoPhase: true,
   };
@@ -82,7 +91,7 @@ function parseExpiresAtMs(value: unknown): number | undefined {
 export type ExecApprovalRegistration = {
   id: string;
   expiresAtMs: number;
-  finalDecision?: string | null;
+  finalResolution?: ExecApprovalResolution;
 };
 
 export async function registerExecApprovalRequest(
@@ -105,24 +114,48 @@ export async function registerExecApprovalRequest(
   const expiresAtMs =
     parseExpiresAtMs(registrationResult?.expiresAtMs) ?? Date.now() + DEFAULT_APPROVAL_TIMEOUT_MS;
   if (decision.present) {
-    return { id, expiresAtMs, finalDecision: decision.value };
+    return {
+      id,
+      expiresAtMs,
+      finalResolution: {
+        decision: decision.value,
+        command: parseString((registrationResult as { command?: unknown })?.command),
+        cwd:
+          Object.hasOwn(registrationResult ?? {}, "cwd") &&
+          (typeof (registrationResult as { cwd?: unknown })?.cwd === "string" ||
+            (registrationResult as { cwd?: unknown })?.cwd === null)
+            ? ((registrationResult as { cwd?: string | null }).cwd ?? null)
+            : undefined,
+        feedback: parseString((registrationResult as { feedback?: unknown })?.feedback),
+      },
+    };
   }
   return { id, expiresAtMs };
 }
 
-export async function waitForExecApprovalDecision(id: string): Promise<string | null> {
+export async function waitForExecApprovalDecision(id: string): Promise<ExecApprovalResolution> {
   try {
-    const decisionResult = await callGatewayTool<{ decision: string }>(
-      "exec.approval.waitDecision",
-      { timeoutMs: DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS },
-      { id },
-    );
-    return parseDecision(decisionResult).value;
+    const decisionResult = await callGatewayTool<{
+      decision?: string;
+      command?: string;
+      cwd?: string | null;
+      feedback?: string;
+    }>("exec.approval.waitDecision", { timeoutMs: DEFAULT_APPROVAL_REQUEST_TIMEOUT_MS }, { id });
+    return {
+      decision: parseDecision(decisionResult).value,
+      command: parseString(decisionResult?.command),
+      cwd:
+        Object.hasOwn(decisionResult ?? {}, "cwd") &&
+        (typeof decisionResult?.cwd === "string" || decisionResult?.cwd === null)
+          ? (decisionResult?.cwd ?? null)
+          : undefined,
+      feedback: parseString(decisionResult?.feedback),
+    };
   } catch (err) {
     // Timeout/cleanup path: treat missing/expired as no decision so askFallback applies.
     const message = String(err).toLowerCase();
     if (message.includes("approval expired or not found")) {
-      return null;
+      return { decision: null };
     }
     throw err;
   }
@@ -130,20 +163,20 @@ export async function waitForExecApprovalDecision(id: string): Promise<string | 
 
 export async function resolveRegisteredExecApprovalDecision(params: {
   approvalId: string;
-  preResolvedDecision: string | null | undefined;
-}): Promise<string | null> {
-  if (params.preResolvedDecision !== undefined) {
-    return params.preResolvedDecision ?? null;
+  preResolvedResolution?: ExecApprovalResolution;
+}): Promise<ExecApprovalResolution> {
+  if (params.preResolvedResolution !== undefined) {
+    return params.preResolvedResolution;
   }
   return await waitForExecApprovalDecision(params.approvalId);
 }
 
 export async function requestExecApprovalDecision(
   params: RequestExecApprovalDecisionParams,
-): Promise<string | null> {
+): Promise<ExecApprovalResolution> {
   const registration = await registerExecApprovalRequest(params);
-  if (Object.hasOwn(registration, "finalDecision")) {
-    return registration.finalDecision ?? null;
+  if (registration.finalResolution !== undefined) {
+    return registration.finalResolution;
   }
   return await waitForExecApprovalDecision(registration.id);
 }
@@ -166,6 +199,7 @@ type HostExecApprovalParams = {
   turnSourceTo?: string;
   turnSourceAccountId?: string;
   turnSourceThreadId?: string | number;
+  allowedResolutionKeys?: Array<"command" | "cwd">;
 };
 
 type ExecApprovalRequesterContext = {
@@ -220,13 +254,14 @@ function buildHostApprovalDecisionParams(
       sessionKey: params.sessionKey,
     }),
     resolvedPath: params.resolvedPath,
+    allowedResolutionKeys: params.allowedResolutionKeys,
     ...buildExecApprovalTurnSourceContext(params),
   };
 }
 
 export async function requestExecApprovalDecisionForHost(
   params: HostExecApprovalParams,
-): Promise<string | null> {
+): Promise<ExecApprovalResolution> {
   return await requestExecApprovalDecision(buildHostApprovalDecisionParams(params));
 }
 

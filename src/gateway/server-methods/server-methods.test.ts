@@ -422,9 +422,14 @@ describe("exec approval handlers", () => {
     id: string;
     respond: ReturnType<typeof vi.fn>;
     context: { broadcast: (event: string, payload: unknown) => void };
+    params?: Record<string, unknown>;
   }) {
     return params.handlers["exec.approval.resolve"]({
-      params: { id: params.id, decision: "allow-once" } as ExecApprovalResolveArgs["params"],
+      params: {
+        id: params.id,
+        decision: "allow-once",
+        ...params.params,
+      } as ExecApprovalResolveArgs["params"],
       respond: params.respond as unknown as ExecApprovalResolveArgs["respond"],
       context: toExecApprovalResolveContext(params.context),
       client: null,
@@ -598,6 +603,7 @@ describe("exec approval handlers", () => {
     expect(requested).toBeTruthy();
     const request = (requested?.payload as { request?: Record<string, unknown> })?.request ?? {};
     expect(request["envKeys"]).toEqual(["A_VAR", "Z_VAR"]);
+    expect(request["allowedResolutionKeys"]).toEqual(["command", "cwd"]);
     expect(request["systemRunBinding"]).toEqual(
       buildSystemRunApprovalBinding({
         argv: ["echo", "ok"],
@@ -797,6 +803,45 @@ describe("exec approval handlers", () => {
       undefined,
     );
     expect(resolveRespond).toHaveBeenCalledWith(true, { ok: true }, undefined);
+  });
+
+  it("accepts bounded exec command and cwd adjustments on resolve", async () => {
+    const { handlers, broadcasts, respond, context } = createExecApprovalFixture();
+
+    const requestPromise = requestExecApproval({
+      handlers,
+      respond,
+      context,
+      params: { host: "gateway" },
+    });
+
+    const requested = broadcasts.find((entry) => entry.event === "exec.approval.requested");
+    const id = (requested?.payload as { id?: string })?.id ?? "";
+    const resolveRespond = vi.fn();
+    await resolveExecApproval({
+      handlers,
+      id,
+      respond: resolveRespond,
+      context,
+      params: {
+        command: "pwd",
+        cwd: "/safe",
+        feedback: "Use the safer command and cwd.",
+      },
+    });
+
+    await requestPromise;
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        id,
+        decision: "allow-once",
+        command: "pwd",
+        cwd: "/safe",
+        feedback: "Use the safer command and cwd.",
+      }),
+      undefined,
+    );
   });
 
   it("accepts unique short approval id prefixes", async () => {
