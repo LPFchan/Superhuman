@@ -2,6 +2,11 @@
 
 This directory turns the architecture spec into implementation-ready work packets.
 
+Additional planning docs:
+
+1. [Product Migration Plan](product-migration-plan.md) for the full repo identity, provenance, code-structure, runtime, and docs migration.
+2. [Weekly Upstream Intake Template](weekly-upstream-intake-template.md) for logging accept, adapt, or decline decisions during OpenClaw sync review.
+
 How to use it:
 
 1. Read [../superhuman-architecture-technical.md](../superhuman-architecture-technical.md) for the target system shape.
