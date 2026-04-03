@@ -4,7 +4,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import {
   resolveSuperRuntimeInvocationMode,
   SuperhumanAgentRuntimeTurn,
-} from "../superhuman/super-agent-runtime.js";
+} from "../superhuman/runtime/agent.js";
 import { executePreparedCliRun } from "./cli-runner/execute.js";
 import { prepareCliRunContext } from "./cli-runner/prepare.js";
 import type { RunCliAgentParams } from "./cli-runner/types.js";

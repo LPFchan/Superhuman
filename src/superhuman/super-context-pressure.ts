@@ -4,7 +4,7 @@ import { DEFAULT_CONTEXT_TOKENS } from "../agents/defaults.js";
 import { resolveCompactionReserveTokensFloor } from "../agents/pi-settings.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { loadGatewaySessionRow, resolveSessionModelRef } from "../gateway/session-utils.js";
-import type { ContextPressureSnapshot } from "./super-runtime-seams.js";
+import type { ContextPressureSnapshot } from "./runtime/seams.js";
 
 export const DEFAULT_RESERVED_OUTPUT_TOKENS = 4_096;
 export const DEFAULT_AUTOCOMPACT_BUFFER_TOKENS = 13_000;

@@ -6,7 +6,7 @@ import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runt
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
-import type { SuperhumanAgentRuntimeTurn } from "../superhuman/super-agent-runtime.js";
+import type { SuperhumanAgentRuntimeTurn } from "../superhuman/runtime/agent.js";
 import {
   applyDefaultSuperRuntimeToolSafety,
   applySuperRuntimeToolExecutionContext,

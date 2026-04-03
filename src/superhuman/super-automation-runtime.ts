@@ -6,15 +6,15 @@ import { onAgentEvent } from "../infra/agent-events.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
-import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
-import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
-import { SuperProactiveLoop } from "./super-proactive-loop.js";
 import type {
   SessionRegistry,
   StateActionAppend,
   StateAutomationEventAppend,
   StateStore,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
+import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
+import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
+import { SuperProactiveLoop } from "./super-proactive-loop.js";
 
 export type SuperAutomationRuntime = {
   proactiveLoop: SuperProactiveLoop;

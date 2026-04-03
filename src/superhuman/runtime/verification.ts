@@ -4,7 +4,7 @@ import type {
   StateStore,
   SuperVerifierKind,
   VerificationOutcome,
-} from "./super-runtime-seams.js";
+} from "./seams.js";
 
 export type TerminalVerificationResolution = {
   outcome?: VerificationOutcome;

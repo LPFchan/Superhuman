@@ -6,7 +6,7 @@ import type {
   StateAutomationEventAppend,
   SuperShellCapabilityMode,
   VerificationOutcome,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
 
 export type SuperAutomationPolicyAudit = Pick<
   StateAutomationEventAppend,

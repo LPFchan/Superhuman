@@ -1,3 +1,4 @@
+import type { StateStore } from "./runtime/seams.js";
 import { createAutomationStateStoreApi } from "./state/super-state-automation.js";
 import { createContextStateStoreApi } from "./state/super-state-context.js";
 import {
@@ -8,7 +9,6 @@ import {
 } from "./state/super-state-db.js";
 import { createRuntimeStateStoreApi } from "./state/super-state-runtime.js";
 import { createSessionStateStoreApi } from "./state/super-state-sessions.js";
-import type { StateStore } from "./super-runtime-seams.js";
 
 export { resolveSuperhumanStateDbPath, resolveSuperhumanStateDir } from "./state/super-state-db.js";
 

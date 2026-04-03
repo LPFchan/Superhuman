@@ -8,11 +8,7 @@ import { resolveContextEngine } from "../context-engine/registry.js";
 import type { ContextEngine, CompactResult } from "../context-engine/types.js";
 import { resolveSessionTranscriptCandidates } from "../gateway/session-utils.fs.js";
 import { loadGatewaySessionRow, loadSessionEntry } from "../gateway/session-utils.js";
-import type {
-  CompactionActionResult,
-  CompactionManager,
-  StateStore,
-} from "./super-runtime-seams.js";
+import type { CompactionActionResult, CompactionManager, StateStore } from "./runtime/seams.js";
 
 function createId(prefix: string): string {
   return `${prefix}:${crypto.randomUUID()}`;

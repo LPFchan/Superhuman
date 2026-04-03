@@ -35,11 +35,11 @@ import type {
   SuperExecutionEnvironmentSnapshot,
   SuperExecutionProviderAdapter,
   SuperExecutionProviderDescriptor,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
 import {
   resolveCanonicalBackendIdForEnvironmentKind,
   toSuperExecutionEnvironmentCapabilities,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
 
 const COMPUTER_USE_ROLLOUT_ENV_KEYS = [
   "OPENCLAW_SUPERHUMAN_COMPUTER_USE",

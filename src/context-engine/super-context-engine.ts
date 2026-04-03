@@ -11,7 +11,7 @@ import { createSubsystemLogger } from "../logging/subsystem.js";
 import { listMemoryFiles } from "../plugin-sdk/memory-core-host-runtime-files.js";
 import { resolveMemoryFlushPlan } from "../plugins/memory-state.js";
 import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
-import type { StateEvidenceSource } from "../superhuman/super-runtime-seams.js";
+import type { StateEvidenceSource } from "../superhuman/runtime/seams.js";
 import {
   createSuperhumanStateStore,
   resolveSuperhumanStateDir,

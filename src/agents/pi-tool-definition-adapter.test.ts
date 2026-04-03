@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it } from "vitest";
-import { SuperhumanAgentRuntimeTurn } from "../superhuman/super-agent-runtime.js";
+import { SuperhumanAgentRuntimeTurn } from "../superhuman/runtime/agent.js";
 import { createSuperhumanStateStore } from "../superhuman/super-state-store.js";
 import {
   setSuperRuntimeToolExecutionContext,

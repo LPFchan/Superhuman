@@ -5,7 +5,7 @@ import type {
   StateAutomationLoopStateRecord,
   StateAutomationLoopStateUpsert,
   StateStore,
-} from "../super-runtime-seams.js";
+} from "../runtime/seams.js";
 import type {
   AutomationEventRow,
   AutomationLoopStateRow,

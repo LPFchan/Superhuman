@@ -5,18 +5,18 @@ import type { CronService } from "../cron/service.js";
 import type { CronJob } from "../cron/types.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
-import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
-import {
-  getActiveSuperNotificationCenter,
-  type SuperNotificationCenter,
-} from "./super-notification-center.js";
 import type {
   ExecutionEnvironmentRegistry,
   SessionRegistry,
   StateStore,
   SuperExecutionEnvironmentSnapshot,
   SuperShellCapabilityMode,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
+import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
+import {
+  getActiveSuperNotificationCenter,
+  type SuperNotificationCenter,
+} from "./super-notification-center.js";
 import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
 export type SuperRemoteScheduleRecord = {

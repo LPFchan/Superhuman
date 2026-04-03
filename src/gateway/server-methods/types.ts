@@ -4,7 +4,7 @@ import type { HealthSummary } from "../../commands/health.js";
 import type { CronService } from "../../cron/service.js";
 import type { PluginApprovalRequestPayload } from "../../infra/plugin-approvals.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
-import type { SuperhumanGatewayRuntime } from "../../superhuman/super-gateway-runtime.js";
+import type { SuperhumanGatewayRuntime } from "../../superhuman/runtime/gateway.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
 import type { ExecApprovalManager } from "../exec-approval-manager.js";

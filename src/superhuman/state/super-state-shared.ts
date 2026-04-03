@@ -14,7 +14,7 @@ import type {
   TeamMemorySyncDirection,
   TeamMemorySyncStatus,
   VerificationOutcome,
-} from "../super-runtime-seams.js";
+} from "../runtime/seams.js";
 
 export type StateStoreStatements = {
   upsertSession: StatementSync;

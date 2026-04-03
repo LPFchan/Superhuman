@@ -2,10 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
 import { buildMemoryPromptSection } from "../plugins/memory-state.js";
-import type {
-  FrozenMemoryReductionReason,
-  StateFrozenMemoryBlockedLine,
-} from "./super-runtime-seams.js";
+import type { FrozenMemoryReductionReason, StateFrozenMemoryBlockedLine } from "./runtime/seams.js";
 import { createSuperhumanStateStore, resolveSuperhumanStateDir } from "./super-state-store.js";
 
 type FrozenMemoryPromptSnapshot = {

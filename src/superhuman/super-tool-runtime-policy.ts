@@ -1,5 +1,5 @@
 import type { AnyAgentTool } from "../agents/tools/common.js";
-import type { SuperhumanAgentRuntimeTurn } from "./super-agent-runtime.js";
+import type { SuperhumanAgentRuntimeTurn } from "./runtime/agent.js";
 import {
   planSuperToolBatch,
   type ToolBatchItem,

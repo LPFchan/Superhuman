@@ -5,7 +5,7 @@ import type { OpenClawConfig } from "../../../config/config.js";
 import type { PromptImageOrderEntry } from "../../../media/prompt-image-order.js";
 import type { enqueueCommand } from "../../../process/command-queue.js";
 import type { InputProvenance } from "../../../sessions/input-provenance.js";
-import type { SuperhumanAgentRuntimeTurn } from "../../../superhuman/super-agent-runtime.js";
+import type { SuperhumanAgentRuntimeTurn } from "../../../superhuman/runtime/agent.js";
 import type { ExecElevatedDefaults, ExecToolDefaults } from "../../bash-tools.js";
 import type { AgentStreamParams } from "../../command/types.js";
 import type { BlockReplyPayload } from "../../pi-embedded-payloads.js";

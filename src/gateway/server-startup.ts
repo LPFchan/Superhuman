@@ -30,7 +30,7 @@ import { type PluginServicesHandle, startPluginServices } from "../plugins/servi
 import {
   startSuperhumanGatewayRuntime,
   type SuperhumanGatewayRuntime,
-} from "../superhuman/super-gateway-runtime.js";
+} from "../superhuman/runtime/gateway.js";
 import {
   scheduleRestartSentinelWake,
   shouldWakeFromRestartSentinel,

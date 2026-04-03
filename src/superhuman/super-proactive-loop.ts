@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
-import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
-import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
 import type {
   AutomationLoopState,
   StateAutomationEventAppend,
   StateAutomationLoopStateRecord,
   StateStore,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
+import { createTrustedStateAutomationPolicy } from "./super-automation-policy.js";
+import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 

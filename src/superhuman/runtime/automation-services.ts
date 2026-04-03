@@ -11,15 +11,11 @@ import {
   startSuperRemoteScheduleRuntime,
   type SuperRemoteScheduleRuntime,
 } from "../super-remote-schedule-runtime.js";
-import type {
-  ExecutionEnvironmentRegistry,
-  SessionRegistry,
-  StateStore,
-} from "../super-runtime-seams.js";
 import {
   startSuperSubscriptionManager,
   type SuperSubscriptionManager,
 } from "../super-subscription-manager.js";
+import type { ExecutionEnvironmentRegistry, SessionRegistry, StateStore } from "./seams.js";
 
 export type SuperAutomationServices = {
   automationRuntime: SuperAutomationRuntime;

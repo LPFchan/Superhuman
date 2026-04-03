@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
+import type { StateStore } from "./runtime/seams.js";
 import { createStructuredExternalAutomationPolicy } from "./super-automation-policy.js";
-import type { StateStore } from "./super-runtime-seams.js";
 import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
 export type SuperSubscriptionKind = "pr_review" | "pr_comment" | "ci_result";

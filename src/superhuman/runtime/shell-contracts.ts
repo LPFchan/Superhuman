@@ -15,7 +15,7 @@ import type {
   SuperSandboxRuntimeSnapshot,
   SuperSandboxToolDecision,
   SuperShellCapabilitySnapshot,
-} from "../super-runtime-seams.js";
+} from "./seams.js";
 
 function hasUnsafeControlChars(value: string): boolean {
   return Array.from(value).some((char) => {

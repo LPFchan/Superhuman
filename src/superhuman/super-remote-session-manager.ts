@@ -6,13 +6,13 @@ import type {
   StateStore,
   SuperExecutionEnvironmentSnapshot,
   SuperShellCapabilityMode,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
 import {
   evaluateSuperExecutionCapabilityRequirements,
   resolveCanonicalBackendIdForEnvironmentKind,
   toSuperExecutionEnvironmentCapabilities,
   type SuperExecutionLaunchCapabilityRequirement,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
 import { resolveSuperhumanStateDir } from "./super-state-store.js";
 
 export type SuperRemoteSessionState =

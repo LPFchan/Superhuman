@@ -1,7 +1,7 @@
 import type { StreamFn } from "@mariozechner/pi-agent-core";
-import type { ProviderCapabilities } from "../agents/provider-capabilities.js";
-import type { BootRunResult } from "../gateway/boot.js";
-import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
+import type { ProviderCapabilities } from "../../agents/provider-capabilities.js";
+import type { BootRunResult } from "../../gateway/boot.js";
+import type { PluginRegistry as OpenClawPluginRegistry } from "../../plugins/registry.js";
 import type {
   ProviderCreateStreamFnContext,
   ProviderDefaultThinkingPolicyContext,
@@ -9,7 +9,7 @@ import type {
   ProviderPreparedRuntimeAuth,
   ProviderPrepareRuntimeAuthContext,
   ProviderThinkingPolicyContext,
-} from "../plugins/types.js";
+} from "../../plugins/types.js";
 
 export type StateEvidenceSource =
   | "original"

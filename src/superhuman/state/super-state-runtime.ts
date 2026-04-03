@@ -7,7 +7,7 @@ import type {
   StateRuntimeInvocationUpsert,
   StateRuntimeStageEventAppend,
   StateStore,
-} from "../super-runtime-seams.js";
+} from "../runtime/seams.js";
 import type {
   AbortNodeRow,
   IterationBudgetRow,

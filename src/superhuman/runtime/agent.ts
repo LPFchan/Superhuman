@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
-import type { AgentEventPayload } from "../infra/agent-events.js";
-import { classifySuperCommandRisk } from "./super-command-risk-classifier.js";
+import type { AgentEventPayload } from "../../infra/agent-events.js";
+import { classifySuperCommandRisk } from "../super-command-risk-classifier.js";
+import { createSuperhumanStateStore } from "../super-state-store.js";
 import type {
   AgentRuntimeStage,
   RuntimeBudgetExhaustionReason,
@@ -11,9 +12,8 @@ import type {
   StateRuntimeInvocationRecord,
   StateStore,
   VerificationOutcome,
-} from "./super-runtime-seams.js";
-import { SuperRuntimeVerificationTracker } from "./super-runtime-verification.js";
-import { createSuperhumanStateStore } from "./super-state-store.js";
+} from "./seams.js";
+import { SuperRuntimeVerificationTracker } from "./verification.js";
 
 type RuntimeBudgetState = StateIterationBudgetRecord;
 type RuntimeAbortNodeState = StateAbortNodeRecord;

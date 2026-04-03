@@ -4,7 +4,7 @@ import {
   type OrchestrationRuntime,
 } from "../super-orchestration-runtime.js";
 import type { SuperRemoteSessionManager } from "../super-remote-session-manager.js";
-import type { ExecutionEnvironmentRegistry, StateStore } from "../super-runtime-seams.js";
+import type { ExecutionEnvironmentRegistry, StateStore } from "./seams.js";
 
 export type SuperOrchestrationServices = {
   orchestrationRuntime: OrchestrationRuntime;

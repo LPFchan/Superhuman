@@ -1,7 +1,3 @@
-import {
-  buildSuperContextPressureSnapshot,
-  resolveSuperContextPressureOptionsForSession,
-} from "../super-context-pressure.js";
 import type {
   ContextPressureSnapshot,
   StateContextCollapseCommittedSpan,
@@ -20,7 +16,11 @@ import type {
   StateTeamMemorySyncStateRecord,
   StateTeamMemorySyncStateUpsert,
   TeamMemorySyncStatus,
-} from "../super-runtime-seams.js";
+} from "../runtime/seams.js";
+import {
+  buildSuperContextPressureSnapshot,
+  resolveSuperContextPressureOptionsForSession,
+} from "../super-context-pressure.js";
 import type {
   ContextCollapseLedgerRow,
   ContextPressureSnapshotRow,

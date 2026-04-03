@@ -3,7 +3,7 @@ import type {
   SuperVerificationStage,
   SuperVerifierKind,
   VerificationOutcome,
-} from "./super-runtime-seams.js";
+} from "./runtime/seams.js";
 
 function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;

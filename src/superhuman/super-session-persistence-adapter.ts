@@ -16,6 +16,14 @@ import {
   type SessionTranscriptUpdate,
   onSessionTranscriptUpdate,
 } from "../sessions/transcript-events.js";
+import type {
+  StateArtifactAppend,
+  StateEvidenceProvenance,
+  SuperArtifactRelationship,
+  StateStore,
+  StateStructuredDetails,
+  StateSessionUpsert,
+} from "./runtime/seams.js";
 import {
   resolveSuperSandboxRuntimeSnapshot,
   resolveSuperShellCapabilitySnapshot,
@@ -25,14 +33,6 @@ import {
   type ContextPressureSnapshotOptions,
 } from "./super-context-pressure.js";
 import { extractSuperReplayAnnotations } from "./super-replay-annotations.js";
-import type {
-  StateArtifactAppend,
-  StateEvidenceProvenance,
-  SuperArtifactRelationship,
-  StateStore,
-  StateStructuredDetails,
-  StateSessionUpsert,
-} from "./super-runtime-seams.js";
 
 function normalizePathForComparison(input: string): string {
   const resolved = path.resolve(input);

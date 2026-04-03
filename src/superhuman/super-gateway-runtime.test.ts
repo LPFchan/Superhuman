@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { startSuperhumanGatewayRuntime } from "./runtime/gateway.js";
 import { getActiveSuperAutomationRuntime } from "./super-automation-runtime.js";
-import { startSuperhumanGatewayRuntime } from "./super-gateway-runtime.js";
 
 const cleanupPaths = new Set<string>();
 

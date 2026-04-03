@@ -11,7 +11,7 @@ import { enqueueCommandInLane } from "../../process/command-queue.js";
 import {
   resolveSuperRuntimeInvocationMode,
   SuperhumanAgentRuntimeTurn,
-} from "../../superhuman/super-agent-runtime.js";
+} from "../../superhuman/runtime/agent.js";
 import { sanitizeForLog } from "../../terminal/ansi.js";
 import { isMarkdownCapableMessageChannel } from "../../utils/message-channel.js";
 import { resolveOpenClawAgentDir } from "../agent-paths.js";

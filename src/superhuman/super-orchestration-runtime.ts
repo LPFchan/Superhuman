@@ -22,6 +22,7 @@ import {
   type TaskRegistryHookEvent,
 } from "../tasks/task-registry.store.js";
 import type { TaskQueueState, TaskRecord, TaskStatus } from "../tasks/task-registry.types.js";
+import type { ExecutionEnvironmentRegistry, StateStore } from "./runtime/seams.js";
 import { getActiveSuperNotificationCenter } from "./super-notification-center.js";
 import {
   type OrchestrationApprovalHistoryEntry,
@@ -37,7 +38,6 @@ import {
   type SuperRemoteSessionEvent,
   type SuperRemoteSessionManager,
 } from "./super-remote-session-manager.js";
-import type { ExecutionEnvironmentRegistry, StateStore } from "./super-runtime-seams.js";
 
 const log = createSubsystemLogger("superhuman/orchestration");
 

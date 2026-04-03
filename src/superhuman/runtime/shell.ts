@@ -13,6 +13,8 @@ import {
   resolveSuperComputerUseRolloutEnabled,
   startSuperComputerUseRuntime,
 } from "../super-execution-surfaces.js";
+import { SuperSessionPersistenceAdapter } from "../super-session-persistence-adapter.js";
+import { createSuperhumanStateStore } from "../super-state-store.js";
 import {
   createSuperPluginCapabilityRegistry,
   type ChannelRegistry,
@@ -26,9 +28,7 @@ import {
   type StateStore,
   type SuperComputerUseRuntime,
   type WorkspaceBootstrap,
-} from "../super-runtime-seams.js";
-import { SuperSessionPersistenceAdapter } from "../super-session-persistence-adapter.js";
-import { createSuperhumanStateStore } from "../super-state-store.js";
+} from "./seams.js";
 import {
   evaluateSuperSandboxToolDecision,
   resolveSuperPluginShellContracts,

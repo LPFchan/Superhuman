@@ -78,7 +78,7 @@ import {
 } from "../secrets/runtime.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
-import type { SuperhumanGatewayRuntime } from "../superhuman/super-gateway-runtime.js";
+import type { SuperhumanGatewayRuntime } from "../superhuman/runtime/gateway.js";
 import { getActiveSuperOrchestrationRuntime } from "../superhuman/super-orchestration-runtime.js";
 import {
   getInspectableTaskRegistrySummary,

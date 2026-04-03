@@ -1,16 +1,16 @@
-import type { CliDeps } from "../cli/deps.js";
-import type { OpenClawConfig } from "../config/config.js";
-import type { CronService } from "../cron/service.js";
-import type { PluginRegistry as OpenClawPluginRegistry } from "../plugins/registry.js";
-import { startSuperAutomationServices } from "./runtime/automation-services.js";
-import { startSuperContextServices } from "./runtime/context-services.js";
-import { startSuperOrchestrationServices } from "./runtime/orchestration-services.js";
-import { startSuperShellRuntime } from "./runtime/shell.js";
-import type { SuperAutomationRuntime } from "./super-automation-runtime.js";
-import type { SuperNotificationCenter } from "./super-notification-center.js";
-import type { OrchestrationRuntime } from "./super-orchestration-runtime.js";
-import type { SuperRemoteScheduleRuntime } from "./super-remote-schedule-runtime.js";
-import type { SuperRemoteSessionManager } from "./super-remote-session-manager.js";
+import type { CliDeps } from "../../cli/deps.js";
+import type { OpenClawConfig } from "../../config/config.js";
+import type { CronService } from "../../cron/service.js";
+import type { PluginRegistry as OpenClawPluginRegistry } from "../../plugins/registry.js";
+import type { SuperAutomationRuntime } from "../super-automation-runtime.js";
+import type { SuperNotificationCenter } from "../super-notification-center.js";
+import type { OrchestrationRuntime } from "../super-orchestration-runtime.js";
+import type { SuperRemoteScheduleRuntime } from "../super-remote-schedule-runtime.js";
+import type { SuperRemoteSessionManager } from "../super-remote-session-manager.js";
+import type { SuperSubscriptionManager } from "../super-subscription-manager.js";
+import { startSuperAutomationServices } from "./automation-services.js";
+import { startSuperContextServices } from "./context-services.js";
+import { startSuperOrchestrationServices } from "./orchestration-services.js";
 import type {
   ChannelRegistry,
   CompactionManager,
@@ -24,8 +24,8 @@ import type {
   StateStore,
   SuperComputerUseRuntime,
   WorkspaceBootstrap,
-} from "./super-runtime-seams.js";
-import type { SuperSubscriptionManager } from "./super-subscription-manager.js";
+} from "./seams.js";
+import { startSuperShellRuntime } from "./shell.js";
 
 export type SuperhumanGatewayRuntime = {
   stateStore: StateStore;

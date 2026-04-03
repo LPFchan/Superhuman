@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { SuperhumanAgentRuntimeTurn } from "./super-agent-runtime.js";
+import { SuperhumanAgentRuntimeTurn } from "./runtime/agent.js";
 import { createSuperhumanStateStore } from "./super-state-store.js";
 
 const cleanupPaths = new Set<string>();

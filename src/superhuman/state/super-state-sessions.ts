@@ -16,7 +16,7 @@ import type {
   SuperSandboxRuntimeSnapshot,
   SuperShellCapabilitySnapshot,
   SuperVerificationStage,
-} from "../super-runtime-seams.js";
+} from "../runtime/seams.js";
 import {
   parseJsonValue,
   stringifyJson,
