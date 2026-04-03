@@ -1,22 +1,22 @@
 ---
-summary: "OpenClaw is a multi-channel gateway for AI agents that runs on any OS."
+summary: "Superhuman is a multi-channel AI assistant gateway that runs on any OS."
 read_when:
-  - Introducing OpenClaw to newcomers
-title: "OpenClaw"
+  - Introducing Superhuman to newcomers
+title: "Superhuman"
 ---
 
-# OpenClaw 🦞
+# Superhuman
 
 <p align="center">
     <img
         src="/assets/openclaw-logo-text-dark.png"
-        alt="OpenClaw"
+        alt="Superhuman"
         width="500"
         class="dark:hidden"
     />
     <img
         src="/assets/openclaw-logo-text.png"
-        alt="OpenClaw"
+        alt="Superhuman"
         width="500"
         class="hidden dark:block"
     />
@@ -25,25 +25,25 @@ title: "OpenClaw"
 > _"EXFOLIATE! EXFOLIATE!"_ — A space lobster, probably
 
 <p align="center">
-  <strong>Any OS gateway for AI agents across WhatsApp, Telegram, Discord, iMessage, and more.</strong><br />
-  Send a message, get an agent response from your pocket. Plugins add Mattermost and more.
+  <strong>Any OS gateway for your persistent AI assistant across chat, apps, and devices.</strong><br />
+  Superhuman keeps the public product identity while preserving the OpenClaw plugin ecosystem compatibility story.
 </p>
 
 <Columns>
   <Card title="Get Started" href="/start/getting-started" icon="rocket">
-    Install OpenClaw and bring up the Gateway in minutes.
+    Install Superhuman and bring up the Gateway in minutes.
   </Card>
   <Card title="Run Onboarding" href="/start/wizard" icon="sparkles">
-    Guided setup with `openclaw onboard` and pairing flows.
+    Guided setup with `superhuman onboard` and pairing flows.
   </Card>
   <Card title="Open the Control UI" href="/web/control-ui" icon="layout-dashboard">
     Launch the browser dashboard for chat, config, and sessions.
   </Card>
 </Columns>
 
-## What is OpenClaw?
+## What is Superhuman?
 
-OpenClaw is a **self-hosted gateway** that connects your favorite chat apps — WhatsApp, Telegram, Discord, iMessage, and more — to AI coding agents like Pi. You run a single Gateway process on your own machine (or a server), and it becomes the bridge between your messaging apps and an always-available AI assistant.
+Superhuman is a **self-hosted gateway** that connects your favorite chat apps, devices, and control surfaces to a persistent AI assistant. It preserves compatibility with its upstream OpenClaw-shaped core while moving the public product identity, docs, and runtime defaults to Superhuman.
 
 **Who is it for?** Developers and power users who want a personal AI assistant they can message from anywhere — without giving up control of their data or relying on a hosted service.
 
@@ -52,7 +52,7 @@ OpenClaw is a **self-hosted gateway** that connects your favorite chat apps — 
 - **Self-hosted**: runs on your hardware, your rules
 - **Multi-channel**: one Gateway serves WhatsApp, Telegram, Discord, and more simultaneously
 - **Agent-native**: built for coding agents with tool use, sessions, memory, and multi-agent routing
-- **Open source**: MIT licensed, community-driven
+- **OpenClaw-compatible**: preserves inherited plugin ecosystem contracts during the migration wave
 
 **What do you need?** Node 24 (recommended), or Node 22 LTS (`22.14+`) for compatibility, an API key from your chosen provider, and 5 minutes. For best quality and security, use the strongest latest-generation model available.
 
@@ -98,19 +98,19 @@ The Gateway is the single source of truth for sessions, routing, and channel con
 <Steps>
   <Step title="Install OpenClaw">
     ```bash
-    npm install -g openclaw@latest
+    npm install -g @lpfchan/superhuman@latest
     ```
   </Step>
   <Step title="Onboard and install the service">
     ```bash
-    openclaw onboard --install-daemon
+    superhuman onboard --install-daemon
     ```
   </Step>
   <Step title="Chat">
     Open the Control UI in your browser and send a message:
 
     ```bash
-    openclaw dashboard
+    superhuman dashboard
     ```
 
     Or connect a channel ([Telegram](/channels/telegram) is fastest) and chat from your phone.
@@ -127,15 +127,11 @@ Open the browser Control UI after the Gateway starts.
 - Local default: [http://127.0.0.1:18789/](http://127.0.0.1:18789/)
 - Remote access: [Web surfaces](/web) and [Tailscale](/gateway/tailscale)
 
-<p align="center">
-  <img src="/whatsapp-openclaw.jpg" alt="OpenClaw" width="420" />
-</p>
-
 ## Configuration (optional)
 
-Config lives at `~/.openclaw/openclaw.json`.
+Canonical config is moving to `~/.superhuman/superhuman.json`.
 
-- If you **do nothing**, OpenClaw uses the bundled Pi binary in RPC mode with per-sender sessions.
+- If you **do nothing**, Superhuman uses the bundled Pi binary in RPC mode with per-sender sessions.
 - If you want to lock it down, start with `channels.whatsapp.allowFrom` and (for groups) mention rules.
 
 Example:
@@ -148,7 +144,7 @@ Example:
       groups: { "*": { requireMention: true } },
     },
   },
-  messages: { groupChat: { mentionPatterns: ["@openclaw"] } },
+  messages: { groupChat: { mentionPatterns: ["@superhuman"] } },
 }
 ```
 
@@ -191,6 +187,6 @@ Example:
     Gateway diagnostics and common errors.
   </Card>
   <Card title="About and credits" href="/reference/credits" icon="info">
-    Project origins, contributors, and license.
+    Provenance, project origins, contributors, and license.
   </Card>
 </Columns>

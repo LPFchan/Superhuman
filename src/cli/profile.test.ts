@@ -101,10 +101,13 @@ describe("applyCliProfileEnv", () => {
       env,
       homedir: () => "/home/peter",
     });
-    const expectedStateDir = path.join(path.resolve("/home/peter"), ".openclaw-dev");
+    const expectedStateDir = path.join(path.resolve("/home/peter"), ".superhuman-dev");
     expect(env.OPENCLAW_PROFILE).toBe("dev");
+    expect(env.SUPERHUMAN_STATE_DIR).toBe(expectedStateDir);
     expect(env.OPENCLAW_STATE_DIR).toBe(expectedStateDir);
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join(expectedStateDir, "openclaw.json"));
+    expect(env.SUPERHUMAN_CONFIG_PATH).toBe(path.join(expectedStateDir, "superhuman.json"));
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join(expectedStateDir, "superhuman.json"));
+    expect(env.SUPERHUMAN_GATEWAY_PORT).toBe("19001");
     expect(env.OPENCLAW_GATEWAY_PORT).toBe("19001");
   });
 
@@ -120,12 +123,13 @@ describe("applyCliProfileEnv", () => {
     });
     expect(env.OPENCLAW_STATE_DIR).toBe("/custom");
     expect(env.OPENCLAW_GATEWAY_PORT).toBe("19099");
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join("/custom", "openclaw.json"));
+    expect(env.SUPERHUMAN_STATE_DIR).toBe("/custom");
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join("/custom", "superhuman.json"));
   });
 
-  it("uses OPENCLAW_HOME when deriving profile state dir", () => {
+  it("uses SUPERHUMAN_HOME when deriving profile state dir", () => {
     const env: Record<string, string | undefined> = {
-      OPENCLAW_HOME: "/srv/openclaw-home",
+      SUPERHUMAN_HOME: "/srv/superhuman-home",
       HOME: "/home/other",
     };
     applyCliProfileEnv({
@@ -134,10 +138,11 @@ describe("applyCliProfileEnv", () => {
       homedir: () => "/home/fallback",
     });
 
-    const resolvedHome = path.resolve("/srv/openclaw-home");
-    expect(env.OPENCLAW_STATE_DIR).toBe(path.join(resolvedHome, ".openclaw-work"));
+    const resolvedHome = path.resolve("/srv/superhuman-home");
+    expect(env.SUPERHUMAN_STATE_DIR).toBe(path.join(resolvedHome, ".superhuman-work"));
+    expect(env.OPENCLAW_STATE_DIR).toBe(path.join(resolvedHome, ".superhuman-work"));
     expect(env.OPENCLAW_CONFIG_PATH).toBe(
-      path.join(resolvedHome, ".openclaw-work", "openclaw.json"),
+      path.join(resolvedHome, ".superhuman-work", "superhuman.json"),
     );
   });
 });

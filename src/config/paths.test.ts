@@ -18,21 +18,22 @@ function envWith(overrides: Record<string, string | undefined>): NodeJS.ProcessE
 }
 
 describe("oauth paths", () => {
-  it("prefers OPENCLAW_OAUTH_DIR over OPENCLAW_STATE_DIR", () => {
+  it("prefers SUPERHUMAN_OAUTH_DIR over legacy overrides", () => {
     const env = {
+      SUPERHUMAN_OAUTH_DIR: "/custom/superhuman-oauth",
       OPENCLAW_OAUTH_DIR: "/custom/oauth",
       OPENCLAW_STATE_DIR: "/custom/state",
     } as NodeJS.ProcessEnv;
 
-    expect(resolveOAuthDir(env, "/custom/state")).toBe(path.resolve("/custom/oauth"));
+    expect(resolveOAuthDir(env, "/custom/state")).toBe(path.resolve("/custom/superhuman-oauth"));
     expect(resolveOAuthPath(env, "/custom/state")).toBe(
-      path.join(path.resolve("/custom/oauth"), "oauth.json"),
+      path.join(path.resolve("/custom/superhuman-oauth"), "oauth.json"),
     );
   });
 
-  it("derives oauth path from OPENCLAW_STATE_DIR when unset", () => {
+  it("derives oauth path from SUPERHUMAN_STATE_DIR when unset", () => {
     const env = {
-      OPENCLAW_STATE_DIR: "/custom/state",
+      SUPERHUMAN_STATE_DIR: "/custom/state",
     } as NodeJS.ProcessEnv;
 
     expect(resolveOAuthDir(env, "/custom/state")).toBe(path.join("/custom/state", "credentials"));
@@ -43,10 +44,13 @@ describe("oauth paths", () => {
 });
 
 describe("gateway port resolution", () => {
-  it("prefers numeric env values over config", () => {
+  it("prefers SUPERHUMAN_GATEWAY_PORT over config and legacy env", () => {
     expect(
-      resolveGatewayPort({ gateway: { port: 19002 } }, envWith({ OPENCLAW_GATEWAY_PORT: "19001" })),
-    ).toBe(19001);
+      resolveGatewayPort(
+        { gateway: { port: 19002 } },
+        envWith({ SUPERHUMAN_GATEWAY_PORT: "19011", OPENCLAW_GATEWAY_PORT: "19001" }),
+      ),
+    ).toBe(19011);
   });
 
   it("accepts Compose-style IPv4 host publish values from env", () => {
@@ -102,39 +106,39 @@ describe("gateway port resolution", () => {
 });
 
 describe("state + config path candidates", () => {
-  function expectOpenClawHomeDefaults(env: NodeJS.ProcessEnv): void {
-    const configuredHome = env.OPENCLAW_HOME;
+  function expectSuperhumanHomeDefaults(env: NodeJS.ProcessEnv): void {
+    const configuredHome = env.SUPERHUMAN_HOME ?? env.OPENCLAW_HOME;
     if (!configuredHome) {
-      throw new Error("OPENCLAW_HOME must be set for this assertion helper");
+      throw new Error("SUPERHUMAN_HOME or OPENCLAW_HOME must be set for this assertion helper");
     }
     const resolvedHome = path.resolve(configuredHome);
-    expect(resolveStateDir(env)).toBe(path.join(resolvedHome, ".openclaw"));
+    expect(resolveStateDir(env)).toBe(path.join(resolvedHome, ".superhuman"));
 
     const candidates = resolveDefaultConfigCandidates(env);
-    expect(candidates[0]).toBe(path.join(resolvedHome, ".openclaw", "openclaw.json"));
+    expect(candidates[0]).toBe(path.join(resolvedHome, ".superhuman", "superhuman.json"));
   }
 
-  it("uses OPENCLAW_STATE_DIR when set", () => {
+  it("uses SUPERHUMAN_STATE_DIR when set", () => {
     const env = {
-      OPENCLAW_STATE_DIR: "/new/state",
+      SUPERHUMAN_STATE_DIR: "/new/state",
     } as NodeJS.ProcessEnv;
 
     expect(resolveStateDir(env, () => "/home/test")).toBe(path.resolve("/new/state"));
   });
 
-  it("uses OPENCLAW_HOME for default state/config locations", () => {
+  it("uses SUPERHUMAN_HOME for default state/config locations", () => {
     const env = {
-      OPENCLAW_HOME: "/srv/openclaw-home",
+      SUPERHUMAN_HOME: "/srv/superhuman-home",
     } as NodeJS.ProcessEnv;
-    expectOpenClawHomeDefaults(env);
+    expectSuperhumanHomeDefaults(env);
   });
 
-  it("prefers OPENCLAW_HOME over HOME for default state/config locations", () => {
+  it("falls back to OPENCLAW_HOME when SUPERHUMAN_HOME is unset", () => {
     const env = {
       OPENCLAW_HOME: "/srv/openclaw-home",
       HOME: "/home/other",
     } as NodeJS.ProcessEnv;
-    expectOpenClawHomeDefaults(env);
+    expectSuperhumanHomeDefaults(env);
   });
 
   it("orders default config candidates in a stable order", () => {
@@ -142,37 +146,42 @@ describe("state + config path candidates", () => {
     const resolvedHome = path.resolve(home);
     const candidates = resolveDefaultConfigCandidates({} as NodeJS.ProcessEnv, () => home);
     const expected = [
+      path.join(resolvedHome, ".superhuman", "superhuman.json"),
+      path.join(resolvedHome, ".superhuman", "openclaw.json"),
+      path.join(resolvedHome, ".superhuman", "clawdbot.json"),
+      path.join(resolvedHome, ".openclaw", "superhuman.json"),
       path.join(resolvedHome, ".openclaw", "openclaw.json"),
       path.join(resolvedHome, ".openclaw", "clawdbot.json"),
+      path.join(resolvedHome, ".clawdbot", "superhuman.json"),
       path.join(resolvedHome, ".clawdbot", "openclaw.json"),
       path.join(resolvedHome, ".clawdbot", "clawdbot.json"),
     ];
     expect(candidates).toEqual(expected);
   });
 
-  it("prefers ~/.openclaw when it exists and legacy dir is missing", async () => {
+  it("prefers ~/.superhuman when it exists and legacy dirs are missing", async () => {
     await withTempDir({ prefix: "openclaw-state-" }, async (root) => {
-      const newDir = path.join(root, ".openclaw");
+      const newDir = path.join(root, ".superhuman");
       await fs.mkdir(newDir, { recursive: true });
       const resolved = resolveStateDir({} as NodeJS.ProcessEnv, () => root);
       expect(resolved).toBe(newDir);
     });
   });
 
-  it("falls back to existing legacy state dir when ~/.openclaw is missing", async () => {
+  it("falls back to existing legacy state dir when ~/.superhuman is missing", async () => {
     await withTempDir({ prefix: "openclaw-state-legacy-" }, async (root) => {
-      const legacyDir = path.join(root, ".clawdbot");
+      const legacyDir = path.join(root, ".openclaw");
       await fs.mkdir(legacyDir, { recursive: true });
       const resolved = resolveStateDir({} as NodeJS.ProcessEnv, () => root);
       expect(resolved).toBe(legacyDir);
     });
   });
 
-  it("CONFIG_PATH prefers existing config when present", async () => {
+  it("CONFIG_PATH prefers existing legacy config in the canonical state dir when present", async () => {
     await withTempDir({ prefix: "openclaw-config-" }, async (root) => {
-      const legacyDir = path.join(root, ".openclaw");
-      await fs.mkdir(legacyDir, { recursive: true });
-      const legacyPath = path.join(legacyDir, "openclaw.json");
+      const canonicalDir = path.join(root, ".superhuman");
+      await fs.mkdir(canonicalDir, { recursive: true });
+      const legacyPath = path.join(canonicalDir, "openclaw.json");
       await fs.writeFile(legacyPath, "{}", "utf-8");
 
       const resolved = resolveConfigPathCandidate({} as NodeJS.ProcessEnv, () => root);
@@ -182,15 +191,15 @@ describe("state + config path candidates", () => {
 
   it("respects state dir overrides when config is missing", async () => {
     await withTempDir({ prefix: "openclaw-config-override-" }, async (root) => {
-      const legacyDir = path.join(root, ".openclaw");
+      const legacyDir = path.join(root, ".superhuman");
       await fs.mkdir(legacyDir, { recursive: true });
       const legacyConfig = path.join(legacyDir, "openclaw.json");
       await fs.writeFile(legacyConfig, "{}", "utf-8");
 
       const overrideDir = path.join(root, "override");
-      const env = { OPENCLAW_STATE_DIR: overrideDir } as NodeJS.ProcessEnv;
+      const env = { SUPERHUMAN_STATE_DIR: overrideDir } as NodeJS.ProcessEnv;
       const resolved = resolveConfigPath(env, overrideDir, () => root);
-      expect(resolved).toBe(path.join(overrideDir, "openclaw.json"));
+      expect(resolved).toBe(path.join(overrideDir, "superhuman.json"));
     });
   });
 });

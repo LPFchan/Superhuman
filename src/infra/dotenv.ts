@@ -32,6 +32,11 @@ const BLOCKED_WORKSPACE_DOTENV_KEYS = new Set([
   "OPENCLAW_OAUTH_DIR",
   "OPENCLAW_PROFILE",
   "OPENCLAW_STATE_DIR",
+  "SUPERHUMAN_CONFIG_PATH",
+  "SUPERHUMAN_HOME",
+  "SUPERHUMAN_OAUTH_DIR",
+  "SUPERHUMAN_PROFILE",
+  "SUPERHUMAN_STATE_DIR",
   "OPENAI_API_KEY",
   "OPENAI_API_KEYS",
   "PI_CODING_AGENT_DIR",
@@ -45,7 +50,7 @@ function shouldBlockWorkspaceRuntimeDotEnvKey(key: string): boolean {
 }
 
 function shouldBlockRuntimeDotEnvKey(key: string): boolean {
-  // The global ~/.openclaw/.env (or OPENCLAW_STATE_DIR/.env) is a trusted
+  // The global ~/.superhuman/.env (or *_STATE_DIR/.env) is a trusted
   // operator-controlled runtime surface. Workspace .env is untrusted and gets
   // the strict blocklist, but the trusted global fallback is allowed to set
   // runtime vars like proxy/base-url/auth values.

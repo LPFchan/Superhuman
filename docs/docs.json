@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "OpenClaw",
-  "description": "Self-hosted gateway that connects WhatsApp, Telegram, Discord, iMessage, and more to AI coding agents. Run a single Gateway process on your own machine and message your AI assistant from anywhere.",
+  "name": "Superhuman",
+  "description": "Superhuman is a self-hosted AI assistant gateway with OpenClaw plugin ecosystem compatibility. Run one Gateway process on your own machine and message your assistant from anywhere.",
   "theme": "mint",
   "icons": {
     "library": "lucide"
@@ -36,12 +36,12 @@
     "links": [
       {
         "label": "GitHub",
-        "href": "https://github.com/openclaw/openclaw",
+        "href": "https://github.com/LPFchan/Superhuman",
         "icon": "github"
       },
       {
         "label": "Releases",
-        "href": "https://github.com/openclaw/openclaw/releases",
+        "href": "https://github.com/LPFchan/Superhuman/releases",
         "icon": "package"
       },
       {
@@ -955,6 +955,7 @@
                 "pages": [
                   "install/updating",
                   "install/migrating",
+                  "install/superhuman-migration",
                   "install/migrating-matrix",
                   "install/uninstall",
                   "install/development-channels"
@@ -1509,7 +1510,7 @@
               },
               {
                 "group": "Project",
-                "pages": ["reference/credits"]
+                "pages": ["reference/provenance", "reference/credits"]
               },
               {
                 "group": "Release policy",

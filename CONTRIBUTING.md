@@ -1,13 +1,32 @@
-# Contributing to OpenClaw
+# Contributing to Superhuman
 
-Welcome to the lobster tank! 🦞
+Superhuman is an independent product built from an OpenClaw fork. Contributor-facing branding should treat `Superhuman` as the public product name while preserving `OpenClaw` for provenance, compatibility namespaces, and upstream references.
 
 ## Quick Links
 
-- **GitHub:** https://github.com/openclaw/openclaw
+- **GitHub:** https://github.com/LPFchan/Superhuman
 - **Vision:** [`VISION.md`](VISION.md)
+- **Website:** https://superhuman.lost.plus
+- **Docs:** https://superhuman.lost.plus/docs
 - **Discord:** https://discord.gg/qkhbAGHRBT
 - **X/Twitter:** [@steipete](https://x.com/steipete) / [@openclaw](https://x.com/openclaw)
+
+## Naming Rules
+
+- Use `Superhuman` for public product identity in docs, UI copy, README text, release notes, screenshots, and contributor-facing guidance.
+- Use `OpenClaw` or `openclaw` only for legal provenance, compatibility namespaces, inherited SDK or manifest contracts, and upstream references.
+- Do not add new public OpenClaw branding to product-facing surfaces unless the text is explicitly about provenance or compatibility.
+
+## Provenance vs Branding
+
+Legal provenance records where the code came from.
+Public branding states what product users are adopting today.
+
+In this repo:
+
+- `OpenClaw` remains correct for license lineage, fork history, inherited plugin compatibility contracts, and upstream references.
+- `Superhuman` is the correct public product name.
+- If a surface still says `OpenClaw` outside provenance or compatibility context, treat it as migration work rather than as the intended final state.
 
 ## Maintainers
 
@@ -87,7 +106,7 @@ Welcome to the lobster tank! 🦞
 
 ## Before You PR
 
-- Test locally with your OpenClaw instance
+- Test locally with your Superhuman instance
 - Run tests: `pnpm build && pnpm check && pnpm test`
 - For extension/plugin changes, run the fast local lane first:
   - `pnpm test:extension <extension-name>`

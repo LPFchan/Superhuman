@@ -12,14 +12,15 @@ import {
 describe("resolveEffectiveHomeDir", () => {
   it.each([
     {
-      name: "prefers OPENCLAW_HOME over HOME and USERPROFILE",
+      name: "prefers SUPERHUMAN_HOME over OPENCLAW_HOME, HOME and USERPROFILE",
       env: {
+        SUPERHUMAN_HOME: " /srv/superhuman-home ",
         OPENCLAW_HOME: " /srv/openclaw-home ",
         HOME: "/home/other",
         USERPROFILE: "C:/Users/other",
       } as NodeJS.ProcessEnv,
       homedir: () => "/fallback",
-      expected: "/srv/openclaw-home",
+      expected: "/srv/superhuman-home",
     },
     {
       name: "falls back to HOME",
@@ -37,6 +38,7 @@ describe("resolveEffectiveHomeDir", () => {
     {
       name: "falls back to homedir when env values are blank",
       env: {
+        SUPERHUMAN_HOME: " ",
         OPENCLAW_HOME: " ",
         HOME: " ",
         USERPROFILE: "\t",
@@ -47,6 +49,7 @@ describe("resolveEffectiveHomeDir", () => {
     {
       name: "treats literal undefined env values as unset",
       env: {
+        SUPERHUMAN_HOME: "undefined",
         OPENCLAW_HOME: "undefined",
         HOME: "undefined",
         USERPROFILE: "null",
@@ -62,7 +65,7 @@ describe("resolveEffectiveHomeDir", () => {
     {
       name: "expands ~/ using HOME",
       env: {
-        OPENCLAW_HOME: "~/svc",
+        SUPERHUMAN_HOME: "~/svc",
         HOME: "/home/alice",
       } as NodeJS.ProcessEnv,
       expected: "/home/alice/svc",
@@ -70,7 +73,7 @@ describe("resolveEffectiveHomeDir", () => {
     {
       name: "expands ~\\\\ using USERPROFILE",
       env: {
-        OPENCLAW_HOME: "~\\svc",
+        SUPERHUMAN_HOME: "~\\svc",
         HOME: " ",
         USERPROFILE: "C:/Users/alice",
       } as NodeJS.ProcessEnv,
@@ -92,14 +95,14 @@ describe("resolveRequiredHomeDir", () => {
       expected: process.cwd(),
     },
     {
-      name: "returns a fully resolved path for OPENCLAW_HOME",
-      env: { OPENCLAW_HOME: "/custom/home" } as NodeJS.ProcessEnv,
+      name: "returns a fully resolved path for SUPERHUMAN_HOME",
+      env: { SUPERHUMAN_HOME: "/custom/home" } as NodeJS.ProcessEnv,
       homedir: () => "/fallback",
       expected: path.resolve("/custom/home"),
     },
     {
-      name: "returns cwd when OPENCLAW_HOME is tilde-only and no fallback home exists",
-      env: { OPENCLAW_HOME: "~" } as NodeJS.ProcessEnv,
+      name: "returns cwd when SUPERHUMAN_HOME is tilde-only and no fallback home exists",
+      env: { SUPERHUMAN_HOME: "~" } as NodeJS.ProcessEnv,
       homedir: () => {
         throw new Error("no home");
       },
@@ -115,6 +118,7 @@ describe("resolveOsHomeDir", () => {
     expect(
       resolveOsHomeDir(
         {
+          SUPERHUMAN_HOME: "/srv/superhuman-home",
           OPENCLAW_HOME: "/srv/openclaw-home",
           HOME: "/home/alice",
           USERPROFILE: "C:/Users/alice",
@@ -131,9 +135,9 @@ describe("expandHomePrefix", () => {
       name: "expands ~/ using effective home",
       input: "~/x",
       opts: {
-        env: { OPENCLAW_HOME: "/srv/openclaw-home" } as NodeJS.ProcessEnv,
+        env: { SUPERHUMAN_HOME: "/srv/superhuman-home" } as NodeJS.ProcessEnv,
       },
-      expected: `${path.resolve("/srv/openclaw-home")}/x`,
+      expected: `${path.resolve("/srv/superhuman-home")}/x`,
     },
     {
       name: "expands exact ~ using explicit home",
@@ -180,9 +184,9 @@ describe("resolveHomeRelativePath", () => {
       name: "expands tilde paths using the resolved home directory",
       input: "~/docs",
       opts: {
-        env: { OPENCLAW_HOME: "/srv/openclaw-home" } as NodeJS.ProcessEnv,
+        env: { SUPERHUMAN_HOME: "/srv/superhuman-home" } as NodeJS.ProcessEnv,
       },
-      expected: path.resolve("/srv/openclaw-home/docs"),
+      expected: path.resolve("/srv/superhuman-home/docs"),
     },
     {
       name: "falls back to cwd when tilde paths have no home source",
@@ -205,6 +209,7 @@ describe("resolveOsHomeRelativePath", () => {
     expect(
       resolveOsHomeRelativePath("~/docs", {
         env: {
+          SUPERHUMAN_HOME: "/srv/superhuman-home",
           OPENCLAW_HOME: "/srv/openclaw-home",
           HOME: "/home/alice",
         } as NodeJS.ProcessEnv,

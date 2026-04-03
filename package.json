@@ -1,20 +1,20 @@
 {
-  "name": "openclaw",
+  "name": "@lpfchan/superhuman",
   "version": "2026.4.1",
-  "description": "Multi-channel AI gateway with extensible messaging integrations",
+  "description": "Superhuman is a multi-channel AI assistant gateway with OpenClaw plugin compatibility",
   "keywords": [],
-  "homepage": "https://github.com/openclaw/openclaw#readme",
+  "homepage": "https://github.com/LPFchan/Superhuman#readme",
   "bugs": {
-    "url": "https://github.com/openclaw/openclaw/issues"
+    "url": "https://github.com/LPFchan/Superhuman/issues"
   },
   "license": "MIT",
-  "author": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/openclaw/openclaw.git"
+    "url": "git+https://github.com/LPFchan/Superhuman.git"
   },
   "bin": {
-    "openclaw": "openclaw.mjs"
+    "openclaw": "openclaw.mjs",
+    "superhuman": "superhuman.mjs"
   },
   "directories": {
     "doc": "docs",
@@ -24,6 +24,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "openclaw.mjs",
+    "superhuman.mjs",
     "README.md",
     "assets/",
     "dist/",
@@ -1042,6 +1043,7 @@
     "lint:all": "pnpm lint && pnpm lint:swift",
     "lint:auth:no-pairing-store-group": "node scripts/check-no-pairing-store-group-auth.mjs",
     "lint:auth:pairing-account-scope": "node scripts/check-pairing-account-scope.mjs",
+    "lint:branding:public-identity": "node scripts/check-public-branding-guardrail.mjs",
     "lint:docs": "pnpm dlx markdownlint-cli2",
     "lint:docs:fix": "pnpm dlx markdownlint-cli2 --fix",
     "lint:extensions:no-plugin-sdk-internal": "node scripts/check-extension-plugin-sdk-boundary.mjs --mode=plugin-sdk-internal",
@@ -1088,6 +1090,7 @@
     "release:plugins:npm:plan": "node --import tsx scripts/plugin-npm-release-plan.ts",
     "stage:bundled-plugin-runtime-deps": "node scripts/stage-bundled-plugin-runtime-deps.mjs",
     "start": "node scripts/run-node.mjs",
+    "superhuman": "node scripts/run-node.mjs",
     "test": "node scripts/test-parallel.mjs",
     "test:all": "pnpm lint && pnpm build && pnpm test && pnpm test:e2e && pnpm test:live && pnpm test:docker:all",
     "test:auth:compat": "vitest run --config vitest.gateway.config.ts src/gateway/server.auth.compat-baseline.test.ts src/gateway/client.test.ts src/gateway/reconnect-gating.test.ts src/gateway/protocol/connect-error-details.test.ts",

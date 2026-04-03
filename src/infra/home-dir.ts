@@ -12,6 +12,16 @@ function normalize(value: string | undefined): string | undefined {
   return trimmed;
 }
 
+function resolveNamedHomeEnv(env: NodeJS.ProcessEnv, names: readonly string[]): string | undefined {
+  for (const name of names) {
+    const value = normalize(env[name]);
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 export function resolveEffectiveHomeDir(
   env: NodeJS.ProcessEnv = process.env,
   homedir: () => string = os.homedir,
@@ -29,7 +39,7 @@ export function resolveOsHomeDir(
 }
 
 function resolveRawHomeDir(env: NodeJS.ProcessEnv, homedir: () => string): string | undefined {
-  const explicitHome = normalize(env.OPENCLAW_HOME);
+  const explicitHome = resolveNamedHomeEnv(env, ["SUPERHUMAN_HOME", "OPENCLAW_HOME"]);
   if (explicitHome) {
     if (explicitHome === "~" || explicitHome.startsWith("~/") || explicitHome.startsWith("~\\")) {
       const fallbackHome = resolveRawOsHomeDir(env, homedir);

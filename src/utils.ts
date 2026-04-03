@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveOAuthDir } from "./config/paths.js";
+import { resolveOAuthDir, resolveStateDir } from "./config/paths.js";
 import { logVerbose, shouldLogVerbose } from "./globals.js";
 import {
   resolveEffectiveHomeDir,
@@ -287,20 +287,7 @@ export function resolveConfigDir(
   env: NodeJS.ProcessEnv = process.env,
   homedir: () => string = os.homedir,
 ): string {
-  const override = env.OPENCLAW_STATE_DIR?.trim();
-  if (override) {
-    return resolveUserPath(override, env, homedir);
-  }
-  const newDir = path.join(resolveRequiredHomeDir(env, homedir), ".openclaw");
-  try {
-    const hasNew = fs.existsSync(newDir);
-    if (hasNew) {
-      return newDir;
-    }
-  } catch {
-    // best-effort
-  }
-  return newDir;
+  return resolveStateDir(env, () => resolveRequiredHomeDir(env, homedir));
 }
 
 export function resolveHomeDir(): string | undefined {
@@ -311,6 +298,10 @@ function resolveHomeDisplayPrefix(): { home: string; prefix: string } | undefine
   const home = resolveHomeDir();
   if (!home) {
     return undefined;
+  }
+  const superhumanHome = process.env.SUPERHUMAN_HOME?.trim();
+  if (superhumanHome) {
+    return { home, prefix: "$SUPERHUMAN_HOME" };
   }
   const explicitHome = process.env.OPENCLAW_HOME?.trim();
   if (explicitHome) {
@@ -356,5 +347,5 @@ export function displayString(input: string): string {
   return shortenHomeInString(input);
 }
 
-// Configuration root; can be overridden via OPENCLAW_STATE_DIR.
+// Configuration root; can be overridden via SUPERHUMAN_STATE_DIR or OPENCLAW_STATE_DIR.
 export const CONFIG_DIR = resolveConfigDir();

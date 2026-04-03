@@ -6,6 +6,11 @@ Additional planning docs:
 
 1. [Product Migration Plan](product-migration-plan.md) for the full repo identity, provenance, code-structure, runtime, and docs migration.
 2. [Weekly Upstream Intake Template](weekly-upstream-intake-template.md) for logging accept, adapt, or decline decisions during OpenClaw sync review.
+3. [Migration Charter](migration-charter.md) for Phase 1 ratification status, approval roles, freeze rules, and unresolved canonical values.
+4. [Current Surface Inventory](current-surface-inventory.md) for public identity, compatibility, shared-core, and downstream classification.
+5. [Plugin Contract Map](plugin-contract-map.md) for keep, alias, or migrate decisions on plugin-facing contracts.
+6. [Plugin Compatibility Matrix](plugin-compatibility-matrix.md) for the representative compatibility set that later phases must preserve.
+7. [Naming Glossary](naming-glossary.md) for current migration naming rules and drift freezes.
 
 How to use it:
 
