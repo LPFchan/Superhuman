@@ -19,7 +19,7 @@ import {
 import {
   resolveSuperSandboxRuntimeSnapshot,
   resolveSuperShellCapabilitySnapshot,
-} from "./runtime/super-shell-contracts.js";
+} from "./runtime/shell-contracts.js";
 import {
   resolveSuperContextPressureOptionsFromConfig,
   type ContextPressureSnapshotOptions,

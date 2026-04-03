@@ -34,7 +34,7 @@ import {
   resolveSuperPluginShellContracts,
   resolveSuperSandboxRuntimeSnapshot,
   resolveSuperShellCapabilitySnapshot,
-} from "./super-shell-contracts.js";
+} from "./shell-contracts.js";
 
 export type SuperShellRuntimeServices = {
   stateStore: StateStore;
