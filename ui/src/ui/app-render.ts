@@ -144,7 +144,8 @@ function lazyRender<M>(getter: () => M | null, render: (mod: M) => unknown) {
   return mod ? render(mod) : nothing;
 }
 
-const UPDATE_BANNER_DISMISS_KEY = "openclaw:control-ui:update-banner-dismissed:v1";
+const UPDATE_BANNER_DISMISS_KEY = "superhuman:control-ui:update-banner-dismissed:v1";
+const LEGACY_UPDATE_BANNER_DISMISS_KEY = "openclaw:control-ui:update-banner-dismissed:v1";
 const CRON_THINKING_SUGGESTIONS = ["off", "minimal", "low", "medium", "high"];
 const CRON_TIMEZONE_SUGGESTIONS = [
   "UTC",
@@ -191,7 +192,10 @@ type DismissedUpdateBanner = {
 
 function loadDismissedUpdateBanner(): DismissedUpdateBanner | null {
   try {
-    const raw = getSafeLocalStorage()?.getItem(UPDATE_BANNER_DISMISS_KEY);
+    const storage = getSafeLocalStorage();
+    const raw =
+      storage?.getItem(UPDATE_BANNER_DISMISS_KEY) ??
+      storage?.getItem(LEGACY_UPDATE_BANNER_DISMISS_KEY);
     if (!raw) {
       return null;
     }
@@ -235,7 +239,9 @@ function dismissUpdateBanner(updateAvailable: unknown) {
     dismissedAtMs: Date.now(),
   };
   try {
-    getSafeLocalStorage()?.setItem(UPDATE_BANNER_DISMISS_KEY, JSON.stringify(payload));
+    const storage = getSafeLocalStorage();
+    storage?.setItem(UPDATE_BANNER_DISMISS_KEY, JSON.stringify(payload));
+    storage?.removeItem(LEGACY_UPDATE_BANNER_DISMISS_KEY);
   } catch {
     // ignore
   }

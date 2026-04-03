@@ -66,6 +66,7 @@ describe("i18n", () => {
       expect(fresh.i18n.getLocale()).toBe("zh-CN");
     });
     expect(fresh.i18n.getLocale()).toBe("zh-CN");
+    expect(localStorage.getItem("superhuman.i18n.locale")).toBe("zh-CN");
     expect(fresh.t("common.health")).toBe("健康状况");
   });
 

@@ -3,7 +3,20 @@
 import { readFileSync } from "node:fs";
 import { access } from "node:fs/promises";
 import module from "node:module";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const resolveInvokedCliName = () => {
+  const argv1 = process.argv[1] || "";
+  const base = path
+    .basename(argv1)
+    .trim()
+    .replace(/\.m?js$/i, "");
+  return base || "superhuman";
+};
+
+const INVOKED_CLI_NAME = resolveInvokedCliName();
+const USING_LEGACY_ALIAS = INVOKED_CLI_NAME === "openclaw";
 
 const MIN_NODE_MAJOR = 22;
 const MIN_NODE_MINOR = 12;
@@ -27,7 +40,7 @@ const ensureSupportedNodeVersion = () => {
   }
 
   process.stderr.write(
-    `openclaw: Node.js v${MIN_NODE_VERSION}+ is required (current: v${process.versions.node}).\n` +
+    `superhuman: Node.js v${MIN_NODE_VERSION}+ is required (current: v${process.versions.node}).\n` +
       "If you use nvm, run:\n" +
       `  nvm install ${MIN_NODE_MAJOR}\n` +
       `  nvm use ${MIN_NODE_MAJOR}\n` +
@@ -37,6 +50,15 @@ const ensureSupportedNodeVersion = () => {
 };
 
 ensureSupportedNodeVersion();
+
+if (USING_LEGACY_ALIAS && !process.env.SUPERHUMAN_SUPPRESS_OPENCLAW_ALIAS_WARNING) {
+  process.emitWarning(
+    'The "openclaw" CLI alias is deprecated and will be removed in a future release. Use "superhuman" instead.',
+    {
+      code: "SUPERHUMAN_OPENCLAW_ALIAS_DEPRECATED",
+    },
+  );
+}
 
 // https://nodejs.org/api/module.html#module-compile-cache
 if (module.enableCompileCache && !process.env.NODE_DISABLE_COMPILE_CACHE) {
@@ -109,7 +131,7 @@ const exists = async (specifier) => {
 };
 
 const buildMissingEntryErrorMessage = async () => {
-  const lines = ["openclaw: missing dist/entry.(m)js (build output)."];
+  const lines = ["superhuman: missing dist/entry.(m)js (build output)."];
   if (!(await exists("./src/entry.ts"))) {
     return lines.join("\n");
   }
@@ -119,9 +141,9 @@ const buildMissingEntryErrorMessage = async () => {
     "Build locally with `pnpm install && pnpm build`, or install a built package instead.",
   );
   lines.push(
-    "For pinned GitHub installs, use `npm install -g github:openclaw/openclaw#<ref>` instead of a raw `/archive/<ref>.tar.gz` URL.",
+    "For pinned GitHub installs, use `npm install -g github:LPFchan/Superhuman#<ref>` instead of a raw `/archive/<ref>.tar.gz` URL.",
   );
-  lines.push("For releases, use `npm install -g openclaw@latest`.");
+  lines.push("For releases, use `npm install -g @lpfchan/superhuman@latest`.");
   return lines.join("\n");
 };
 

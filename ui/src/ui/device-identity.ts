@@ -15,7 +15,8 @@ export type DeviceIdentity = {
   privateKey: string;
 };
 
-const STORAGE_KEY = "openclaw-device-identity-v1";
+const STORAGE_KEY = "superhuman-device-identity-v1";
+const LEGACY_STORAGE_KEY = "openclaw-device-identity-v1";
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = "";
@@ -61,7 +62,7 @@ async function generateIdentity(): Promise<DeviceIdentity> {
 export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
   const storage = getSafeLocalStorage();
   try {
-    const raw = storage?.getItem(STORAGE_KEY);
+    const raw = storage?.getItem(STORAGE_KEY) ?? storage?.getItem(LEGACY_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as StoredIdentity;
       if (
@@ -77,6 +78,7 @@ export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
             deviceId: derivedId,
           };
           storage?.setItem(STORAGE_KEY, JSON.stringify(updated));
+          storage?.removeItem(LEGACY_STORAGE_KEY);
           return {
             deviceId: derivedId,
             publicKey: parsed.publicKey,
@@ -103,6 +105,7 @@ export async function loadOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
     createdAtMs: Date.now(),
   };
   storage?.setItem(STORAGE_KEY, JSON.stringify(stored));
+  storage?.removeItem(LEGACY_STORAGE_KEY);
   return identity;
 }
 

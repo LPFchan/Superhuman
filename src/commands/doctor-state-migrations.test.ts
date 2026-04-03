@@ -120,8 +120,8 @@ const DIR_LINK_TYPE = process.platform === "win32" ? "junction" : "dir";
 
 function getStateDirMigrationPaths(root: string) {
   return {
-    targetDir: path.join(root, ".openclaw"),
-    legacyDir: path.join(root, ".clawdbot"),
+    targetDir: path.join(root, ".superhuman"),
+    legacyDir: path.join(root, ".openclaw"),
   };
 }
 
@@ -283,6 +283,21 @@ describe("doctor legacy state migrations", () => {
     expect(fs.existsSync(path.join(targetDir, "a.jsonl"))).toBe(true);
     expect(fs.existsSync(path.join(legacySessionsDir, "a.jsonl"))).toBe(false);
     expect(fs.existsSync(path.join(targetDir, "sessions.json"))).toBe(true);
+
+    const reportPath = path.join(root, "migration-reports", "runtime-identity.json");
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf-8")) as {
+      migrated: boolean;
+      changes: string[];
+      warnings: string[];
+    };
+    expect(report.migrated).toBe(true);
+    expect(report.changes).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Merged sessions store"),
+        expect.stringContaining("Moved a.jsonl"),
+      ]),
+    );
+    expect(report.warnings).toEqual([]);
   });
 
   it("migrates legacy WhatsApp auth files without touching oauth.json", async () => {

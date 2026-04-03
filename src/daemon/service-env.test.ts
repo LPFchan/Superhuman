@@ -290,10 +290,10 @@ describe("buildServiceEnvironment", () => {
     expect(env.OPENCLAW_SERVICE_MARKER).toBe("openclaw");
     expect(env.OPENCLAW_SERVICE_KIND).toBe("gateway");
     expect(typeof env.OPENCLAW_SERVICE_VERSION).toBe("string");
-    expect(env.OPENCLAW_SYSTEMD_UNIT).toBe("openclaw-gateway.service");
-    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("OpenClaw Gateway");
+    expect(env.OPENCLAW_SYSTEMD_UNIT).toBe("superhuman-gateway.service");
+    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("Superhuman Gateway");
     if (process.platform === "darwin") {
-      expect(env.OPENCLAW_LAUNCHD_LABEL).toBe("ai.openclaw.gateway");
+      expect(env.OPENCLAW_LAUNCHD_LABEL).toBe("ai.superhuman.gateway");
     }
   });
 
@@ -318,10 +318,10 @@ describe("buildServiceEnvironment", () => {
       env: { HOME: "/home/user", OPENCLAW_PROFILE: "work" },
       port: 18789,
     });
-    expect(env.OPENCLAW_SYSTEMD_UNIT).toBe("openclaw-gateway-work.service");
-    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("OpenClaw Gateway (work)");
+    expect(env.OPENCLAW_SYSTEMD_UNIT).toBe("superhuman-gateway-work.service");
+    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("Superhuman Gateway (work)");
     if (process.platform === "darwin") {
-      expect(env.OPENCLAW_LAUNCHD_LABEL).toBe("ai.openclaw.work");
+      expect(env.OPENCLAW_LAUNCHD_LABEL).toBe("ai.superhuman.work");
     }
   });
 
@@ -356,7 +356,7 @@ describe("buildServiceEnvironment", () => {
     });
 
     expect(env).not.toHaveProperty("PATH");
-    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("OpenClaw Gateway");
+    expect(env.OPENCLAW_WINDOWS_TASK_NAME).toBe("Superhuman Gateway");
   });
 
   it("prepends extra runtime directories to the gateway service PATH", () => {

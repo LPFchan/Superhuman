@@ -11,6 +11,9 @@ import type { Locale, TranslationMap } from "./types.ts";
 
 type Subscriber = (locale: Locale) => void;
 
+const STORAGE_KEY = "superhuman.i18n.locale";
+const LEGACY_STORAGE_KEY = "openclaw.i18n.locale";
+
 export { SUPPORTED_LOCALES, isSupportedLocale };
 
 class I18nManager {
@@ -28,7 +31,12 @@ class I18nManager {
       return null;
     }
     try {
-      return storage.getItem("openclaw.i18n.locale");
+      const locale = storage.getItem(STORAGE_KEY) ?? storage.getItem(LEGACY_STORAGE_KEY);
+      if (locale) {
+        storage.setItem(STORAGE_KEY, locale);
+        storage.removeItem(LEGACY_STORAGE_KEY);
+      }
+      return locale;
     } catch {
       return null;
     }
@@ -40,7 +48,8 @@ class I18nManager {
       return;
     }
     try {
-      storage.setItem("openclaw.i18n.locale", locale);
+      storage.setItem(STORAGE_KEY, locale);
+      storage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       // Ignore storage write failures in private/blocked contexts.
     }

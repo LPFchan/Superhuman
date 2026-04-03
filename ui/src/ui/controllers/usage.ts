@@ -35,6 +35,7 @@ type UsageDateInterpretationParams = {
   utcOffset?: string;
 };
 
+const USAGE_DATE_PARAMS_STORAGE_KEY = "superhuman.control.usage.date-params.v1";
 const LEGACY_USAGE_DATE_PARAMS_STORAGE_KEY = "openclaw.control.usage.date-params.v1";
 const LEGACY_USAGE_DATE_PARAMS_DEFAULT_GATEWAY_KEY = "__default__";
 const LEGACY_USAGE_DATE_PARAMS_MODE_RE = /unexpected property ['"]mode['"]/i;
@@ -53,7 +54,9 @@ function loadLegacyUsageDateParamsCache(): Set<string> {
     return new Set<string>();
   }
   try {
-    const raw = storage.getItem(LEGACY_USAGE_DATE_PARAMS_STORAGE_KEY);
+    const raw =
+      storage.getItem(USAGE_DATE_PARAMS_STORAGE_KEY) ??
+      storage.getItem(LEGACY_USAGE_DATE_PARAMS_STORAGE_KEY);
     if (!raw) {
       return new Set<string>();
     }
@@ -61,6 +64,8 @@ function loadLegacyUsageDateParamsCache(): Set<string> {
     if (!parsed || !Array.isArray(parsed.unsupportedGatewayKeys)) {
       return new Set<string>();
     }
+    storage.setItem(USAGE_DATE_PARAMS_STORAGE_KEY, raw);
+    storage.removeItem(LEGACY_USAGE_DATE_PARAMS_STORAGE_KEY);
     return new Set(
       parsed.unsupportedGatewayKeys
         .filter((entry): entry is string => typeof entry === "string")
@@ -79,9 +84,10 @@ function persistLegacyUsageDateParamsCache(cache: Set<string>) {
   }
   try {
     storage.setItem(
-      LEGACY_USAGE_DATE_PARAMS_STORAGE_KEY,
+      USAGE_DATE_PARAMS_STORAGE_KEY,
       JSON.stringify({ unsupportedGatewayKeys: Array.from(cache) }),
     );
+    storage.removeItem(LEGACY_USAGE_DATE_PARAMS_STORAGE_KEY);
   } catch {
     // ignore quota/private-mode failures
   }

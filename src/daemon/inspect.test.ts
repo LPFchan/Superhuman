@@ -12,15 +12,15 @@ vi.mock("./schtasks-exec.js", () => ({
   execSchtasks: (...args: unknown[]) => execSchtasksMock(...args),
 }));
 
-// Real content from the openclaw-gateway.service unit file (the canonical gateway unit).
+// Real content from the superhuman-gateway.service unit file (the canonical gateway unit).
 const GATEWAY_SERVICE_CONTENTS = `\
 [Unit]
-Description=OpenClaw Gateway (v2026.3.8)
+Description=Superhuman Gateway (v2026.3.8)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/node /home/openclaw/.npm-global/lib/node_modules/openclaw/dist/entry.js gateway --port 18789
+ExecStart=/usr/bin/node /home/superhuman/.npm-global/lib/node_modules/@lpfchan/superhuman/dist/entry.js gateway --port 18789
 Restart=always
 Environment=OPENCLAW_SERVICE_MARKER=openclaw
 Environment=OPENCLAW_SERVICE_KIND=gateway
@@ -58,8 +58,8 @@ describe("detectMarkerLineWithGateway", () => {
     expect(detectMarkerLineWithGateway(TEST_SERVICE_CONTENTS)).toBeNull();
   });
 
-  it("returns openclaw for the canonical gateway unit (ExecStart has both openclaw and gateway)", () => {
-    expect(detectMarkerLineWithGateway(GATEWAY_SERVICE_CONTENTS)).toBe("openclaw");
+  it("returns superhuman for the canonical gateway unit", () => {
+    expect(detectMarkerLineWithGateway(GATEWAY_SERVICE_CONTENTS)).toBe("superhuman");
   });
 
   it("returns clawdbot for a clawdbot gateway unit", () => {
@@ -92,14 +92,14 @@ describe("findExtraGatewayServices (linux / scanSystemdDir) — real filesystem"
   });
 
   it.skipIf(!isLinux)(
-    "does not report the canonical openclaw-gateway.service as an extra service",
+    "does not report the canonical superhuman-gateway.service as an extra service",
     async () => {
       const tmpHome = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-test-"));
       const systemdDir = path.join(tmpHome, ".config", "systemd", "user");
       try {
         await fs.mkdir(systemdDir, { recursive: true });
         await fs.writeFile(
-          path.join(systemdDir, "openclaw-gateway.service"),
+          path.join(systemdDir, "superhuman-gateway.service"),
           GATEWAY_SERVICE_CONTENTS,
         );
         const result = await findExtraGatewayServices({ HOME: tmpHome });
@@ -172,10 +172,13 @@ describe("findExtraGatewayServices (win32)", () => {
     expect(result).toEqual([]);
   });
 
-  it("collects only non-openclaw marker tasks from schtasks output", async () => {
+  it("collects legacy marker tasks from schtasks output while ignoring the canonical Superhuman task", async () => {
     execSchtasksMock.mockResolvedValueOnce({
       code: 0,
       stdout: [
+        "TaskName: Superhuman Gateway",
+        "Task To Run: C:\\Program Files\\Superhuman\\superhuman.exe gateway run",
+        "",
         "TaskName: OpenClaw Gateway",
         "Task To Run: C:\\Program Files\\OpenClaw\\openclaw.exe gateway run",
         "",
@@ -191,6 +194,15 @@ describe("findExtraGatewayServices (win32)", () => {
 
     const result = await findExtraGatewayServices({}, { deep: true });
     expect(result).toEqual([
+      {
+        platform: "win32",
+        label: "OpenClaw Gateway",
+        detail:
+          "task: OpenClaw Gateway, run: C:\\Program Files\\OpenClaw\\openclaw.exe gateway run",
+        scope: "system",
+        marker: "openclaw",
+        legacy: true,
+      },
       {
         platform: "win32",
         label: "Clawdbot Legacy",

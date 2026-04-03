@@ -79,8 +79,45 @@ type MigrationLogger = {
   warn: (message: string) => void;
 };
 
+type RuntimeIdentityMigrationReport = {
+  version: 1;
+  generatedAt: string;
+  stateDir: string;
+  skipped: boolean;
+  migrated: boolean;
+  changes: string[];
+  warnings: string[];
+};
+
 let autoMigrateChecked = false;
 let autoMigrateStateDirChecked = false;
+
+function writeRuntimeIdentityMigrationReport(params: {
+  stateDir: string;
+  skipped: boolean;
+  migrated: boolean;
+  changes: string[];
+  warnings: string[];
+}): string | null {
+  try {
+    const reportDir = path.join(params.stateDir, "migration-reports");
+    ensureDir(reportDir);
+    const reportPath = path.join(reportDir, "runtime-identity.json");
+    const report: RuntimeIdentityMigrationReport = {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      stateDir: params.stateDir,
+      skipped: params.skipped,
+      migrated: params.migrated,
+      changes: params.changes,
+      warnings: params.warnings,
+    };
+    fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+    return reportPath;
+  } catch {
+    return null;
+  }
+}
 
 function isSurfaceGroupKey(key: string): boolean {
   return key.includes(":group:") || key.includes(":channel:");
@@ -1218,16 +1255,36 @@ export async function autoMigrateLegacyState(params: {
     }
   };
 
-  if (env.OPENCLAW_AGENT_DIR?.trim() || env.PI_CODING_AGENT_DIR?.trim()) {
-    const changes = [...stateDirResult.changes, ...orphanKeys.changes];
-    const warnings = [...stateDirResult.warnings, ...orphanKeys.warnings];
-    logMigrationResults(changes, warnings);
+  const finalize = (result: {
+    migrated: boolean;
+    skipped: boolean;
+    changes: string[];
+    warnings: string[];
+  }) => {
+    const reportPath = writeRuntimeIdentityMigrationReport({
+      stateDir: resolveStateDir(env, params.homedir),
+      skipped: result.skipped,
+      migrated: result.migrated,
+      changes: result.changes,
+      warnings: result.warnings,
+    });
+    const finalChanges = reportPath
+      ? [...result.changes, `Wrote runtime identity migration report → ${reportPath}`]
+      : result.changes;
+    logMigrationResults(finalChanges, result.warnings);
     return {
+      ...result,
+      changes: finalChanges,
+    };
+  };
+
+  if (env.OPENCLAW_AGENT_DIR?.trim() || env.PI_CODING_AGENT_DIR?.trim()) {
+    return finalize({
       migrated: stateDirResult.migrated || orphanKeys.changes.length > 0,
       skipped: true,
-      changes,
-      warnings,
-    };
+      changes: [...stateDirResult.changes, ...orphanKeys.changes],
+      warnings: [...stateDirResult.warnings, ...orphanKeys.warnings],
+    });
   }
 
   const detected = await detectLegacyStateMigrations({
@@ -1236,15 +1293,12 @@ export async function autoMigrateLegacyState(params: {
     homedir: params.homedir,
   });
   if (!detected.sessions.hasLegacy && !detected.agentDir.hasLegacy) {
-    const changes = [...stateDirResult.changes, ...orphanKeys.changes];
-    const warnings = [...stateDirResult.warnings, ...orphanKeys.warnings];
-    logMigrationResults(changes, warnings);
-    return {
+    return finalize({
       migrated: stateDirResult.migrated || orphanKeys.changes.length > 0,
       skipped: false,
-      changes,
-      warnings,
-    };
+      changes: [...stateDirResult.changes, ...orphanKeys.changes],
+      warnings: [...stateDirResult.warnings, ...orphanKeys.warnings],
+    });
   }
 
   const now = params.now ?? (() => Date.now());
@@ -1263,12 +1317,10 @@ export async function autoMigrateLegacyState(params: {
     ...agentDir.warnings,
   ];
 
-  logMigrationResults(changes, warnings);
-
-  return {
+  return finalize({
     migrated: changes.length > 0,
     skipped: false,
     changes,
     warnings,
-  };
+  });
 }
