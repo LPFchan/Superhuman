@@ -54,6 +54,18 @@ describe("version resolution", () => {
     });
   });
 
+  it("accepts the Superhuman package name when reading version metadata", async () => {
+    await withTempDir(async (root) => {
+      await writeJsonFixture(root, "package.json", {
+        name: "@lpfchan/superhuman",
+        version: "7.8.9",
+      });
+      const moduleUrl = await ensureModuleFixture(root);
+      expect(readVersionFromPackageJsonForModuleUrl(moduleUrl)).toBe("7.8.9");
+      expect(resolveVersionFromModuleUrl(moduleUrl)).toBe("7.8.9");
+    });
+  });
+
   it("ignores unrelated nearby package.json files", async () => {
     await withTempDir(async (root) => {
       await writeJsonFixture(root, "package.json", { name: "openclaw", version: "2.3.4" });

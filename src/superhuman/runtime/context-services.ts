@@ -1,5 +1,5 @@
 import type { OpenClawConfig } from "../../config/config.js";
-import { SuperContextEngineCompactionManager } from "../super-compaction-manager.js";
+import { SuperContextEngineCompactionManager } from "../context/compaction-manager.js";
 import type { CompactionManager, StateStore } from "./seams.js";
 
 export type SuperContextServices = {

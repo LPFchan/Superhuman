@@ -1,6 +1,7 @@
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./test-helpers/schtasks-base-mocks.js";
+import { resolveGatewayWindowsTaskName } from "./constants.js";
 import {
   inspectPortUsage,
   killProcessTree,
@@ -183,7 +184,11 @@ describe("Scheduled Task stop/restart cleanup", () => {
       expect(findVerifiedGatewayListenerPidsOnPortSync).toHaveBeenCalledWith(GATEWAY_PORT);
       expectGatewayTermination(5151);
       expect(inspectPortUsage).toHaveBeenCalledTimes(2);
-      expect(schtasksCalls.at(-1)).toEqual(["/Run", "/TN", "OpenClaw Gateway"]);
+      expect(schtasksCalls.at(-1)).toEqual([
+        "/Run",
+        "/TN",
+        resolveGatewayWindowsTaskName(env.OPENCLAW_PROFILE),
+      ]);
     });
   });
 });

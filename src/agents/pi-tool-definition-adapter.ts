@@ -10,7 +10,7 @@ import {
   createSuperToolExecutionScheduler,
   getSuperRuntimeToolExecutionContext,
   getSuperRuntimeToolSafetyMeta,
-} from "../superhuman/super-tool-runtime-policy.js";
+} from "../superhuman/policy/tool-runtime.js";
 import { isPlainObject } from "../utils.js";
 import { sanitizeForConsole } from "./console-sanitize.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";

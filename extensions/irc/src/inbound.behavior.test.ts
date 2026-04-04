@@ -108,7 +108,7 @@ describe("irc inbound behavior", () => {
     expect(sendReply).toHaveBeenCalledTimes(1);
     expect(sendReply).toHaveBeenCalledWith(
       "alice",
-      expect.stringContaining("OpenClaw: access not configured."),
+      expect.stringContaining("Superhuman: access not configured."),
       undefined,
     );
     expect(sendReply).toHaveBeenCalledWith(

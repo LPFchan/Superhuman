@@ -2,8 +2,8 @@ import type { OpenClawConfig } from "../../config/config.js";
 import {
   startSuperOrchestrationRuntime,
   type OrchestrationRuntime,
-} from "../super-orchestration-runtime.js";
-import type { SuperRemoteSessionManager } from "../super-remote-session-manager.js";
+} from "../orchestration/runtime.js";
+import type { SuperRemoteSessionManager } from "../remote/session-manager.js";
 import type { ExecutionEnvironmentRegistry, StateStore } from "./seams.js";
 
 export type SuperOrchestrationServices = {

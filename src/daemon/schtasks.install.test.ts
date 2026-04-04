@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveGatewayWindowsTaskName } from "./constants.js";
 import { installScheduledTask, readScheduledTaskCommand } from "./schtasks.js";
 
 const schtasksCalls: string[][] = [];
@@ -98,7 +99,11 @@ describe("installScheduledTask", () => {
 
       expect(schtasksCalls[0]).toEqual(["/Query"]);
       expect(schtasksCalls[1]?.[0]).toBe("/Create");
-      expect(schtasksCalls[2]).toEqual(["/Run", "/TN", "OpenClaw Gateway"]);
+      expect(schtasksCalls[2]).toEqual([
+        "/Run",
+        "/TN",
+        resolveGatewayWindowsTaskName(env.OPENCLAW_PROFILE),
+      ]);
     });
   });
 

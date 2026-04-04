@@ -955,6 +955,7 @@
                 "pages": [
                   "install/updating",
                   "install/migrating",
+                  "install/config-state-migration",
                   "install/superhuman-migration",
                   "install/migrating-matrix",
                   "install/uninstall",
@@ -1084,6 +1085,7 @@
                     "group": "Building Plugins",
                     "pages": [
                       "plugins/building-plugins",
+                      "plugins/compatibility-contracts",
                       "plugins/sdk-channel-plugins",
                       "plugins/sdk-provider-plugins",
                       "plugins/sdk-migration"
@@ -1510,7 +1512,11 @@
               },
               {
                 "group": "Project",
-                "pages": ["reference/provenance", "reference/credits"]
+                "pages": [
+                  "reference/provenance",
+                  "reference/compatibility-namespaces",
+                  "reference/credits"
+                ]
               },
               {
                 "group": "Release policy",

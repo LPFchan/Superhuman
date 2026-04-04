@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveGatewayWindowsTaskName } from "../daemon/constants.js";
 import { captureFullEnv } from "../test-utils/env.js";
 
 const spawnMock = vi.hoisted(() => vi.fn());
@@ -77,7 +78,9 @@ describe("relaunchGatewayScheduledTask", () => {
     expect(result).toMatchObject({
       ok: true,
       method: "schtasks",
-      tried: expect.arrayContaining(['schtasks /Run /TN "OpenClaw Gateway (work)"']),
+      tried: expect.arrayContaining([
+        `schtasks /Run /TN "${resolveGatewayWindowsTaskName("work")}"`,
+      ]),
     });
     expect(result.tried).toContain(`cmd.exe /d /s /c ${seenCommandArg}`);
     expect(spawnMock).toHaveBeenCalledWith(
@@ -95,7 +98,9 @@ describe("relaunchGatewayScheduledTask", () => {
     expect(scriptPath).toBeTruthy();
     const script = fs.readFileSync(scriptPath, "utf8");
     expect(script).toContain("timeout /t 1 /nobreak >nul");
-    expect(script).toContain('schtasks /Run /TN "OpenClaw Gateway (work)" >nul 2>&1');
+    expect(script).toContain(
+      `schtasks /Run /TN "${resolveGatewayWindowsTaskName("work")}" >nul 2>&1`,
+    );
     expect(script).toContain('del "%~f0" >nul 2>&1');
   });
 

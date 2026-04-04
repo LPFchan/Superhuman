@@ -2,7 +2,7 @@ import { listAgentIds, resolveAgentWorkspaceDir } from "../../../agents/agent-sc
 import { createDefaultDeps } from "../../../cli/deps.js";
 import { runBootOnce } from "../../../gateway/boot.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
-import { getActiveSuperAutomationRuntime } from "../../../superhuman/super-automation-runtime.js";
+import { getActiveSuperAutomationRuntime } from "../../../superhuman/automation/runtime.js";
 import type { HookHandler } from "../../hooks.js";
 import { isGatewayStartupEvent } from "../../internal-hooks.js";
 

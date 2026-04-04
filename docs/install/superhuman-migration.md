@@ -61,4 +61,6 @@ It is the public statement of migration direction and compatibility posture that
 ## Related pages
 
 - Provenance: [Provenance](/reference/provenance)
+- Compatibility namespaces: [Compatibility Namespaces](/reference/compatibility-namespaces)
+- Config and state migration: [Config and State Migration](/install/config-state-migration)
 - Release policy: [Releasing](/reference/RELEASING)

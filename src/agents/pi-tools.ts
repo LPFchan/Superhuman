@@ -6,11 +6,11 @@ import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runt
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
-import type { SuperhumanAgentRuntimeTurn } from "../superhuman/runtime/agent.js";
 import {
   applyDefaultSuperRuntimeToolSafety,
   applySuperRuntimeToolExecutionContext,
-} from "../superhuman/super-tool-runtime-policy.js";
+} from "../superhuman/policy/tool-runtime.js";
+import type { SuperhumanAgentRuntimeTurn } from "../superhuman/runtime/agent.js";
 import { resolveGatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 import { createApplyPatchTool } from "./apply-patch.js";

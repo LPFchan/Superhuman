@@ -1,20 +1,17 @@
 import type { CronService } from "../../cron/service.js";
 import {
-  startSuperAutomationRuntime,
-  type SuperAutomationRuntime,
-} from "../super-automation-runtime.js";
-import {
   startSuperNotificationCenter,
   type SuperNotificationCenter,
-} from "../super-notification-center.js";
+} from "../automation/notification-center.js";
 import {
   startSuperRemoteScheduleRuntime,
   type SuperRemoteScheduleRuntime,
-} from "../super-remote-schedule-runtime.js";
+} from "../automation/remote-schedule.js";
+import { startSuperAutomationRuntime, type SuperAutomationRuntime } from "../automation/runtime.js";
 import {
   startSuperSubscriptionManager,
   type SuperSubscriptionManager,
-} from "../super-subscription-manager.js";
+} from "../automation/subscription-manager.js";
 import type { ExecutionEnvironmentRegistry, SessionRegistry, StateStore } from "./seams.js";
 
 export type SuperAutomationServices = {

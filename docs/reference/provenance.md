@@ -55,4 +55,5 @@ Branding changes are product changes, not provenance erasure.
 ## Related pages
 
 - Migration guide: [OpenClaw to Superhuman](/install/superhuman-migration)
+- Compatibility namespaces: [Compatibility Namespaces](/reference/compatibility-namespaces)
 - Credits: [Credits](/reference/credits)

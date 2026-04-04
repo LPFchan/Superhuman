@@ -29,6 +29,10 @@ function setPackageRoot(root: string, name = "openclaw") {
   setFile(path.join(root, "package.json"), JSON.stringify({ name }));
 }
 
+function setSuperhumanPackageRoot(root: string) {
+  setPackageRoot(root, "@lpfchan/superhuman");
+}
+
 function expectResolvedPackageRoot(
   syncResolver: typeof import("./openclaw-root.js").resolveOpenClawPackageRootSync,
   asyncResolver: typeof import("./openclaw-root.js").resolveOpenClawPackageRoot,
@@ -158,6 +162,17 @@ describe("resolveOpenClawPackageRoot", () => {
       },
     },
     {
+      name: "recognizes Superhuman package roots from moduleUrl",
+      setup: () => {
+        const pkgRoot = fx("superhuman-moduleurl");
+        setSuperhumanPackageRoot(pkgRoot);
+        return {
+          opts: { moduleUrl: pathToFileURL(path.join(pkgRoot, "dist", "index.js")).toString() },
+          expected: pkgRoot,
+        };
+      },
+    },
+    {
       name: "falls through from a non-openclaw moduleUrl candidate to cwd",
       setup: () => {
         const wrongPkgRoot = fx("moduleurl-fallthrough", "wrong");
@@ -171,6 +186,14 @@ describe("resolveOpenClawPackageRoot", () => {
           },
           expected: cwdPkgRoot,
         };
+      },
+    },
+    {
+      name: "recognizes Superhuman package roots from cwd",
+      setup: () => {
+        const pkgRoot = fx("superhuman-cwd");
+        setSuperhumanPackageRoot(pkgRoot);
+        return { opts: { cwd: pkgRoot }, expected: pkgRoot };
       },
     },
     {

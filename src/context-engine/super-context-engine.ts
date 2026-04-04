@@ -15,7 +15,7 @@ import type { StateEvidenceSource } from "../superhuman/runtime/seams.js";
 import {
   createSuperhumanStateStore,
   resolveSuperhumanStateDir,
-} from "../superhuman/super-state-store.js";
+} from "../superhuman/state/store.js";
 import { delegateCompactionToRuntime } from "./delegate.js";
 import { registerContextEngineForOwner } from "./registry.js";
 import type {

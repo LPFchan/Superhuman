@@ -98,7 +98,7 @@ describe("nodes camera helpers", () => {
       tmpDir: "/tmp",
       id: "id1",
     });
-    expect(p).toBe(path.join("/tmp", "openclaw-camera-snap-front-id1.jpg"));
+    expect(p).toBe(path.join("/tmp", "superhuman-camera-snap-front-id1.jpg"));
   });
 
   it("writes camera clip payload to temp path", async () => {
@@ -114,7 +114,7 @@ describe("nodes camera helpers", () => {
         tmpDir: dir,
         id: "clip1",
       });
-      expect(out).toBe(path.join(dir, "openclaw-camera-clip-front-clip1.mp4"));
+      expect(out).toBe(path.join(dir, "superhuman-camera-clip-front-clip1.mp4"));
       await expect(readFileUtf8AndCleanup(out)).resolves.toBe("hi");
     });
   });
@@ -135,7 +135,7 @@ describe("nodes camera helpers", () => {
         id: "clip2",
         expectedHost,
       });
-      expect(out).toBe(path.join(dir, "openclaw-camera-clip-back-clip2.mp4"));
+      expect(out).toBe(path.join(dir, "superhuman-camera-clip-back-clip2.mp4"));
       await expect(readFileUtf8AndCleanup(out)).resolves.toBe("url-clip");
     });
   });
@@ -290,6 +290,6 @@ describe("nodes screen helpers", () => {
       tmpDir: "/tmp",
       id: "id1",
     });
-    expect(p).toBe(path.join("/tmp", "openclaw-screen-record-id1.mp4"));
+    expect(p).toBe(path.join("/tmp", "superhuman-screen-record-id1.mp4"));
   });
 });

@@ -4,12 +4,12 @@ import path from "node:path";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import { afterEach, describe, expect, it } from "vitest";
-import { SuperhumanAgentRuntimeTurn } from "../superhuman/runtime/agent.js";
-import { createSuperhumanStateStore } from "../superhuman/super-state-store.js";
 import {
   setSuperRuntimeToolExecutionContext,
   setSuperRuntimeToolSafetyMeta,
-} from "../superhuman/super-tool-runtime-policy.js";
+} from "../superhuman/policy/tool-runtime.js";
+import { SuperhumanAgentRuntimeTurn } from "../superhuman/runtime/agent.js";
+import { createSuperhumanStateStore } from "../superhuman/state/store.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";
 import { toClientToolDefinitions, toToolDefinitions } from "./pi-tool-definition-adapter.js";
 

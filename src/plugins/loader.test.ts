@@ -2057,13 +2057,13 @@ module.exports = { id: "skipped-scoped-only", register() { throw new Error("skip
         label: "rejects plugin context engine ids reserved by core",
         pluginId: "context-engine-core-collision",
         body: `module.exports = { id: "context-engine-core-collision", register(api) {
-  api.registerContextEngine("legacy", () => ({}));
+  api.registerContextEngine("super-context", () => ({}));
 } };`,
         assert: (registry: ReturnType<typeof loadOpenClawPlugins>) => {
           expectRegistryErrorDiagnostic({
             registry,
             pluginId: "context-engine-core-collision",
-            message: "context engine id reserved by core: legacy",
+            message: "context engine id reserved by core: super-context",
           });
         },
       },

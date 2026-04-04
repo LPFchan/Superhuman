@@ -587,7 +587,8 @@ async function activateScheduledTask(params: {
   scriptPath: string;
   description?: string;
 }) {
-  const taskDescription = params.description ?? "OpenClaw Gateway";
+  const taskDescription =
+    params.description ?? resolveGatewayServiceDescription({ env: params.env });
 
   const taskName = resolveTaskName(params.env);
   const quotedScript = quoteSchtasksArg(params.scriptPath);

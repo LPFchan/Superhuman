@@ -1,5 +1,5 @@
 import { stripInboundMetadata } from "../auto-reply/reply/strip-inbound-meta.js";
-import { extractSuperReplayAnnotations } from "../superhuman/super-replay-annotations.js";
+import { extractSuperReplayAnnotations } from "../superhuman/transcript/replay-annotations.js";
 
 const DEDUPE_TIMESTAMP_WINDOW_MS = 5 * 60 * 1000;
 

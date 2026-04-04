@@ -4,6 +4,9 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createConfigIO } from "./io.js";
 
+const DEFAULT_STATE_DIRNAME = ".superhuman";
+const DEFAULT_CONFIG_FILENAME = "superhuman.json";
+
 describe("config io observe", () => {
   let fixtureRoot = "";
   let homeCaseId = 0;
@@ -31,8 +34,8 @@ describe("config io observe", () => {
         error,
       },
     });
-    const configPath = path.join(home, ".openclaw", "openclaw.json");
-    const auditPath = path.join(home, ".openclaw", "logs", "config-audit.jsonl");
+    const configPath = path.join(home, DEFAULT_STATE_DIRNAME, DEFAULT_CONFIG_FILENAME);
+    const auditPath = path.join(home, DEFAULT_STATE_DIRNAME, "logs", "config-audit.jsonl");
     return { io, configPath, auditPath, warn, error };
   }
 

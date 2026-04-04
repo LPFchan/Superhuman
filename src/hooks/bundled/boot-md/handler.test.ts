@@ -27,7 +27,7 @@ vi.mock("../../../agents/agent-scope.js", () => ({
 vi.mock("../../../logging/subsystem.js", () => ({
   createSubsystemLogger: () => createMockLogger(),
 }));
-vi.mock("../../../superhuman/super-automation-runtime.js", () => ({
+vi.mock("../../../superhuman/automation/runtime.js", () => ({
   getActiveSuperAutomationRuntime: () => ({
     recordBootRun,
   }),

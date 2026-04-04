@@ -2,7 +2,7 @@ import { copyPluginToolMeta } from "../plugins/tools.js";
 import {
   copySuperRuntimeToolExecutionContext,
   copySuperRuntimeToolSafetyMeta,
-} from "../superhuman/super-tool-runtime-policy.js";
+} from "../superhuman/policy/tool-runtime.js";
 import { bindAbortRelay } from "../utils/fetch-timeout.js";
 import { copyChannelAgentToolMeta } from "./channel-tools.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";

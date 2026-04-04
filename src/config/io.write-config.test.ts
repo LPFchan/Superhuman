@@ -5,6 +5,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createConfigIO } from "./io.js";
 import type { OpenClawConfig } from "./types.js";
 
+const DEFAULT_STATE_DIRNAME = ".superhuman";
+const DEFAULT_CONFIG_FILENAME = "superhuman.json";
+
 // Mock the plugin manifest registry so we can register a fake channel whose
 // AJV JSON Schema carries a `default` value.  This lets the #56772 regression
 // test exercise the exact code path that caused the bug: AJV injecting
@@ -64,7 +67,7 @@ describe("config io write", () => {
     env?: NodeJS.ProcessEnv;
     logger?: { warn: (msg: string) => void; error: (msg: string) => void };
   }) {
-    const configPath = path.join(params.home, ".openclaw", "openclaw.json");
+    const configPath = path.join(params.home, DEFAULT_STATE_DIRNAME, DEFAULT_CONFIG_FILENAME);
     await fs.mkdir(path.dirname(configPath), { recursive: true });
     await fs.writeFile(configPath, JSON.stringify(params.initialConfig, null, 2), "utf-8");
 
@@ -111,7 +114,7 @@ describe("config io write", () => {
         error: vi.fn(),
       },
     });
-    const auditPath = path.join(params.home, ".openclaw", "logs", "config-audit.jsonl");
+    const auditPath = path.join(params.home, DEFAULT_STATE_DIRNAME, "logs", "config-audit.jsonl");
     const next = structuredClone(snapshot.config);
     const gateway =
       next.gateway && typeof next.gateway === "object"
@@ -177,7 +180,7 @@ describe("config io write", () => {
     "tightens world-writable state dir when writing the default config",
     async () => {
       await withSuiteHome(async (home) => {
-        const stateDir = path.join(home, ".openclaw");
+        const stateDir = path.join(home, DEFAULT_STATE_DIRNAME);
         await fs.mkdir(stateDir, { recursive: true, mode: 0o777 });
         await fs.chmod(stateDir, 0o777);
 
@@ -251,7 +254,7 @@ describe("config io write", () => {
 
   it("does not mutate caller config when unsetPaths is applied on first write", async () => {
     await withSuiteHome(async (home) => {
-      const configPath = path.join(home, ".openclaw", "openclaw.json");
+      const configPath = path.join(home, DEFAULT_STATE_DIRNAME, DEFAULT_CONFIG_FILENAME);
       const io = createConfigIO({
         env: {} as NodeJS.ProcessEnv,
         homedir: () => home,
@@ -409,29 +412,45 @@ describe("config io write", () => {
     });
 
     await withSuiteHome(async (home) => {
-      const { configPath, io, snapshot } = await writeConfigAndCreateIo({
-        home,
-        initialConfig: {
-          gateway: { port: 18789 },
-          channels: {
-            bluebubbles: {
-              serverUrl: "http://localhost:1234",
+      vi.resetModules();
+      const { createConfigIO: createIsolatedConfigIO } = await import("./io.js");
+
+      const configPath = path.join(home, DEFAULT_STATE_DIRNAME, DEFAULT_CONFIG_FILENAME);
+      await fs.mkdir(path.dirname(configPath), { recursive: true });
+      await fs.writeFile(
+        configPath,
+        JSON.stringify(
+          {
+            gateway: { port: 18789 },
+            channels: {
+              bluebubbles: {
+                serverUrl: "http://localhost:1234",
+              },
             },
+          },
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+
+      const io = createIsolatedConfigIO({
+        env: {} as NodeJS.ProcessEnv,
+        homedir: () => home,
+        logger: silentLogger,
+      });
+
+      await io.writeConfigFile({
+        gateway: {
+          port: 18789,
+          auth: { mode: "token" },
+        },
+        channels: {
+          bluebubbles: {
+            serverUrl: "http://localhost:1234",
           },
         },
       });
-
-      // Simulate doctor: clone snapshot.config, make a small change, write back.
-      const next = structuredClone(snapshot.config);
-      const gateway =
-        next.gateway && typeof next.gateway === "object"
-          ? (next.gateway as Record<string, unknown>)
-          : {};
-      next.gateway = {
-        ...gateway,
-        auth: { mode: "token" },
-      };
-      await io.writeConfigFile(next);
 
       const persisted = JSON.parse(await fs.readFile(configPath, "utf-8")) as Record<
         string,
@@ -507,7 +526,7 @@ describe("config io write", () => {
 
   it("keeps env refs in arrays when appending entries", async () => {
     await withSuiteHome(async (home) => {
-      const configPath = path.join(home, ".openclaw", "openclaw.json");
+      const configPath = path.join(home, DEFAULT_STATE_DIRNAME, DEFAULT_CONFIG_FILENAME);
       await fs.mkdir(path.dirname(configPath), { recursive: true });
       await fs.writeFile(
         configPath,
@@ -669,10 +688,10 @@ describe("config io write", () => {
       });
       expect(lines.length).toBeGreaterThan(0);
       await expect(
-        fs.stat(path.join(home, ".openclaw", "logs", "config-audit.jsonl")),
+        fs.stat(path.join(home, DEFAULT_STATE_DIRNAME, "logs", "config-audit.jsonl")),
       ).resolves.toBeDefined();
       await expect(
-        fs.stat(path.resolve("undefined", ".openclaw", "logs", "config-audit.jsonl")),
+        fs.stat(path.resolve("undefined", DEFAULT_STATE_DIRNAME, "logs", "config-audit.jsonl")),
       ).rejects.toThrow();
     });
   });

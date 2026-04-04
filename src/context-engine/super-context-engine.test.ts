@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
-import { createSuperhumanStateStore } from "../superhuman/super-state-store.js";
+import { createSuperhumanStateStore } from "../superhuman/state/store.js";
 import { SuperContextEngine } from "./super-context-engine.js";
 
 const cleanupPaths = new Set<string>();

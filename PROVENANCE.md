@@ -36,5 +36,5 @@ Those surfaces are documented as compatibility namespaces, not as the public pro
 
 - Public provenance page: `docs/reference/provenance.md`
 - Public migration guide: `docs/install/superhuman-migration.md`
-- Internal migration contract: `port/product-migration-plan.md`
-- Phase 1 governance artifacts: `port/migration-charter.md`
+- Internal migration contract: `architecture/product-migration-plan.md`
+- Phase 1 governance artifacts: `architecture/migration-charter.md`

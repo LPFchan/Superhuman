@@ -22,7 +22,7 @@ vi.mock("../acp-spawn.js", () => ({
   spawnAcpDirect: (...args: unknown[]) => hoisted.spawnAcpDirectMock(...args),
 }));
 
-vi.mock("../../superhuman/super-orchestration-runtime.js", () => ({
+vi.mock("../../superhuman/orchestration/runtime.js", () => ({
   getActiveSuperOrchestrationRuntime: () => hoisted.getActiveOrchestrationRuntimeMock(),
 }));
 
@@ -39,7 +39,7 @@ async function loadFreshSessionsSpawnToolModuleForTest() {
     ACP_SPAWN_STREAM_TARGETS: ["parent"],
     spawnAcpDirect: (...args: unknown[]) => hoisted.spawnAcpDirectMock(...args),
   }));
-  vi.doMock("../../superhuman/super-orchestration-runtime.js", () => ({
+  vi.doMock("../../superhuman/orchestration/runtime.js", () => ({
     getActiveSuperOrchestrationRuntime: () => hoisted.getActiveOrchestrationRuntimeMock(),
   }));
   ({ createSessionsSpawnTool } = await import("./sessions-spawn-tool.js"));

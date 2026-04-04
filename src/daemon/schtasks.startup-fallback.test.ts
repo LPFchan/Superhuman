@@ -3,6 +3,7 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { quoteCmdScriptArg } from "./cmd-argv.js";
+import { resolveGatewayWindowsTaskName } from "./constants.js";
 import "./test-helpers/schtasks-base-mocks.js";
 import {
   inspectPortUsage,
@@ -40,7 +41,7 @@ function resolveStartupEntryPath(env: Record<string, string>) {
     "Start Menu",
     "Programs",
     "Startup",
-    "OpenClaw Gateway.cmd",
+    `${resolveGatewayWindowsTaskName(env.OPENCLAW_PROFILE)}.cmd`,
   );
 }
 

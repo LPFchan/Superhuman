@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import { loadConfig } from "../../config/config.js";
-import { getActiveSuperOrchestrationRuntime } from "../../superhuman/super-orchestration-runtime.js";
+import { getActiveSuperOrchestrationRuntime } from "../../superhuman/orchestration/runtime.js";
 import type { GatewayMessageChannel } from "../../utils/message-channel.js";
 import { spawnAcpDirect } from "../acp-spawn.js";
 import { optionalStringEnum } from "../schema/typebox.js";

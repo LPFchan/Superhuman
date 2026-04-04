@@ -7,6 +7,7 @@ import {
   clearConfigCache,
   clearRuntimeConfigSnapshot,
   loadConfig,
+  resolveConfigPath,
   type OpenClawConfig,
   writeConfigFile,
 } from "../config/config.js";
@@ -338,7 +339,7 @@ describe("secrets runtime snapshot integration", () => {
         expect(activeAfterFailure?.sourceConfig.gateway?.auth?.token).toEqual(initialTokenRef);
 
         const persistedConfig = JSON.parse(
-          await fs.readFile(path.join(home, ".openclaw", "openclaw.json"), "utf8"),
+          await fs.readFile(resolveConfigPath({ HOME: home, USERPROFILE: home }), "utf8"),
         ) as OpenClawConfig;
         expect(persistedConfig.gateway?.auth?.token).toEqual(missingTokenRef);
       });
@@ -432,7 +433,7 @@ describe("secrets runtime snapshot integration", () => {
         expect(getActiveRuntimeWebToolsMetadata()?.search.selectedProvider).toBe("gemini");
 
         const persistedConfig = JSON.parse(
-          await fs.readFile(path.join(home, ".openclaw", "openclaw.json"), "utf8"),
+          await fs.readFile(resolveConfigPath({ HOME: home, USERPROFILE: home }), "utf8"),
         ) as OpenClawConfig;
         const persistedGoogleWebSearchConfig = persistedConfig.plugins?.entries?.google?.config as
           | { webSearch?: { apiKey?: unknown } }

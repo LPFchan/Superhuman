@@ -5,11 +5,11 @@ import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { copyPluginToolMeta } from "../plugins/tools.js";
 import { PluginApprovalResolutions, type PluginApprovalResolution } from "../plugins/types.js";
 import { createLazyRuntimeSurface } from "../shared/lazy-runtime.js";
-import { classifySuperCommandRisk } from "../superhuman/super-command-risk-classifier.js";
+import { classifySuperCommandRisk } from "../superhuman/policy/command-risk-classifier.js";
 import {
   copySuperRuntimeToolExecutionContext,
   copySuperRuntimeToolSafetyMeta,
-} from "../superhuman/super-tool-runtime-policy.js";
+} from "../superhuman/policy/tool-runtime.js";
 import { isPlainObject } from "../utils.js";
 import { copyChannelAgentToolMeta } from "./channel-tools.js";
 import { normalizeToolName } from "./tool-policy.js";

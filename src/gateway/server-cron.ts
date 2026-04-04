@@ -29,7 +29,7 @@ import { enqueueSystemEvent } from "../infra/system-events.js";
 import { getChildLogger } from "../logging.js";
 import { normalizeAgentId, toAgentStoreSessionKey } from "../routing/session-key.js";
 import { defaultRuntime } from "../runtime.js";
-import { getActiveSuperAutomationRuntime } from "../superhuman/super-automation-runtime.js";
+import { getActiveSuperAutomationRuntime } from "../superhuman/automation/runtime.js";
 
 export type GatewayCronState = {
   cron: CronService;

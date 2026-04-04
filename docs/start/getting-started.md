@@ -1,5 +1,5 @@
 ---
-summary: "Get OpenClaw installed and run your first chat in minutes."
+summary: "Get Superhuman installed and run your first chat in minutes."
 read_when:
   - First time setup from zero
   - You want the fastest path to a working chat
@@ -8,7 +8,7 @@ title: "Getting Started"
 
 # Getting Started
 
-Install OpenClaw, run onboarding, and chat with your AI assistant — all in
+Install Superhuman, run onboarding, and chat with your AI assistant — all in
 about 5 minutes. By the end you will have a running Gateway, configured auth,
 and a working chat session.
 
@@ -27,11 +27,11 @@ Need to install Node? See [Node setup](/install/node).
 ## Quick setup
 
 <Steps>
-  <Step title="Install OpenClaw">
+  <Step title="Install Superhuman">
     <Tabs>
       <Tab title="macOS / Linux">
         ```bash
-        curl -fsSL https://openclaw.ai/install.sh | bash
+        npm install -g @lpfchan/superhuman@latest
         ```
         <img
   src="/assets/install-script.svg"
@@ -41,19 +41,19 @@ Need to install Node? See [Node setup](/install/node).
       </Tab>
       <Tab title="Windows (PowerShell)">
         ```powershell
-        iwr -useb https://openclaw.ai/install.ps1 | iex
+        npm install -g @lpfchan/superhuman@latest
         ```
       </Tab>
     </Tabs>
 
     <Note>
-    Other install methods (Docker, Nix, npm): [Install](/install).
+    Other install methods and deployment targets: [Install](/install).
     </Note>
 
   </Step>
   <Step title="Run onboarding">
     ```bash
-    openclaw onboard --install-daemon
+    superhuman onboard --install-daemon
     ```
 
     The wizard walks you through choosing a model provider, setting an API key,
@@ -64,7 +64,7 @@ Need to install Node? See [Node setup](/install/node).
   </Step>
   <Step title="Verify the Gateway is running">
     ```bash
-    openclaw gateway status
+    superhuman gateway status
     ```
 
     You should see the Gateway listening on port 18789.
@@ -72,7 +72,7 @@ Need to install Node? See [Node setup](/install/node).
   </Step>
   <Step title="Open the dashboard">
     ```bash
-    openclaw dashboard
+    superhuman dashboard
     ```
 
     This opens the Control UI in your browser. If it loads, everything is working.
@@ -106,11 +106,13 @@ Need to install Node? See [Node setup](/install/node).
 </Columns>
 
 <Accordion title="Advanced: environment variables">
-  If you run OpenClaw as a service account or want custom paths:
+  If you run Superhuman as a service account or want custom paths:
 
-- `OPENCLAW_HOME` — home directory for internal path resolution
-- `OPENCLAW_STATE_DIR` — override the state directory
-- `OPENCLAW_CONFIG_PATH` — override the config file path
+- `SUPERHUMAN_HOME` — home directory for internal path resolution
+- `SUPERHUMAN_STATE_DIR` — override the state directory
+- `SUPERHUMAN_CONFIG_PATH` — override the config file path
+
+Legacy `OPENCLAW_*` env vars are still read during the migration wave.
 
 Full reference: [Environment variables](/help/environment).
 </Accordion>

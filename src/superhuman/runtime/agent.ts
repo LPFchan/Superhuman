@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { AgentEventPayload } from "../../infra/agent-events.js";
-import { classifySuperCommandRisk } from "../super-command-risk-classifier.js";
-import { createSuperhumanStateStore } from "../super-state-store.js";
+import { classifySuperCommandRisk } from "../policy/command-risk-classifier.js";
+import { createSuperhumanStateStore } from "../state/store.js";
 import type {
   AgentRuntimeStage,
   RuntimeBudgetExhaustionReason,
