@@ -20,6 +20,10 @@ assembly, and contract enforcement.
 
 - Preserve manifest-first behavior: discovery, config validation, and setup
   should work from metadata before plugin runtime executes.
+- Treat `openclaw.plugin.json`, `openclaw/plugin-sdk/*`, and related
+  `openclaw.*` manifest metadata as preserved external contracts, not stale
+  naming debt. If you change them, update the explicit compatibility docs and
+  contract tests first.
 - Keep loader behavior aligned with the documented Plugin SDK and manifest
   contracts. Do not create private backdoors that bundled plugins can use but
   external plugins cannot.

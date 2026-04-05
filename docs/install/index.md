@@ -1,5 +1,5 @@
 ---
-summary: "Install OpenClaw — installer script, npm/pnpm, from source, Docker, and more"
+summary: "Install Superhuman via the current OpenClaw compatibility installer, npm/pnpm, source, Docker, and more"
 read_when:
   - You need an install method other than the Getting Started quickstart
   - You want to deploy to a cloud platform
@@ -9,9 +9,14 @@ title: "Install"
 
 # Install
 
-## Recommended: installer script
+Superhuman's runtime identity has moved to Superhuman, but the verified public
+installer and npm distribution channels are still OpenClaw-shaped compatibility
+surfaces during this migration wave.
 
-The fastest way to install. It detects your OS, installs Node if needed, installs OpenClaw, and launches onboarding.
+## Recommended: compatibility installer script
+
+The fastest way to install. It detects your OS, installs Node if needed,
+installs the current public compatibility build, and launches onboarding.
 
 <Tabs>
   <Tab title="macOS / Linux / WSL2">
@@ -41,6 +46,14 @@ To install without running onboarding:
   </Tab>
 </Tabs>
 
+<Note>
+The `openclaw.ai` installer URLs are intentionally still the verified public
+distribution path for now. The runtime itself now defaults to Superhuman-shaped
+config and state paths while continuing to read legacy OpenClaw locations for
+upgrade compatibility. See [OpenClaw to Superhuman](/install/superhuman-migration)
+and [Config and State Migration](/install/config-state-migration).
+</Note>
+
 For all flags and CI/automation options, see [Installer internals](/install/installer).
 
 ## System requirements
@@ -54,6 +67,8 @@ For all flags and CI/automation options, see [Installer internals](/install/inst
 ### npm or pnpm
 
 If you already manage Node yourself:
+
+The currently verified public package channel is still `openclaw`.
 
 <Tabs>
   <Tab title="npm">
@@ -94,10 +109,13 @@ git clone https://github.com/openclaw/openclaw.git
 cd openclaw
 pnpm install && pnpm ui:build && pnpm build
 pnpm link --global
-openclaw onboard --install-daemon
+superhuman onboard --install-daemon
 ```
 
-Or skip the link and use `pnpm openclaw ...` from inside the repo. See [Setup](/start/setup) for full development workflows.
+The linked checkout exposes `superhuman` plus the legacy `openclaw` alias from
+this repo. Or skip the link and use `pnpm superhuman ...` from inside the repo.
+The workspace package also keeps `pnpm openclaw ...` available as the
+compatibility alias. See [Setup](/start/setup) for full development workflows.
 
 ### Install from GitHub main
 
@@ -127,15 +145,26 @@ npm install -g github:openclaw/openclaw#main
 
 ## Verify the install
 
-```bash
-openclaw --version      # confirm the CLI is available
-openclaw doctor         # check for config issues
-openclaw gateway status # verify the Gateway is running
-```
+<Tabs>
+  <Tab title="Public compatibility install">
+    ```bash
+    openclaw --version
+    openclaw doctor
+    openclaw gateway status
+    ```
+  </Tab>
+  <Tab title="Repo-linked checkout">
+    ```bash
+    superhuman --version
+    superhuman doctor
+    superhuman gateway status
+    ```
+  </Tab>
+</Tabs>
 
 ## Hosting and deployment
 
-Deploy OpenClaw on a cloud server or VPS:
+Deploy Superhuman on a cloud server or VPS:
 
 <CardGroup cols={3}>
   <Card title="VPS" href="/vps">Any Linux VPS</Card>
@@ -154,19 +183,21 @@ Deploy OpenClaw on a cloud server or VPS:
 
 <CardGroup cols={3}>
   <Card title="Updating" href="/install/updating" icon="refresh-cw">
-    Keep OpenClaw up to date.
+    Keep the current Superhuman runtime up to date.
   </Card>
   <Card title="Migrating" href="/install/migrating" icon="arrow-right">
     Move to a new machine.
   </Card>
   <Card title="Uninstall" href="/install/uninstall" icon="trash-2">
-    Remove OpenClaw completely.
+    Remove the current install completely.
   </Card>
 </CardGroup>
 
-## Troubleshooting: `openclaw` not found
+## Troubleshooting: CLI not found
 
-If the install succeeded but `openclaw` is not found in your terminal:
+If the install succeeded but your CLI is not found in your terminal, check the
+binary that matches your install path: `openclaw` for the current public
+compatibility install, or `superhuman` for a repo-linked checkout.
 
 ```bash
 node -v           # Node installed?

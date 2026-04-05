@@ -1,22 +1,30 @@
 ---
-summary: "Updating OpenClaw safely (global install or source), plus rollback strategy"
+summary: "Updating Superhuman safely while public installer and npm channels remain OpenClaw-shaped compatibility surfaces"
 read_when:
-  - Updating OpenClaw
+  - Updating Superhuman
   - Something breaks after an update
 title: "Updating"
 ---
 
 # Updating
 
-Keep OpenClaw up to date.
+Keep the current Superhuman runtime up to date. During this migration wave, the
+verified public updater, installer, and npm package channels are still
+OpenClaw-shaped compatibility surfaces.
 
-## Recommended: `openclaw update`
+## Recommended: `openclaw update` compatibility updater
 
 The fastest way to update. It detects your install type (npm or git), fetches the latest version, runs `openclaw doctor`, and restarts the gateway.
 
 ```bash
 openclaw update
 ```
+
+<Note>
+Public installs still update through `openclaw update`. Repo-linked checkouts of
+this repo also expose `superhuman update`, but both names drive the same runtime
+here.
+</Note>
 
 To switch channels or target a specific version:
 
@@ -28,7 +36,7 @@ openclaw update --dry-run   # preview without applying
 
 See [Development channels](/install/development-channels) for channel semantics.
 
-## Alternative: re-run the installer
+## Alternative: re-run the compatibility installer
 
 ```bash
 curl -fsSL https://openclaw.ai/install.sh | bash
@@ -48,7 +56,9 @@ pnpm add -g openclaw@latest
 
 ## Auto-updater
 
-The auto-updater is off by default. Enable it in `~/.openclaw/openclaw.json`:
+The auto-updater is off by default. Enable it in
+`~/.superhuman/superhuman.json`. The runtime still reads legacy
+`~/.openclaw/openclaw.json` during the migration window:
 
 ```json5
 {
@@ -108,7 +118,7 @@ openclaw doctor
 openclaw gateway restart
 ```
 
-Tip: `npm view openclaw version` shows the current published version.
+Tip: `npm view openclaw version` shows the current published compatibility build.
 
 ### Pin a commit (source)
 
@@ -132,3 +142,5 @@ To return to latest: `git checkout main && git pull`.
 - [Install Overview](/install) — all installation methods
 - [Doctor](/gateway/doctor) — health checks after updates
 - [Migrating](/install/migrating) — major version migration guides
+- [OpenClaw to Superhuman](/install/superhuman-migration) — identity and compatibility posture
+- [Config and State Migration](/install/config-state-migration) — runtime path migration details

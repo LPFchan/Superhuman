@@ -50,6 +50,9 @@ function hasTrustedOpenClawRootIndicator(params: {
   packageRoot: string;
   packageJson: PluginSdkPackageJson;
 }): boolean {
+  // Plugin authors still import the public SDK through the preserved OpenClaw
+  // namespace, so the loader only trusts package roots that advertise those
+  // legacy entrypoints explicitly.
   const packageExports = params.packageJson.exports ?? {};
   const hasPluginSdkRootExport = Object.prototype.hasOwnProperty.call(
     packageExports,
@@ -314,6 +317,9 @@ export function resolvePluginSdkScopedAliasMap(
     for (const kind of orderedKinds) {
       const candidate = candidateMap[kind];
       if (fs.existsSync(candidate)) {
+        // Preserve openclaw/plugin-sdk/* as the external import contract for
+        // existing plugins while resolving those specifiers onto the current
+        // host source/dist files locally.
         aliasMap[`openclaw/plugin-sdk/${subpath}`] = candidate;
         break;
       }
@@ -367,6 +373,8 @@ export function buildPluginLoaderAliasMap(
     pluginSdkResolution,
   });
   const extensionApiAlias = resolveExtensionApiAlias({ modulePath, pluginSdkResolution });
+  // Keep the OpenClaw SDK and extension-api specifiers wired into the current
+  // host so existing plugins keep loading across the product rename.
   return {
     ...(extensionApiAlias ? { "openclaw/extension-api": extensionApiAlias } : {}),
     ...(pluginSdkAlias ? { "openclaw/plugin-sdk": pluginSdkAlias } : {}),

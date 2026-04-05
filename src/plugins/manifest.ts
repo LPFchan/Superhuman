@@ -5,6 +5,8 @@ import { matchBoundaryFileOpenFailure, openBoundaryFileSync } from "../infra/bou
 import { isRecord } from "../utils.js";
 import type { PluginConfigUiHint, PluginKind } from "./types.js";
 
+// Keep the manifest filename canonical and openclaw-shaped so existing bundled
+// and third-party plugins continue to discover without repackaging.
 export const PLUGIN_MANIFEST_FILENAME = "openclaw.plugin.json";
 export const PLUGIN_MANIFEST_FILENAMES = [PLUGIN_MANIFEST_FILENAME] as const;
 

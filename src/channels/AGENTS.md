@@ -20,6 +20,10 @@ import from this tree directly.
 
 - Keep extension-facing channel surfaces flowing through `openclaw/plugin-sdk/*`
   instead of direct imports from `src/channels/**`.
+- The `openclaw/plugin-sdk/*` namespace remains the canonical extension
+  contract during the Superhuman migration. Do not rename imports to a
+  Superhuman namespace unless the SDK contract, loader aliases, and
+  compatibility docs all change together.
 - When a bundled or third-party channel needs a new seam, add a typed SDK
   contract or facade first.
 - Remember that shared channel changes affect both built-in and extension
