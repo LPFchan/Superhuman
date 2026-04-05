@@ -8,25 +8,12 @@ title: "Superhuman"
 # Superhuman
 
 <p align="center">
-    <img
-        src="/assets/openclaw-logo-text-dark.png"
-        alt="Superhuman"
-        width="500"
-        class="dark:hidden"
-    />
-    <img
-        src="/assets/openclaw-logo-text.png"
-        alt="Superhuman"
-        width="500"
-        class="hidden dark:block"
-    />
+  <img src="/assets/pixel-lobster.svg" alt="Superhuman" width="180" />
 </p>
 
-> _"EXFOLIATE! EXFOLIATE!"_ — A space lobster, probably
-
 <p align="center">
-  <strong>Any OS gateway for your persistent AI assistant across chat, apps, and devices.</strong><br />
-  Superhuman keeps the public product identity while preserving the OpenClaw plugin ecosystem compatibility story.
+  <strong>Your self-hosted AI assistant across chat, apps, and devices.</strong><br />
+  Run one Gateway and use it from WhatsApp, Telegram, the web dashboard, macOS, iPhone, and Android.
 </p>
 
 <Columns>
@@ -43,7 +30,7 @@ title: "Superhuman"
 
 ## What is Superhuman?
 
-Superhuman is a **self-hosted gateway** that connects your favorite chat apps, devices, and control surfaces to a persistent AI assistant. It preserves compatibility with its upstream OpenClaw-shaped core while moving the public product identity, docs, and runtime defaults to Superhuman.
+Superhuman is a **self-hosted gateway** for a persistent AI assistant. It connects your chat apps, paired devices, and browser controls to the same assistant so you can talk to it from wherever you already work.
 
 **Who is it for?** Developers and power users who want a personal AI assistant they can message from anywhere — without giving up control of their data or relying on a hosted service.
 
@@ -52,7 +39,7 @@ Superhuman is a **self-hosted gateway** that connects your favorite chat apps, d
 - **Self-hosted**: runs on your hardware, your rules
 - **Multi-channel**: one Gateway serves WhatsApp, Telegram, Discord, and more simultaneously
 - **Agent-native**: built for coding agents with tool use, sessions, memory, and multi-agent routing
-- **OpenClaw-compatible**: preserves inherited plugin ecosystem contracts during the migration wave
+- **Device-aware**: pair macOS, iPhone, and Android nodes for voice, camera, Canvas, and local actions
 
 **What do you need?** Node 24 (recommended), or Node 22 LTS (`22.14+`) for compatibility, an API key from your chosen provider, and 5 minutes. For best quality and security, use the strongest latest-generation model available.
 
@@ -96,7 +83,7 @@ The Gateway is the single source of truth for sessions, routing, and channel con
 ## Quick start
 
 <Steps>
-  <Step title="Install OpenClaw">
+  <Step title="Install Superhuman">
     ```bash
     npm install -g @lpfchan/superhuman@latest
     ```
@@ -129,7 +116,7 @@ Open the browser Control UI after the Gateway starts.
 
 ## Configuration (optional)
 
-Canonical config is moving to `~/.superhuman/superhuman.json`.
+Canonical config is `~/.superhuman/superhuman.json`.
 
 - If you **do nothing**, Superhuman uses the bundled Pi binary in RPC mode with per-sender sessions.
 - If you want to lock it down, start with `channels.whatsapp.allowFrom` and (for groups) mention rules.

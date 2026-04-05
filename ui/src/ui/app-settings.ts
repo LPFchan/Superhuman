@@ -584,7 +584,7 @@ function buildAttentionItems(host: OpenClawApp) {
       title: "Missing operator.read scope",
       description:
         "This connection does not have the operator.read scope. Some features may be unavailable.",
-      href: "https://docs.openclaw.ai/web/dashboard",
+      href: "https://superhuman.lost.plus/docs/web/dashboard",
       external: true,
     });
   }

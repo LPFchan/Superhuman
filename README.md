@@ -6,19 +6,18 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-**Superhuman** is a personal AI assistant you run on your own devices. It uses a local-first Gateway for sessions, channels, tools, and web surfaces, and it keeps compatibility with the OpenClaw plugin ecosystem where that compatibility is still part of the migration contract.
+**Superhuman** is a personal AI assistant you run on your own devices. One Gateway gives you the same assistant across chat apps, the web dashboard, and paired devices.
 
-It is built for a single-user, operator-controlled setup: local when you want it, remote when you need it, with companion surfaces across macOS, iOS, Android, WebChat, and Canvas.
+It is built for people who want an assistant they control: self-hosted, multi-device, and available from the tools they already use.
 
-[Website](https://superhuman.lost.plus) · [Docs](https://superhuman.lost.plus/docs) · [Getting Started](https://superhuman.lost.plus/docs/start/getting-started) · [Migration](https://superhuman.lost.plus/docs/install/superhuman-migration) · [Provenance](PROVENANCE.md) · [Vision](VISION.md)
+[Website](https://superhuman.lost.plus) · [Docs](https://superhuman.lost.plus/docs) · [Getting Started](https://superhuman.lost.plus/docs/start/getting-started)
 
 ## Highlights
 
-- Local-first Gateway for sessions, channels, tools, automation, and web surfaces
+- One Gateway for chat, sessions, tools, automation, and the web dashboard
 - Multi-channel messaging across WhatsApp, Telegram, Slack, Discord, Signal, iMessage/BlueBubbles, Matrix, WebChat, and more
-- Live Canvas, browser automation, and device nodes for macOS, iOS, and Android
+- Paired devices for macOS, iOS, and Android, plus Canvas and browser automation
 - Multi-agent routing with workspace-backed skills and per-session isolation controls
-- OpenClaw plugin ecosystem compatibility during the Superhuman migration wave
 
 ## Install
 
@@ -44,7 +43,7 @@ superhuman message send --to +1234567890 --message "Hello from Superhuman"
 superhuman agent --message "Ship checklist" --thinking high
 ```
 
-Upgrading from an OpenClaw-shaped install? See [Updating](https://superhuman.lost.plus/docs/install/updating) and [OpenClaw to Superhuman migration](https://superhuman.lost.plus/docs/install/superhuman-migration).
+Already using OpenClaw? See [Updating](https://superhuman.lost.plus/docs/install/updating) and [OpenClaw to Superhuman migration](https://superhuman.lost.plus/docs/install/superhuman-migration).
 
 ## How it works
 
@@ -75,9 +74,7 @@ Canonical config: `~/.superhuman/superhuman.json`.
 }
 ```
 
-Legacy `~/.openclaw/openclaw.json` locations and related state roots are still discovered during the migration wave for upgrade compatibility.
-
-More: [Configuration](https://superhuman.lost.plus/docs/gateway/configuration) · [Config/state migration](https://superhuman.lost.plus/docs/install/config-state-migration) · [Compatibility namespaces](https://superhuman.lost.plus/docs/reference/compatibility-namespaces)
+More: [Configuration](https://superhuman.lost.plus/docs/gateway/configuration) · [Config/state migration](https://superhuman.lost.plus/docs/install/config-state-migration)
 
 ## From source
 
@@ -119,11 +116,7 @@ More: [Security](https://superhuman.lost.plus/docs/gateway/security) · [Gateway
 - [macOS](https://superhuman.lost.plus/docs/platforms/macos)
 - [iOS](https://superhuman.lost.plus/docs/platforms/ios)
 - [Android](https://superhuman.lost.plus/docs/platforms/android)
-- [Migration](https://superhuman.lost.plus/docs/install/superhuman-migration)
-- [Compatibility namespaces](https://superhuman.lost.plus/docs/reference/compatibility-namespaces)
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
-
-Superhuman is the public product name. Remaining OpenClaw-shaped names in the repo are limited to provenance and explicit compatibility surfaces.
