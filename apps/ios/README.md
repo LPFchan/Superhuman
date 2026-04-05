@@ -1,6 +1,6 @@
-# OpenClaw iOS (Super Alpha)
+# Superhuman iOS (Super Alpha)
 
-This iPhone app is super-alpha and internal-use only. It connects to an OpenClaw Gateway as a `role: node`.
+This iPhone app is super-alpha and internal-use only. It connects to a Superhuman Gateway as a `role: node`.
 
 ## Distribution Status
 
@@ -61,7 +61,7 @@ Prereqs:
 Release behavior:
 
 - Local development keeps using unique per-developer bundle IDs from `scripts/ios-configure-signing.sh`.
-- Beta release uses canonical `ai.openclaw.client*` bundle IDs through a temporary generated xcconfig in `apps/ios/build/BetaRelease.xcconfig`.
+- Beta release currently keeps canonical `ai.openclaw.client*` bundle IDs through a temporary generated xcconfig in `apps/ios/build/BetaRelease.xcconfig` for compatibility.
 - Beta release also switches the app to `OpenClawPushTransport=relay`, `OpenClawPushDistribution=official`, and `OpenClawPushAPNsEnvironment=production`.
 - The beta flow does not modify `apps/ios/.local-signing.xcconfig` or `apps/ios/LocalSigning.xcconfig`.
 - Root `package.json.version` is the only version source for iOS.
@@ -110,7 +110,7 @@ pnpm ios:beta -- --build-number 7
 - The app persists the relay handle metadata locally so reconnects can republish the gateway registration without re-registering on every connect.
 - If the relay base URL changes in a later build, the app refreshes the relay registration instead of reusing the old relay origin.
 - Relay mode requires a reachable relay base URL and uses App Attest plus the app receipt during registration.
-- Gateway-side relay sending is configured through `gateway.push.apns.relay.baseUrl` in `openclaw.json`. `OPENCLAW_APNS_RELAY_BASE_URL` remains a temporary env override only.
+- Gateway-side relay sending is configured through `gateway.push.apns.relay.baseUrl` in `superhuman.json`. `OPENCLAW_APNS_RELAY_BASE_URL` remains a temporary env override only.
 
 ## Official Build Relay Trust Model
 

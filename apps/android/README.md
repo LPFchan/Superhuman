@@ -1,4 +1,4 @@
-## OpenClaw Android App
+## Superhuman Android App
 
 Status: **extremely alpha**. The app is actively being rebuilt from the ground up.
 
@@ -43,7 +43,8 @@ cd apps/android
 ./gradlew :app:testThirdPartyDebugUnitTest
 ```
 
-`bun run android:bundle:release` auto-bumps Android `versionName`/`versionCode` in `apps/android/app/build.gradle.kts`, then builds two signed release bundles:
+`bun run android:bundle:release` auto-bumps Android `versionName`/`versionCode` in `apps/android/app/build.gradle.kts`, then builds two signed release bundles.
+The current output filenames still use `openclaw-*` while Android packaging identifiers remain on the compatibility track:
 
 - Play build: `apps/android/build/release-bundles/openclaw-<version>-play-release.aab`
 - Third-party build: `apps/android/build/release-bundles/openclaw-<version>-third-party-release.aab`

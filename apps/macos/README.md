@@ -1,4 +1,4 @@
-# OpenClaw macOS app (dev + signing)
+# Superhuman macOS app (dev + signing)
 
 ## Quick dev run
 
@@ -20,7 +20,8 @@ scripts/restart-mac.sh --sign      # force code signing (requires cert)
 scripts/package-mac-app.sh
 ```
 
-Creates `dist/OpenClaw.app` and signs it via `scripts/codesign-mac-app.sh`.
+Creates the macOS app bundle and signs it via `scripts/codesign-mac-app.sh`.
+The bundle path may still remain `dist/OpenClaw.app` until the bundle-identifier migration is explicitly shipped.
 
 ## Signing behavior
 
