@@ -19,13 +19,16 @@ If execution takes two weeks or six months, preserve the order and the gates rat
 
 ## Current State
 
-The repo is in an awkward middle state:
+The repo is no longer at the raw front-door rebrand stage.
+It is in late migration cleanup with a smaller set of real blockers:
 
-- the public product surface still presents OpenClaw in the README, docs site, package metadata, UI shell, and contributor rules
-- the repo contains a growing Superhuman-specific implementation layer under `src/superhuman/`
-- `architecture/` acts as internal architecture and migration documentation rather than end-user docs
-- some Superhuman logic is isolated, but some has already leaked back into shared OpenClaw-shaped core surfaces
-- naming policy currently uses explicit `super-*` and `Super*` prefixes for many downstream modules, which makes the dedicated subtree feel redundant and noisy
+- package metadata, the README and docs shell, canonical CLI and config defaults, and most operator guidance are now Superhuman-first
+- the repo contains a growing Superhuman-specific implementation layer under `src/superhuman/`, while shared core remains intentionally close to OpenClaw where compatibility or upstream sync still matter
+- `architecture/` is now the canonical internal migration and governance root rather than an ad hoc holding area
+- OpenClaw-shaped compatibility seams are now explicit product contracts, especially `openclaw/plugin-sdk/*`, `@openclaw/*`, `openclaw.plugin.json`, the `openclaw` CLI alias, and legacy config or state reads
+- several visible app and canvas surfaces have already moved toward Superhuman, but the remaining app-facing work now overlaps with platform identifiers such as bundle ids, package ids, URL schemes, and Bonjour service types
+- some downstream logic still needs continued discipline at the shared-core boundary, but the main migration risk is no longer identity confusion at the repo front door
+- the repo should still be treated as pre-release for this migration wave until the platform-identifier decision is explicit and the final verification gate is complete
 
 ## End State
 
@@ -762,15 +765,15 @@ Only after the earlier patch sets land, run the migration completion checks the 
 
 ## Immediate Next-Step Recommendation
 
-If only one patch set is started next from the current repo state, start with Patch Set 3.
+If only one patch set is prioritized next from the current repo state, finish Patch Set 5.
 
 Reason:
 
-- Patch Sets 1, 2, 4, and 6 are already mostly landed or reconciled in the current tree
-- the main remaining operator-facing contradiction is that deeper CLI and channel docs still teach `openclaw` as canonical
-- finishing the operator-doc sweep is lower risk than the remaining platform bundle-id decision in Patch Set 5
+- Patch Sets 1, 2, 3, 4, and 6 are already largely landed or reconciled in the current tree
+- the biggest remaining public-identity gap is in app-facing surfaces where visible Superhuman branding intersects with compatibility-sensitive platform identifiers
+- Patch Set 5 contains the main remaining operator decision that can materially affect upgrade behavior for existing installs
 
-After Patch Set 3, the next explicit operator decision is Patch Set 5: whether platform bundle ids, URL schemes, Bonjour service types, and package ids stay on the OpenClaw compatibility track for this migration wave or ship with a platform-specific upgrade plan.
+After Patch Set 5 is explicitly resolved, Patch Set 7 becomes the next gate: upgrade validation, Control UI storage validation, representative plugin compatibility validation, docs-host validation, and app startup validation for the renamed display surfaces.
 
 ## Public Surface Checklist
 
