@@ -1,21 +1,21 @@
 ---
-summary: "CLI reference for `openclaw configure` (interactive configuration prompts)"
+summary: "CLI reference for `superhuman configure` (interactive configuration prompts)"
 read_when:
   - You want to tweak credentials, devices, or agent defaults interactively
 title: "configure"
 ---
 
-# `openclaw configure`
+# `superhuman configure`
 
 Interactive prompt to set up credentials, devices, and agent defaults.
 
 Note: The **Model** section now includes a multi-select for the
 `agents.defaults.models` allowlist (what shows up in `/model` and the model picker).
 
-Tip: `openclaw config` without a subcommand opens the same wizard. Use
-`openclaw config get|set|unset` for non-interactive edits.
+Tip: `superhuman config` without a subcommand opens the same wizard. Use
+`superhuman config get|set|unset` for non-interactive edits.
 
-For web search, `openclaw configure --section web` lets you choose a provider
+For web search, `superhuman configure --section web` lets you choose a provider
 and configure its credentials. If you choose **Grok**, configure can also show
 a separate follow-up step to enable `x_search` with the same `XAI_API_KEY` and
 pick an `x_search` model. Other web-search providers do not show that step.
@@ -36,7 +36,7 @@ Notes:
 ## Examples
 
 ```bash
-openclaw configure
-openclaw configure --section web
-openclaw configure --section model --section channels
+superhuman configure
+superhuman configure --section web
+superhuman configure --section model --section channels
 ```

@@ -246,8 +246,8 @@ export async function finalizeSetupWizard(
         await prompter.note(
           [
             "Docs:",
-            "https://docs.openclaw.ai/gateway/health",
-            "https://docs.openclaw.ai/gateway/troubleshooting",
+            "https://superhuman.lost.plus/docs/gateway/health",
+            "https://superhuman.lost.plus/docs/gateway/troubleshooting",
           ].join("\n"),
           "Health check help",
         );
@@ -263,8 +263,8 @@ export async function finalizeSetupWizard(
       await prompter.note(
         [
           "Docs:",
-          "https://docs.openclaw.ai/gateway/health",
-          "https://docs.openclaw.ai/gateway/troubleshooting",
+          "https://superhuman.lost.plus/docs/gateway/health",
+          "https://superhuman.lost.plus/docs/gateway/troubleshooting",
         ].join("\n"),
         "Health check help",
       );
@@ -273,9 +273,9 @@ export async function finalizeSetupWizard(
         [
           "Gateway not detected yet.",
           "Setup was run without Gateway service install, so no background gateway is expected.",
-          `Start now: ${formatCliCommand("openclaw gateway run")}`,
-          `Or rerun with: ${formatCliCommand("openclaw onboard --install-daemon")}`,
-          `Or skip this probe next time: ${formatCliCommand("openclaw onboard --skip-health")}`,
+          `Start now: ${formatCliCommand("superhuman gateway run")}`,
+          `Or rerun with: ${formatCliCommand("superhuman onboard --install-daemon")}`,
+          `Or skip this probe next time: ${formatCliCommand("superhuman onboard --skip-health")}`,
         ].join("\n"),
         "Gateway",
       );
@@ -361,7 +361,7 @@ export async function finalizeSetupWizard(
         : undefined,
       `Gateway WS: ${links.wsUrl}`,
       gatewayStatusLine,
-      "Docs: https://docs.openclaw.ai/web/control-ui",
+      "Docs: https://superhuman.lost.plus/docs/web/control-ui",
     ]
       .filter(Boolean)
       .join("\n"),
@@ -390,11 +390,11 @@ export async function finalizeSetupWizard(
     await prompter.note(
       [
         "Gateway token: shared auth for the Gateway + Control UI.",
-        "Stored in: $OPENCLAW_CONFIG_PATH (default: ~/.openclaw/openclaw.json) under gateway.auth.token, or in OPENCLAW_GATEWAY_TOKEN.",
-        `View token: ${formatCliCommand("openclaw config get gateway.auth.token")}`,
-        `Generate token: ${formatCliCommand("openclaw doctor --generate-gateway-token")}`,
+        "Stored in: $SUPERHUMAN_CONFIG_PATH (default: ~/.superhuman/superhuman.json) under gateway.auth.token, or in the existing OPENCLAW_GATEWAY_TOKEN env override.",
+        `View token: ${formatCliCommand("superhuman config get gateway.auth.token")}`,
+        `Generate token: ${formatCliCommand("superhuman doctor --generate-gateway-token")}`,
         "Web UI keeps dashboard URL tokens in memory for the current tab and strips them from the URL after load.",
-        `Open the dashboard anytime: ${formatCliCommand("openclaw dashboard --no-open")}`,
+        `Open the dashboard anytime: ${formatCliCommand("superhuman dashboard --no-open")}`,
         "If prompted: paste the token into Control UI settings (or use the tokenized dashboard URL).",
       ].join("\n"),
       "Token",
@@ -443,8 +443,8 @@ export async function finalizeSetupWizard(
         [
           `Dashboard link (with token): ${authedUrl}`,
           controlUiOpened
-            ? "Opened in your browser. Keep that tab to control OpenClaw."
-            : "Copy/paste this URL in a browser on this machine to control OpenClaw.",
+            ? "Opened in your browser. Keep that tab to control Superhuman."
+            : "Copy/paste this URL in a browser on this machine to control Superhuman.",
           controlUiOpenHint,
         ]
           .filter(Boolean)
@@ -453,7 +453,7 @@ export async function finalizeSetupWizard(
       );
     } else {
       await prompter.note(
-        `When you're ready: ${formatCliCommand("openclaw dashboard --no-open")}`,
+        `When you're ready: ${formatCliCommand("superhuman dashboard --no-open")}`,
         "Later",
       );
     }
@@ -464,13 +464,13 @@ export async function finalizeSetupWizard(
   await prompter.note(
     [
       "Back up your agent workspace.",
-      "Docs: https://docs.openclaw.ai/concepts/agent-workspace",
+      "Docs: https://superhuman.lost.plus/docs/concepts/agent-workspace",
     ].join("\n"),
     "Workspace backup",
   );
 
   await prompter.note(
-    "Running agents on your computer is risky — harden your setup: https://docs.openclaw.ai/security",
+    "Running agents on your computer is risky — harden your setup: https://superhuman.lost.plus/docs/security",
     "Security",
   );
 
@@ -505,8 +505,8 @@ export async function finalizeSetupWizard(
       [
         `Dashboard link (with token): ${authedUrl}`,
         controlUiOpened
-          ? "Opened in your browser. Keep that tab to control OpenClaw."
-          : "Copy/paste this URL in a browser on this machine to control OpenClaw.",
+          ? "Opened in your browser. Keep that tab to control Superhuman."
+          : "Copy/paste this URL in a browser on this machine to control Superhuman.",
         controlUiOpenHint,
       ]
         .filter(Boolean)
@@ -541,9 +541,9 @@ export async function finalizeSetupWizard(
         [
           `Web search provider ${label} is selected but unavailable under the current plugin policy.`,
           "web_search will not work until the provider is re-enabled or a different provider is selected.",
-          `  ${formatCliCommand("openclaw configure --section web")}`,
+          `  ${formatCliCommand("superhuman configure --section web")}`,
           "",
-          "Docs: https://docs.openclaw.ai/tools/web",
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -554,7 +554,7 @@ export async function finalizeSetupWizard(
           "",
           `Provider: ${label}`,
           ...(keySource ? [keySource] : []),
-          "Docs: https://docs.openclaw.ai/tools/web",
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -563,10 +563,10 @@ export async function finalizeSetupWizard(
         [
           `Provider ${label} is selected but no API key was found.`,
           "web_search will not work until a key is added.",
-          `  ${formatCliCommand("openclaw configure --section web")}`,
+          `  ${formatCliCommand("superhuman configure --section web")}`,
           "",
-          `Get your key at: ${entry?.signupUrl ?? "https://docs.openclaw.ai/tools/web"}`,
-          "Docs: https://docs.openclaw.ai/tools/web",
+          `Get your key at: ${entry?.signupUrl ?? "https://superhuman.lost.plus/docs/tools/web"}`,
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -574,9 +574,9 @@ export async function finalizeSetupWizard(
       await prompter.note(
         [
           `Web search (${label}) is configured but disabled.`,
-          `Re-enable: ${formatCliCommand("openclaw configure --section web")}`,
+          `Re-enable: ${formatCliCommand("superhuman configure --section web")}`,
           "",
-          "Docs: https://docs.openclaw.ai/tools/web",
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -592,7 +592,7 @@ export async function finalizeSetupWizard(
       await prompter.note(
         [
           `Web search is available via ${legacyDetected.label} (auto-detected).`,
-          "Docs: https://docs.openclaw.ai/tools/web",
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -601,7 +601,7 @@ export async function finalizeSetupWizard(
         [
           "Managed web search provider was skipped.",
           codexNativeSummary,
-          "Docs: https://docs.openclaw.ai/tools/web",
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -609,9 +609,9 @@ export async function finalizeSetupWizard(
       await prompter.note(
         [
           "Web search was skipped. You can enable it later:",
-          `  ${formatCliCommand("openclaw configure --section web")}`,
+          `  ${formatCliCommand("superhuman configure --section web")}`,
           "",
-          "Docs: https://docs.openclaw.ai/tools/web",
+          "Docs: https://superhuman.lost.plus/docs/tools/web",
         ].join("\n"),
         "Web search",
       );
@@ -623,23 +623,20 @@ export async function finalizeSetupWizard(
       [
         codexNativeSummary,
         "Used only for Codex-capable models.",
-        "Docs: https://docs.openclaw.ai/tools/web",
+        "Docs: https://superhuman.lost.plus/docs/tools/web",
       ].join("\n"),
       "Codex native search",
     );
   }
 
-  await prompter.note(
-    'What now: https://openclaw.ai/showcase ("What People Are Building").',
-    "What now",
-  );
+  await prompter.note("What now: https://superhuman.lost.plus", "What now");
 
   await prompter.outro(
     controlUiOpened
-      ? "Onboarding complete. Dashboard opened; keep that tab to control OpenClaw."
+      ? "Onboarding complete. Dashboard opened; keep that tab to control Superhuman."
       : seededInBackground
         ? "Onboarding complete. Web UI seeded in the background; open it anytime with the dashboard link above."
-        : "Onboarding complete. Use the dashboard link above to control OpenClaw.",
+        : "Onboarding complete. Use the dashboard link above to control Superhuman.",
   );
 
   return { launchedTui };

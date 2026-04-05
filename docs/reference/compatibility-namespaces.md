@@ -25,16 +25,18 @@ These surfaces remain canonical during the current migration wave:
 
 ## What is already Superhuman
 
-These surfaces are now Superhuman-first:
+These surfaces are Superhuman-first or are actively being finished as part of the current migration wave:
 
 - README and repository presentation
 - docs site branding and homepage
 - Control UI branding
-- app display names
+- canonical app display branding direction
 - canonical CLI name: `superhuman`
 - canonical package name: `@lpfchan/superhuman`
 - canonical state root: `~/.superhuman`
 - canonical config path: `~/.superhuman/superhuman.json`
+
+Some platform bundle identifiers and other low-level app/runtime identifiers still remain OpenClaw-shaped until their migration paths are explicit.
 
 ## How to reason about mixed naming
 

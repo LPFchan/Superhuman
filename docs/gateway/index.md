@@ -119,15 +119,15 @@ All of these run on the main Gateway port and use the same trusted operator auth
 ## Operator command set
 
 ```bash
-openclaw gateway status
-openclaw gateway status --deep
-openclaw gateway status --json
-openclaw gateway install
-openclaw gateway restart
-openclaw gateway stop
-openclaw secrets reload
-openclaw logs --follow
-openclaw doctor
+superhuman gateway status
+superhuman gateway status --deep
+superhuman gateway status --json
+superhuman gateway install
+superhuman gateway restart
+superhuman gateway stop
+superhuman secrets reload
+superhuman logs --follow
+superhuman doctor
 ```
 
 ## Remote access
@@ -155,22 +155,22 @@ Use supervised runs for production-like reliability.
   <Tab title="macOS (launchd)">
 
 ```bash
-openclaw gateway install
-openclaw gateway status
-openclaw gateway restart
-openclaw gateway stop
+superhuman gateway install
+superhuman gateway status
+superhuman gateway restart
+superhuman gateway stop
 ```
 
-LaunchAgent labels are `ai.openclaw.gateway` (default) or `ai.openclaw.<profile>` (named profile). `openclaw doctor` audits and repairs service config drift.
+LaunchAgent labels currently remain `ai.openclaw.gateway` (default) or `ai.openclaw.<profile>` (named profile) for compatibility. `superhuman doctor` audits and repairs service config drift.
 
   </Tab>
 
   <Tab title="Linux (systemd user)">
 
 ```bash
-openclaw gateway install
+superhuman gateway install
 systemctl --user enable --now openclaw-gateway[-<profile>].service
-openclaw gateway status
+superhuman gateway status
 ```
 
 For persistence after logout, enable lingering:
@@ -201,15 +201,15 @@ Use multiple only for strict isolation/redundancy (for example a rescue profile)
 Checklist per instance:
 
 - Unique `gateway.port`
-- Unique `OPENCLAW_CONFIG_PATH`
-- Unique `OPENCLAW_STATE_DIR`
+- Unique `SUPERHUMAN_CONFIG_PATH`
+- Unique `SUPERHUMAN_STATE_DIR`
 - Unique `agents.defaults.workspace`
 
 Example:
 
 ```bash
-OPENCLAW_CONFIG_PATH=~/.openclaw/a.json OPENCLAW_STATE_DIR=~/.openclaw-a openclaw gateway --port 19001
-OPENCLAW_CONFIG_PATH=~/.openclaw/b.json OPENCLAW_STATE_DIR=~/.openclaw-b openclaw gateway --port 19002
+SUPERHUMAN_CONFIG_PATH=~/.superhuman/a.json SUPERHUMAN_STATE_DIR=~/.superhuman-a superhuman gateway --port 19001
+SUPERHUMAN_CONFIG_PATH=~/.superhuman/b.json SUPERHUMAN_STATE_DIR=~/.superhuman-b superhuman gateway --port 19002
 ```
 
 See: [Multiple gateways](/gateway/multiple-gateways).
@@ -217,9 +217,9 @@ See: [Multiple gateways](/gateway/multiple-gateways).
 ### Dev profile quick path
 
 ```bash
-openclaw --dev setup
-openclaw --dev gateway --allow-unconfigured
-openclaw --dev status
+superhuman --dev setup
+superhuman --dev gateway --allow-unconfigured
+superhuman --dev status
 ```
 
 Defaults include isolated state/config and base gateway port `19001`.

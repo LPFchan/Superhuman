@@ -11,9 +11,9 @@ Status: production-ready via WhatsApp Web (Baileys). Gateway owns linked session
 
 ## Install (on demand)
 
-- Onboarding (`openclaw onboard`) and `openclaw channels add --channel whatsapp`
+- Onboarding (`superhuman onboard`) and `superhuman channels add --channel whatsapp`
   prompt to install the WhatsApp plugin the first time you select it.
-- `openclaw channels login --channel whatsapp` also offers the install flow when
+- `superhuman channels login --channel whatsapp` also offers the install flow when
   the plugin is not present yet.
 - Dev channel + git checkout: defaults to the local plugin path.
 - Stable/Beta: defaults to the npm package `@openclaw/whatsapp`.
@@ -21,7 +21,7 @@ Status: production-ready via WhatsApp Web (Baileys). Gateway owns linked session
 Manual install stays available:
 
 ```bash
-openclaw plugins install @openclaw/whatsapp
+superhuman plugins install @openclaw/whatsapp
 ```
 
 <CardGroup cols={3}>
@@ -59,13 +59,13 @@ openclaw plugins install @openclaw/whatsapp
   <Step title="Link WhatsApp (QR)">
 
 ```bash
-openclaw channels login --channel whatsapp
+superhuman channels login --channel whatsapp
 ```
 
     For a specific account:
 
 ```bash
-openclaw channels login --channel whatsapp --account work
+superhuman channels login --channel whatsapp --account work
 ```
 
   </Step>
@@ -73,7 +73,7 @@ openclaw channels login --channel whatsapp --account work
   <Step title="Start the gateway">
 
 ```bash
-openclaw gateway
+superhuman gateway
 ```
 
   </Step>
@@ -81,8 +81,8 @@ openclaw gateway
   <Step title="Approve first pairing request (if using pairing mode)">
 
 ```bash
-openclaw pairing list whatsapp
-openclaw pairing approve whatsapp <CODE>
+superhuman pairing list whatsapp
+superhuman pairing approve whatsapp <CODE>
 ```
 
     Pairing requests expire after 1 hour. Pending requests are capped at 3 per channel.
@@ -91,7 +91,7 @@ openclaw pairing approve whatsapp <CODE>
 </Steps>
 
 <Note>
-OpenClaw recommends running WhatsApp on a separate number when possible. (The channel metadata and setup flow are optimized for that setup, but personal-number setups are also supported.)
+Superhuman recommends running WhatsApp on a separate number when possible. (The channel metadata and setup flow are optimized for that setup, but personal-number setups are also supported.)
 </Note>
 
 ## Deployment patterns
@@ -100,7 +100,7 @@ OpenClaw recommends running WhatsApp on a separate number when possible. (The ch
   <Accordion title="Dedicated number (recommended)">
     This is the cleanest operational mode:
 
-    - separate WhatsApp identity for OpenClaw
+    - separate WhatsApp identity for Superhuman
     - clearer DM allowlists and routing boundaries
     - lower chance of self-chat confusion
 
@@ -131,7 +131,7 @@ OpenClaw recommends running WhatsApp on a separate number when possible. (The ch
   </Accordion>
 
   <Accordion title="WhatsApp Web-only channel scope">
-    The messaging platform channel is WhatsApp Web-based (`Baileys`) in current OpenClaw channel architecture.
+    The messaging platform channel is WhatsApp Web-based (`Baileys`) in current Superhuman channel architecture.
 
     There is no separate Twilio WhatsApp messaging channel in the built-in chat-channel registry.
 
@@ -365,13 +365,13 @@ Behavior notes:
   </Accordion>
 
   <Accordion title="Credential paths and legacy compatibility">
-    - current auth path: `~/.openclaw/credentials/whatsapp/<accountId>/creds.json`
+    - current auth path: `~/.superhuman/credentials/whatsapp/<accountId>/creds.json`
     - backup file: `creds.json.bak`
     - legacy default auth in `~/.openclaw/credentials/` is still recognized/migrated for default-account flows
   </Accordion>
 
   <Accordion title="Logout behavior">
-    `openclaw channels logout --channel whatsapp [--account <id>]` clears WhatsApp auth state for that account.
+    `superhuman channels logout --channel whatsapp [--account <id>]` clears WhatsApp auth state for that account.
 
     In legacy auth directories, `oauth.json` is preserved while Baileys auth files are removed.
 
@@ -395,8 +395,8 @@ Behavior notes:
     Fix:
 
     ```bash
-    openclaw channels login --channel whatsapp
-    openclaw channels status
+    superhuman channels login --channel whatsapp
+    superhuman channels status
     ```
 
   </Accordion>
@@ -407,8 +407,8 @@ Behavior notes:
     Fix:
 
     ```bash
-    openclaw doctor
-    openclaw logs --follow
+    superhuman doctor
+    superhuman logs --follow
     ```
 
     If needed, re-link with `channels login`.
@@ -429,7 +429,7 @@ Behavior notes:
     - `groupAllowFrom` / `allowFrom`
     - `groups` allowlist entries
     - mention gating (`requireMention` + mention patterns)
-    - duplicate keys in `openclaw.json` (JSON5): later entries override earlier ones, so keep a single `groupPolicy` per scope
+    - duplicate keys in `superhuman.json` (JSON5): later entries override earlier ones, so keep a single `groupPolicy` per scope
 
   </Accordion>
 

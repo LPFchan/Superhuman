@@ -11,7 +11,7 @@ Manage sandbox runtimes for isolated agent execution.
 
 ## Overview
 
-OpenClaw can run agents in isolated sandbox runtimes for security. The `sandbox` commands help you inspect and recreate those runtimes after updates or configuration changes.
+Superhuman can run agents in isolated sandbox runtimes for security. The `sandbox` commands help you inspect and recreate those runtimes after updates or configuration changes.
 
 Today that usually means:
 
@@ -22,30 +22,30 @@ Today that usually means:
 For `ssh` and OpenShell `remote`, recreate matters more than with Docker:
 
 - the remote workspace is canonical after the initial seed
-- `openclaw sandbox recreate` deletes that canonical remote workspace for the selected scope
+- `superhuman sandbox recreate` deletes that canonical remote workspace for the selected scope
 - next use seeds it again from the current local workspace
 
 ## Commands
 
-### `openclaw sandbox explain`
+### `superhuman sandbox explain`
 
 Inspect the **effective** sandbox mode/scope/workspace access, sandbox tool policy, and elevated gates (with fix-it config key paths).
 
 ```bash
-openclaw sandbox explain
-openclaw sandbox explain --session agent:main:main
-openclaw sandbox explain --agent work
-openclaw sandbox explain --json
+superhuman sandbox explain
+superhuman sandbox explain --session agent:main:main
+superhuman sandbox explain --agent work
+superhuman sandbox explain --json
 ```
 
-### `openclaw sandbox list`
+### `superhuman sandbox list`
 
 List all sandbox runtimes with their status and configuration.
 
 ```bash
-openclaw sandbox list
-openclaw sandbox list --browser  # List only browser containers
-openclaw sandbox list --json     # JSON output
+superhuman sandbox list
+superhuman sandbox list --browser  # List only browser containers
+superhuman sandbox list --json     # JSON output
 ```
 
 **Output includes:**
@@ -57,16 +57,16 @@ openclaw sandbox list --json     # JSON output
 - Idle time (time since last use)
 - Associated session/agent
 
-### `openclaw sandbox recreate`
+### `superhuman sandbox recreate`
 
 Remove sandbox runtimes to force recreation with updated config.
 
 ```bash
-openclaw sandbox recreate --all                # Recreate all containers
-openclaw sandbox recreate --session main       # Specific session
-openclaw sandbox recreate --agent mybot        # Specific agent
-openclaw sandbox recreate --browser            # Only browser containers
-openclaw sandbox recreate --all --force        # Skip confirmation
+superhuman sandbox recreate --all                # Recreate all containers
+superhuman sandbox recreate --session main       # Specific session
+superhuman sandbox recreate --agent mybot        # Specific agent
+superhuman sandbox recreate --browser            # Only browser containers
+superhuman sandbox recreate --all --force        # Skip confirmation
 ```
 
 **Options:**
@@ -92,7 +92,7 @@ docker tag openclaw-sandbox:latest openclaw-sandbox:bookworm-slim
 # Edit config: agents.defaults.sandbox.docker.image (or agents.list[].sandbox.docker.image)
 
 # Recreate containers
-openclaw sandbox recreate --all
+superhuman sandbox recreate --all
 ```
 
 ### After changing sandbox configuration
@@ -101,7 +101,7 @@ openclaw sandbox recreate --all
 # Edit config: agents.defaults.sandbox.* (or agents.list[].sandbox.*)
 
 # Recreate to apply new config
-openclaw sandbox recreate --all
+superhuman sandbox recreate --all
 ```
 
 ### After changing SSH target or SSH auth material
@@ -114,7 +114,7 @@ openclaw sandbox recreate --all
 # - agents.defaults.sandbox.ssh.identityFile / certificateFile / knownHostsFile
 # - agents.defaults.sandbox.ssh.identityData / certificateData / knownHostsData
 
-openclaw sandbox recreate --all
+superhuman sandbox recreate --all
 ```
 
 For the core `ssh` backend, recreate deletes the per-scope remote workspace root
@@ -129,7 +129,7 @@ on the SSH target. The next run seeds it again from the local workspace.
 # - plugins.entries.openshell.config.mode
 # - plugins.entries.openshell.config.policy
 
-openclaw sandbox recreate --all
+superhuman sandbox recreate --all
 ```
 
 For OpenShell `remote` mode, recreate deletes the canonical remote workspace
@@ -138,16 +138,16 @@ for that scope. The next run seeds it again from the local workspace.
 ### After changing setupCommand
 
 ```bash
-openclaw sandbox recreate --all
+superhuman sandbox recreate --all
 # or just one agent:
-openclaw sandbox recreate --agent family
+superhuman sandbox recreate --agent family
 ```
 
 ### For a specific agent only
 
 ```bash
 # Update only one agent's containers
-openclaw sandbox recreate --agent alfred
+superhuman sandbox recreate --agent alfred
 ```
 
 ## Why is this needed?
@@ -158,14 +158,14 @@ openclaw sandbox recreate --agent alfred
 - Runtimes are only pruned after 24h of inactivity
 - Regularly-used agents keep old runtimes alive indefinitely
 
-**Solution:** Use `openclaw sandbox recreate` to force removal of old runtimes. They'll be recreated automatically with current settings when next needed.
+**Solution:** Use `superhuman sandbox recreate` to force removal of old runtimes. They'll be recreated automatically with current settings when next needed.
 
-Tip: prefer `openclaw sandbox recreate` over manual backend-specific cleanup.
+Tip: prefer `superhuman sandbox recreate` over manual backend-specific cleanup.
 It uses the Gateway’s runtime registry and avoids mismatches when scope/session keys change.
 
 ## Configuration
 
-Sandbox settings live in `~/.openclaw/openclaw.json` under `agents.defaults.sandbox` (per-agent overrides go in `agents.list[].sandbox`):
+Sandbox settings live in `~/.superhuman/superhuman.json` under `agents.defaults.sandbox` (per-agent overrides go in `agents.list[].sandbox`):
 
 ```jsonc
 {

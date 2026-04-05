@@ -1,13 +1,13 @@
 ---
 summary: "Twitch chat bot configuration and setup"
 read_when:
-  - Setting up Twitch chat integration for OpenClaw
+  - Setting up Twitch chat integration for Superhuman
 title: "Twitch"
 ---
 
 # Twitch (plugin)
 
-Twitch chat support via IRC connection. OpenClaw connects as a Twitch user (bot account) to receive and send messages in channels.
+Twitch chat support via IRC connection. Superhuman connects as a Twitch user (bot account) to receive and send messages in channels.
 
 ## Plugin required
 
@@ -16,13 +16,13 @@ Twitch ships as a plugin and is not bundled with the core install.
 Install via CLI (npm registry):
 
 ```bash
-openclaw plugins install @openclaw/twitch
+superhuman plugins install @openclaw/twitch
 ```
 
 Local checkout (when running from a git repo):
 
 ```bash
-openclaw plugins install ./path/to/local/twitch-plugin
+superhuman plugins install ./path/to/local/twitch-plugin
 ```
 
 Details: [Plugins](/tools/plugin)
@@ -251,8 +251,8 @@ By default, `requireMention` is `true`. To disable and respond to all messages:
 First, run diagnostic commands:
 
 ```bash
-openclaw doctor
-openclaw channels status --probe
+superhuman doctor
+superhuman channels status --probe
 ```
 
 ### Bot does not respond to messages

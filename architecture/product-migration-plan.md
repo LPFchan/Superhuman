@@ -531,6 +531,247 @@ Ship the new identity cleanly and define the maintenance model that keeps upstre
 
 The product ships as Superhuman, upgrades cleanly, keeps the OpenClaw plugin ecosystem working as an intentional feature, and the team has an explicit operating model for continuing to absorb upstream OpenClaw patches with bounded agent autonomy and operator escalation for critical decisions.
 
+## Concrete Patch Set
+
+The repo is past pure planning, but it is not at the end-state gate yet.
+The most useful next step is not another abstract status note.
+It is a small number of concrete patch sets, landed in dependency order, each with a narrow acceptance bar.
+
+These patch sets intentionally separate public identity cleanup from compatibility-sensitive runtime and plugin work.
+Do not collapse them into one giant rename PR.
+
+### Patch Set 1: Public Front Door Cleanup
+
+#### Objective
+
+Make the repo landing surfaces read as Superhuman without touching compatibility namespaces.
+
+#### Primary files
+
+- `README.md`
+- `docs/docs.json`
+- `docs/index.md`
+- `docs/start/**`
+- `src/terminal/links.ts`
+
+#### Required changes
+
+- Replace public docs links that still point at `docs.openclaw.ai` with the canonical Superhuman docs domain.
+- Replace user-facing `openclaw` CLI examples with `superhuman` except where the old name is explicitly documented as a compatibility alias.
+- Replace public default path examples that still present `~/.openclaw/openclaw.json` as the primary path.
+- Replace OpenClaw-first wording in the README and docs homepage.
+- Replace stale OpenClaw-branded logo asset references on the docs homepage.
+
+#### Must not change
+
+- `openclaw/plugin-sdk/*`
+- `@openclaw/*` package names kept for ecosystem compatibility
+- plugin manifest filenames or ids unless a separate compatibility patch ships with it
+
+#### Acceptance bar
+
+- A new user landing on the repo root or docs homepage sees Superhuman first.
+- Public docs helpers and top-level links resolve to the canonical Superhuman docs host.
+- No compatibility contract is renamed as part of this patch.
+
+### Patch Set 2: Control UI and Browser Surface Cleanup
+
+#### Objective
+
+Remove OpenClaw-first copy from the shipped browser control surfaces while keeping legacy storage migration behavior.
+
+#### Primary files
+
+- `ui/index.html`
+- `ui/src/ui/views/overview.ts`
+- `ui/src/ui/views/login-gate.ts`
+- `ui/src/i18n/locales/*.ts`
+- `ui/src/i18n/lib/translate.ts`
+- `ui/src/ui/storage.ts`
+
+#### Required changes
+
+- Replace OpenClaw-first commands in help text with Superhuman-first commands.
+- Replace public references to `openclaw dashboard --no-open` and `openclaw doctor` with Superhuman-first guidance, while still documenting the old name as an alias only where needed.
+- Keep legacy storage keys readable, but make `superhuman.control.*` and `superhuman.i18n.*` the only names presented in user-facing copy.
+- Ensure Control UI overview/login/help strings no longer describe `openclaw.json` as the primary config file.
+
+#### Must not change
+
+- legacy storage fallback reads
+- compatibility migration logic for `openclaw.control.*` and `openclaw.i18n.*`
+
+#### Acceptance bar
+
+- A Control UI user cannot mistake the product identity for OpenClaw.
+- Legacy browser storage migration still exists, but the public UI no longer teaches the legacy names as canonical.
+
+### Patch Set 3: Runtime and Operator Docs Alignment
+
+#### Objective
+
+Bring the operator docs into line with the already-landed Superhuman-first path resolver and alias policy.
+
+#### Primary files
+
+- `docs/gateway/configuration.md`
+- `docs/gateway/index.md`
+- `docs/gateway/doctor.md`
+- `docs/install/superhuman-migration.md`
+- `docs/install/config-state-migration.md`
+- `docs/reference/compatibility-namespaces.md`
+- `docs/cli/**`
+- `src/wizard/setup.finalize.ts`
+
+#### Required changes
+
+- Present `~/.superhuman/superhuman.json` as canonical.
+- Present `SUPERHUMAN_*` names first wherever new names already exist.
+- Reframe `OPENCLAW_*`, `~/.openclaw`, and `openclaw` CLI strings as compatibility behavior rather than primary operator guidance.
+- Make the migration docs consistent with each other: no page should say both “runtime migration is already complete” and “runtime migration is still pending.”
+- Update wizard/help output so post-onboarding guidance is Superhuman-first.
+
+#### Must not change
+
+- compatibility reads for legacy state/config/env names
+- explicit provenance references
+
+#### Acceptance bar
+
+- Operator docs have one coherent story: Superhuman is canonical, OpenClaw is compatibility.
+- The docs no longer contradict the runtime path resolver.
+
+### Patch Set 4: Canvas and Branded Web Surface Cleanup
+
+#### Objective
+
+Remove obvious OpenClaw branding from shipped web-facing surfaces that are neither provenance nor plugin compatibility contracts.
+
+#### Primary files
+
+- `src/canvas-host/server.ts`
+- `src/canvas-host/a2ui/index.html`
+- `apps/shared/OpenClawKit/Tools/CanvasA2UI/bootstrap.js`
+- `apps/shared/OpenClawKit/Sources/OpenClawKit/Resources/CanvasScaffold/scaffold.html`
+
+#### Required changes
+
+- Replace `OpenClaw Canvas` user-facing titles with Superhuman branding.
+- Decide whether `openclaw-a2ui-host` remains a compatibility surface or should migrate now.
+- If the custom element name remains legacy for compatibility, document that choice explicitly and avoid presenting it as public product branding.
+
+#### Escalation note
+
+This patch set crosses from branding into possible runtime or app-bridge compatibility.
+If renaming the custom element risks client breakage, keep the legacy tag temporarily and document it as a compatibility namespace instead of renaming it casually.
+
+#### Acceptance bar
+
+- Canvas titles and visible UI labels are Superhuman-first.
+- Any retained OpenClaw-shaped browser/runtime identifier is explicitly classified as compatibility.
+
+### Patch Set 5: App Bundle and Display Identity Cleanup
+
+#### Objective
+
+Move app-facing names and bundle-facing labels toward Superhuman without breaking package identifiers that still need a separate compatibility decision.
+
+#### Primary files
+
+- `apps/android/settings.gradle.kts`
+- `apps/android/app/build.gradle.kts`
+- `apps/android/README.md`
+- `apps/ios/**/Info.plist`
+- `apps/ios/LocalSigning.xcconfig.example`
+- `apps/macos/README.md`
+- `apps/macos/**/Info.plist`
+- `apps/macos/Sources/**`
+
+#### Required changes
+
+- Replace public display names, README copy, build artifact labels, and app-facing strings that still present OpenClaw as the product.
+- Separate display-name cleanup from package-id and bundle-id cleanup.
+- Do not rename `ai.openclaw.*` or other bundle identifiers unless there is an explicit compatibility and upgrade decision for that platform.
+
+#### Escalation note
+
+Bundle ids, URL schemes, Bonjour service types, and app package ids are migration-contract changes, not simple brand copy edits.
+Do not rename them in the same patch as display strings unless operator approval is explicit.
+
+#### Acceptance bar
+
+- User-facing app names and docs are Superhuman-first.
+- Platform identifiers that remain OpenClaw-shaped are either deferred deliberately or shipped with a migration plan.
+
+### Patch Set 6: Migration Status and Governance Doc Reconciliation
+
+#### Objective
+
+Make the migration tracking docs describe the repo as it actually exists now.
+
+#### Primary files
+
+- `architecture/current-surface-inventory.md`
+- `architecture/release-candidate-readiness.md`
+- `architecture/upgrade-validation-report.md`
+- `architecture/plugin-compatibility-report.md`
+- `architecture/docs-taxonomy-audit.md`
+
+#### Required changes
+
+- Remove stale statements that still describe already-migrated surfaces as OpenClaw-branded.
+- Remove overstatements that imply the repo is release-candidate ready before earlier acceptance gates are met.
+- Distinguish clearly between:
+  - done
+  - partially done
+  - intentionally retained for compatibility
+  - still blocked
+
+#### Acceptance bar
+
+- Internal migration docs can be trusted as current-state artifacts.
+- Release-readiness claims do not outrun the actual repo state.
+
+### Patch Set 7: Verification and Release Gate
+
+#### Objective
+
+Only after the earlier patch sets land, run the migration completion checks the plan already requires.
+
+#### Required verification
+
+- upgrade validation from an OpenClaw-shaped install
+- Control UI storage migration validation
+- plugin compatibility validation for representative OpenClaw plugins
+- docs navigation validation on the canonical docs host
+- app startup validation for renamed display surfaces
+
+#### Acceptance bar
+
+- This patch set is complete only when the repo can honestly satisfy the Phase 7 release gate and the Final Release Criteria.
+
+## Recommended Landing Order
+
+1. Patch Set 1: Public Front Door Cleanup
+2. Patch Set 2: Control UI and Browser Surface Cleanup
+3. Patch Set 3: Runtime and Operator Docs Alignment
+4. Patch Set 4: Canvas and Branded Web Surface Cleanup
+5. Patch Set 5: App Bundle and Display Identity Cleanup
+6. Patch Set 6: Migration Status and Governance Doc Reconciliation
+7. Patch Set 7: Verification and Release Gate
+
+## Immediate Next-Step Recommendation
+
+If only one patch set is started next from the current repo state, start with Patch Set 3.
+
+Reason:
+
+- Patch Sets 1, 2, 4, and 6 are already mostly landed or reconciled in the current tree
+- the main remaining operator-facing contradiction is that deeper CLI and channel docs still teach `openclaw` as canonical
+- finishing the operator-doc sweep is lower risk than the remaining platform bundle-id decision in Patch Set 5
+
+After Patch Set 3, the next explicit operator decision is Patch Set 5: whether platform bundle ids, URL schemes, Bonjour service types, and package ids stay on the OpenClaw compatibility track for this migration wave or ship with a platform-specific upgrade plan.
+
 ## Public Surface Checklist
 
 Every item below must be reviewed and either migrated or explicitly classified as compatibility.

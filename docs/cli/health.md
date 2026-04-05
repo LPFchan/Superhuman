@@ -1,18 +1,18 @@
 ---
-summary: "CLI reference for `openclaw health` (gateway health endpoint via RPC)"
+summary: "CLI reference for `superhuman health` (gateway health endpoint via RPC)"
 read_when:
   - You want to quickly check the running Gateway’s health
 title: "health"
 ---
 
-# `openclaw health`
+# `superhuman health`
 
 Fetch health from the running Gateway.
 
 ```bash
-openclaw health
-openclaw health --json
-openclaw health --verbose
+superhuman health
+superhuman health --json
+superhuman health --verbose
 ```
 
 Notes:

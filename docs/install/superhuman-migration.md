@@ -10,7 +10,7 @@ title: "OpenClaw to Superhuman"
 
 Superhuman is migrating from an OpenClaw-shaped fork into its own public product identity.
 
-This guide explains the migration posture before the runtime and install changes are fully rolled out.
+This guide explains the migration posture during the current migration wave.
 
 ## What is changing
 
@@ -22,6 +22,9 @@ Over the migration wave, Superhuman will move public-facing identity from OpenCl
 - app display names
 - CLI, package, config, and state defaults
 
+Runtime defaults and compatibility reads have already landed.
+What remains is finishing the public-surface cleanup, app-facing display cleanup, and the final verification gate.
+
 ## What stays compatible during this wave
 
 Superhuman is keeping OpenClaw plugin ecosystem compatibility as a first-class product feature.
@@ -32,6 +35,7 @@ That means selected inherited surfaces remain valid during this migration wave, 
 - selected `@openclaw/*` package names
 - plugin manifest and discovery conventions consumed by existing plugins
 - compatibility reads for legacy OpenClaw-shaped runtime locations until the runtime migration is complete
+- compatibility reads for legacy OpenClaw-shaped runtime locations while upgrade support remains in place
 
 ## What to expect if you already use an OpenClaw-shaped install
 
@@ -55,8 +59,8 @@ The intended migration behavior is:
 
 ## What this page is not
 
-This page is not the final runtime migration runbook yet.
-It is the public statement of migration direction and compatibility posture that Phase 2 introduces before the full runtime migration lands.
+This page is not the full release-readiness checklist.
+It is the public statement of migration direction and compatibility posture while the remaining cleanup and verification work lands.
 
 ## Related pages
 

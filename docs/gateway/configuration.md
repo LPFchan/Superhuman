@@ -1,7 +1,7 @@
 ---
 summary: "Configuration overview: common tasks, quick setup, and links to the full reference"
 read_when:
-  - Setting up OpenClaw for the first time
+  - Setting up Superhuman for the first time
   - Looking for common configuration patterns
   - Navigating to specific config sections
 title: "Configuration"
@@ -9,9 +9,10 @@ title: "Configuration"
 
 # Configuration
 
-OpenClaw reads an optional <Tooltip tip="JSON5 supports comments and trailing commas">**JSON5**</Tooltip> config from `~/.openclaw/openclaw.json`.
+Superhuman reads an optional <Tooltip tip="JSON5 supports comments and trailing commas">**JSON5**</Tooltip> config from `~/.superhuman/superhuman.json`.
+Legacy `~/.openclaw/openclaw.json` locations are still read for upgrade compatibility.
 
-If the file is missing, OpenClaw uses safe defaults. Common reasons to add a config:
+If the file is missing, Superhuman uses safe defaults. Common reasons to add a config:
 
 - Connect channels and control who can message the bot
 - Set models, tools, sandboxing, or automation (cron, hooks)
@@ -20,15 +21,15 @@ If the file is missing, OpenClaw uses safe defaults. Common reasons to add a con
 See the [full reference](/gateway/configuration-reference) for every available field.
 
 <Tip>
-**New to configuration?** Start with `openclaw onboard` for interactive setup, or check out the [Configuration Examples](/gateway/configuration-examples) guide for complete copy-paste configs.
+**New to configuration?** Start with `superhuman onboard` for interactive setup, or check out the [Configuration Examples](/gateway/configuration-examples) guide for complete copy-paste configs.
 </Tip>
 
 ## Minimal config
 
 ```json5
-// ~/.openclaw/openclaw.json
+// ~/.superhuman/superhuman.json
 {
-  agents: { defaults: { workspace: "~/.openclaw/workspace" } },
+  agents: { defaults: { workspace: "~/.superhuman/workspace" } },
   channels: { whatsapp: { allowFrom: ["+15555550123"] } },
 }
 ```
@@ -38,15 +39,15 @@ See the [full reference](/gateway/configuration-reference) for every available f
 <Tabs>
   <Tab title="Interactive wizard">
     ```bash
-    openclaw onboard       # full onboarding flow
-    openclaw configure     # config wizard
+    superhuman onboard     # full onboarding flow
+    superhuman configure   # config wizard
     ```
   </Tab>
   <Tab title="CLI (one-liners)">
     ```bash
-    openclaw config get agents.defaults.workspace
-    openclaw config set agents.defaults.heartbeat.every "2h"
-    openclaw config unset plugins.entries.brave.config.webSearch.apiKey
+    superhuman config get agents.defaults.workspace
+    superhuman config set agents.defaults.heartbeat.every "2h"
+    superhuman config unset plugins.entries.brave.config.webSearch.apiKey
     ```
   </Tab>
   <Tab title="Control UI">
@@ -54,22 +55,22 @@ See the [full reference](/gateway/configuration-reference) for every available f
     The Control UI renders a form from the config schema, with a **Raw JSON** editor as an escape hatch.
   </Tab>
   <Tab title="Direct edit">
-    Edit `~/.openclaw/openclaw.json` directly. The Gateway watches the file and applies changes automatically (see [hot reload](#config-hot-reload)).
+    Edit `~/.superhuman/superhuman.json` directly. The Gateway watches the file and applies changes automatically (see [hot reload](#config-hot-reload)).
   </Tab>
 </Tabs>
 
 ## Strict validation
 
 <Warning>
-OpenClaw only accepts configurations that fully match the schema. Unknown keys, malformed types, or invalid values cause the Gateway to **refuse to start**. The only root-level exception is `$schema` (string), so editors can attach JSON Schema metadata.
+Superhuman only accepts configurations that fully match the schema. Unknown keys, malformed types, or invalid values cause the Gateway to **refuse to start**. The only root-level exception is `$schema` (string), so editors can attach JSON Schema metadata.
 </Warning>
 
 When validation fails:
 
 - The Gateway does not boot
-- Only diagnostic commands work (`openclaw doctor`, `openclaw logs`, `openclaw health`, `openclaw status`)
-- Run `openclaw doctor` to see exact issues
-- Run `openclaw doctor --fix` (or `--yes`) to apply repairs
+- Only diagnostic commands work (`superhuman doctor`, `superhuman logs`, `superhuman health`, `superhuman status`)
+- Run `superhuman doctor` to see exact issues
+- Run `superhuman doctor --fix` (or `--yes`) to apply repairs
 
 ## Common tasks
 

@@ -8,44 +8,44 @@ title: "Doctor"
 
 # Doctor
 
-`openclaw doctor` is the repair + migration tool for OpenClaw. It fixes stale
+`superhuman doctor` is the repair + migration tool for Superhuman. It fixes stale
 config/state, checks health, and provides actionable repair steps.
 
 ## Quick start
 
 ```bash
-openclaw doctor
+superhuman doctor
 ```
 
 ### Headless / automation
 
 ```bash
-openclaw doctor --yes
+superhuman doctor --yes
 ```
 
 Accept defaults without prompting (including restart/service/sandbox repair steps when applicable).
 
 ```bash
-openclaw doctor --repair
+superhuman doctor --repair
 ```
 
 Apply recommended repairs without prompting (repairs + restarts where safe).
 
 ```bash
-openclaw doctor --repair --force
+superhuman doctor --repair --force
 ```
 
 Apply aggressive repairs too (overwrites custom supervisor configs).
 
 ```bash
-openclaw doctor --non-interactive
+superhuman doctor --non-interactive
 ```
 
 Run without prompts and only apply safe migrations (config normalization + on-disk state moves). Skips restart/service/sandbox actions that require human confirmation.
 Legacy state migrations run automatically when detected.
 
 ```bash
-openclaw doctor --deep
+superhuman doctor --deep
 ```
 
 Scan system services for extra gateway installs (launchd/systemd/schtasks).
@@ -53,7 +53,7 @@ Scan system services for extra gateway installs (launchd/systemd/schtasks).
 If you want to review changes before writing, open the config file first:
 
 ```bash
-cat ~/.openclaw/openclaw.json
+cat ~/.superhuman/superhuman.json
 ```
 
 ## What it does (summary)
@@ -107,13 +107,13 @@ schema.
 ### 2) Legacy config key migrations
 
 When the config contains deprecated keys, other commands refuse to run and ask
-you to run `openclaw doctor`.
+you to run `superhuman doctor`.
 
 Doctor will:
 
 - Explain which legacy keys were found.
 - Show the migration it applied.
-- Rewrite `~/.openclaw/openclaw.json` with the updated schema.
+- Rewrite `~/.superhuman/superhuman.json` with the updated schema.
 
 The Gateway also auto-runs doctor migrations on startup when it detects a
 legacy config format, so stale configs are repaired without manual intervention.

@@ -1,45 +1,45 @@
 ---
-summary: "CLI reference for `openclaw config` (get/set/unset/file/schema/validate)"
+summary: "CLI reference for `superhuman config` (get/set/unset/file/schema/validate)"
 read_when:
   - You want to read or edit config non-interactively
 title: "config"
 ---
 
-# `openclaw config`
+# `superhuman config`
 
-Config helpers for non-interactive edits in `openclaw.json`: get/set/unset/file/schema/validate
+Config helpers for non-interactive edits in `superhuman.json`: get/set/unset/file/schema/validate
 values by path and print the active config file. Run without a subcommand to
-open the configure wizard (same as `openclaw configure`).
+open the configure wizard (same as `superhuman configure`).
 
 ## Examples
 
 ```bash
-openclaw config file
-openclaw config schema
-openclaw config get browser.executablePath
-openclaw config set browser.executablePath "/usr/bin/google-chrome"
-openclaw config set agents.defaults.heartbeat.every "2h"
-openclaw config set agents.list[0].tools.exec.node "node-id-or-name"
-openclaw config set channels.discord.token --ref-provider default --ref-source env --ref-id DISCORD_BOT_TOKEN
-openclaw config set secrets.providers.vaultfile --provider-source file --provider-path /etc/openclaw/secrets.json --provider-mode json
-openclaw config unset plugins.entries.brave.config.webSearch.apiKey
-openclaw config set channels.discord.token --ref-provider default --ref-source env --ref-id DISCORD_BOT_TOKEN --dry-run
-openclaw config validate
-openclaw config validate --json
+superhuman config file
+superhuman config schema
+superhuman config get browser.executablePath
+superhuman config set browser.executablePath "/usr/bin/google-chrome"
+superhuman config set agents.defaults.heartbeat.every "2h"
+superhuman config set agents.list[0].tools.exec.node "node-id-or-name"
+superhuman config set channels.discord.token --ref-provider default --ref-source env --ref-id DISCORD_BOT_TOKEN
+superhuman config set secrets.providers.vaultfile --provider-source file --provider-path /etc/openclaw/secrets.json --provider-mode json
+superhuman config unset plugins.entries.brave.config.webSearch.apiKey
+superhuman config set channels.discord.token --ref-provider default --ref-source env --ref-id DISCORD_BOT_TOKEN --dry-run
+superhuman config validate
+superhuman config validate --json
 ```
 
 ### `config schema`
 
-Print the generated JSON schema for `openclaw.json` to stdout as plain text.
+Print the generated JSON schema for `superhuman.json` to stdout as plain text.
 
 ```bash
-openclaw config schema
+superhuman config schema
 ```
 
 Pipe it into a file when you want to inspect or validate it with other tools:
 
 ```bash
-openclaw config schema > openclaw.schema.json
+superhuman config schema > superhuman.schema.json
 ```
 
 ### Paths
@@ -47,15 +47,15 @@ openclaw config schema > openclaw.schema.json
 Paths use dot or bracket notation:
 
 ```bash
-openclaw config get agents.defaults.workspace
-openclaw config get agents.list[0].id
+superhuman config get agents.defaults.workspace
+superhuman config get agents.list[0].id
 ```
 
 Use the agent list index to target a specific agent:
 
 ```bash
-openclaw config get agents.list
-openclaw config set agents.list[1].tools.exec.node "node-id-or-name"
+superhuman config get agents.list
+superhuman config set agents.list[1].tools.exec.node "node-id-or-name"
 ```
 
 ## Values
@@ -64,20 +64,20 @@ Values are parsed as JSON5 when possible; otherwise they are treated as strings.
 Use `--strict-json` to require JSON5 parsing. `--json` remains supported as a legacy alias.
 
 ```bash
-openclaw config set agents.defaults.heartbeat.every "0m"
-openclaw config set gateway.port 19001 --strict-json
-openclaw config set channels.whatsapp.groups '["*"]' --strict-json
+superhuman config set agents.defaults.heartbeat.every "0m"
+superhuman config set gateway.port 19001 --strict-json
+superhuman config set channels.whatsapp.groups '["*"]' --strict-json
 ```
 
 ## `config set` modes
 
-`openclaw config set` supports four assignment styles:
+`superhuman config set` supports four assignment styles:
 
-1. Value mode: `openclaw config set <path> <value>`
+1. Value mode: `superhuman config set <path> <value>`
 2. SecretRef builder mode:
 
 ```bash
-openclaw config set channels.discord.token \
+superhuman config set channels.discord.token \
   --ref-provider default \
   --ref-source env \
   --ref-id DISCORD_BOT_TOKEN
@@ -86,7 +86,7 @@ openclaw config set channels.discord.token \
 3. Provider builder mode (`secrets.providers.<alias>` path only):
 
 ```bash
-openclaw config set secrets.providers.vault \
+superhuman config set secrets.providers.vault \
   --provider-source exec \
   --provider-command /usr/local/bin/openclaw-vault \
   --provider-arg read \
@@ -97,7 +97,7 @@ openclaw config set secrets.providers.vault \
 4. Batch mode (`--batch-json` or `--batch-file`):
 
 ```bash
-openclaw config set --batch-json '[
+superhuman config set --batch-json '[
   {
     "path": "secrets.providers.default",
     "provider": { "source": "env" }
@@ -110,7 +110,7 @@ openclaw config set --batch-json '[
 ```
 
 ```bash
-openclaw config set --batch-file ./config-set.batch.json --dry-run
+superhuman config set --batch-file ./config-set.batch.json --dry-run
 ```
 
 Policy note:
@@ -123,11 +123,11 @@ Batch parsing always uses the batch payload (`--batch-json`/`--batch-file`) as t
 JSON path/value mode remains supported for both SecretRefs and providers:
 
 ```bash
-openclaw config set channels.discord.token \
+superhuman config set channels.discord.token \
   '{"source":"env","provider":"default","id":"DISCORD_BOT_TOKEN"}' \
   --strict-json
 
-openclaw config set secrets.providers.vaultfile \
+superhuman config set secrets.providers.vaultfile \
   '{"source":"file","path":"/etc/openclaw/secrets.json","mode":"json"}' \
   --strict-json
 ```
@@ -167,7 +167,7 @@ Exec provider (`--provider-source exec`):
 Hardened exec provider example:
 
 ```bash
-openclaw config set secrets.providers.vault \
+superhuman config set secrets.providers.vault \
   --provider-source exec \
   --provider-command /usr/local/bin/openclaw-vault \
   --provider-arg read \
@@ -180,23 +180,23 @@ openclaw config set secrets.providers.vault \
 
 ## Dry run
 
-Use `--dry-run` to validate changes without writing `openclaw.json`.
+Use `--dry-run` to validate changes without writing `superhuman.json`.
 
 ```bash
-openclaw config set channels.discord.token \
+superhuman config set channels.discord.token \
   --ref-provider default \
   --ref-source env \
   --ref-id DISCORD_BOT_TOKEN \
   --dry-run
 
-openclaw config set channels.discord.token \
+superhuman config set channels.discord.token \
   --ref-provider default \
   --ref-source env \
   --ref-id DISCORD_BOT_TOKEN \
   --dry-run \
   --json
 
-openclaw config set channels.discord.token \
+superhuman config set channels.discord.token \
   --ref-provider vault \
   --ref-source exec \
   --ref-id discord/token \
@@ -255,7 +255,7 @@ Success example:
 {
   "ok": true,
   "operations": 1,
-  "configPath": "~/.openclaw/openclaw.json",
+  "configPath": "~/.superhuman/superhuman.json",
   "inputModes": ["builder"],
   "checks": {
     "schema": false,
@@ -273,7 +273,7 @@ Failure example:
 {
   "ok": false,
   "operations": 1,
-  "configPath": "~/.openclaw/openclaw.json",
+  "configPath": "~/.superhuman/superhuman.json",
   "inputModes": ["builder"],
   "checks": {
     "schema": false,
@@ -302,7 +302,7 @@ If dry-run fails:
 
 ## Subcommands
 
-- `config file`: Print the active config file path (resolved from `OPENCLAW_CONFIG_PATH` or default location).
+- `config file`: Print the active config file path (resolved from `SUPERHUMAN_CONFIG_PATH` or default location).
 
 Restart the gateway after edits.
 
@@ -312,6 +312,6 @@ Validate the current config against the active schema without starting the
 gateway.
 
 ```bash
-openclaw config validate
-openclaw config validate --json
+superhuman config validate
+superhuman config validate --json
 ```
