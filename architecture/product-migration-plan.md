@@ -717,7 +717,7 @@ Make the migration tracking docs describe the repo as it actually exists now.
 - `architecture/current-surface-inventory.md`
 - `architecture/release-candidate-readiness.md`
 - `architecture/upgrade-validation-report.md`
-- `architecture/plugin-compatibility-report.md`
+- `architecture/archive/plugin-compatibility-report.md`
 - `architecture/docs-taxonomy-audit.md`
 
 #### Required changes

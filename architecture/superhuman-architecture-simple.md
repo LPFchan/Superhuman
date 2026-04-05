@@ -183,6 +183,8 @@ How we know it worked:
 
 ## Build Order
 
+Detailed implementation content for the build order now lives in [detailed-execution-packet.md](detailed-execution-packet.md).
+
 ## Phase 1: Start from OpenClaw
 
 Do this first:

@@ -399,7 +399,7 @@ Focus:
 
 Execution doc:
 
-- [01-establish-the-shell.md](01-establish-the-shell.md)
+- [Phase 1 in detailed-execution-packet.md](detailed-execution-packet.md#phase-1-establish-the-shell)
 
 ### Phase 2: Harden the runtime core
 
@@ -410,7 +410,7 @@ Focus:
 
 Execution doc:
 
-- [02-harden-the-runtime-core.md](02-harden-the-runtime-core.md)
+- [Phase 2 in detailed-execution-packet.md](detailed-execution-packet.md#phase-2-harden-the-runtime-core)
 
 ### Phase 3: Bring in Claude context and memory intelligence
 
@@ -421,7 +421,7 @@ Focus:
 
 Execution doc:
 
-- [03-context-and-memory.md](03-context-and-memory.md)
+- [Phase 3 in detailed-execution-packet.md](detailed-execution-packet.md#phase-3-context-and-memory)
 
 ### Phase 4: Add orchestration and messaging
 
@@ -432,7 +432,7 @@ Focus:
 
 Execution doc:
 
-- [04-orchestration-and-messaging.md](04-orchestration-and-messaging.md)
+- [Phase 4 in detailed-execution-packet.md](detailed-execution-packet.md#phase-4-orchestration-and-messaging)
 
 ### Phase 5: Add proactive and scheduled automation
 
@@ -443,7 +443,7 @@ Focus:
 
 Execution doc:
 
-- [05-proactive-and-scheduled-automation.md](05-proactive-and-scheduled-automation.md)
+- [Phase 5 in detailed-execution-packet.md](detailed-execution-packet.md#phase-5-proactive-and-scheduled-automation)
 
 ### Phase 6: Add optional high-autonomy execution surfaces
 
@@ -454,7 +454,7 @@ Focus:
 
 Execution doc:
 
-- [06-high-autonomy-execution-surfaces.md](06-high-autonomy-execution-surfaces.md)
+- [Phase 6 in detailed-execution-packet.md](detailed-execution-packet.md#phase-6-high-autonomy-execution-surfaces)
 
 ## Final Target State
 

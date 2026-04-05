@@ -36,9 +36,9 @@ The runtime migration work earlier in the migration wave already updated the Con
 
 ## Upgrade Posture
 
-The repository is now aligned with the intended migration model:
+The repository is partially aligned with the intended migration model:
 
 - Superhuman names are canonical
 - legacy OpenClaw-shaped config and state paths remain readable for upgrade compatibility
-- service and restart helper naming are Superhuman-first
-- legacy surfaces are documented as compatibility behavior, not accidental leftovers
+- service and restart helper naming are trending Superhuman-first, but not every user-facing surface is cleaned up yet
+- many legacy surfaces are documented as compatibility behavior, though some docs and UI copy still present them too prominently

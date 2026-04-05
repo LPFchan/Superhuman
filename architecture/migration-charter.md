@@ -7,14 +7,14 @@ This charter turns the product migration plan into an execution contract for the
 Phase 1 exists to prevent the repo from doing brand work, runtime migrations, or code-structure churn without first deciding which names are canonical, which OpenClaw-shaped surfaces are compatibility contracts, and which parts of the repo are downstream Superhuman ownership.
 
 This charter does not authorize Phase 2 or later work by itself.
-It records the decisions already fixed by policy, the decisions still blocked on operator input, the review roles for each category, and the freeze rules that apply while the rest of Phase 1 is underway.
+It records the ratified decisions, the review roles for each category, and the standing guardrails that remain in effect after Phase 1.
 
 ## Current Status
 
-- Public identity is still predominantly OpenClaw across package metadata, README, docs, UI, app manifests, contributor guidance, issue templates, runtime messaging, and operator scripts.
-- The downstream product layer already exists under `src/superhuman/` and is material enough that it must be treated as a first-class migration surface rather than an experiment.
+- Public identity is now predominantly Superhuman across package metadata, the README front door, docs shell, and canonical runtime defaults, though deeper docs, UI copy, and app-facing surfaces still need cleanup.
+- The downstream product layer under `src/superhuman/` is established and must continue to be treated as a first-class migration surface rather than an experiment.
 - Plugin compatibility is not incidental. The current system is explicitly built around `openclaw/plugin-sdk/*`, `@openclaw/*`, `openclaw.plugin.json`, and related manifest/runtime contracts.
-- The foundational naming table is only partially resolved. Some values are explicit in policy, but public package and domain identifiers are still undecided in-repo.
+- The foundational naming table is fully resolved in-repo for this migration wave.
 
 ## Canonical Decisions
 
@@ -66,15 +66,15 @@ Every reviewed surface in this wave must be placed into one of these buckets.
 
 The working inventory for those classifications lives in `architecture/current-surface-inventory.md`.
 
-## Phase 1 Freeze Rules
+## Standing Naming and Compatibility Guardrails
 
-Until the Phase 1 acceptance gate is met:
+These rules remain in effect after the Phase 1 gate and should be treated as default policy unless the operator explicitly changes the migration contract:
 
 - Do not add new public `OpenClaw` branding to README, docs homepage, docs nav, UI titles, app display names, package metadata, or contributor guidance unless it is clearly a provenance or compatibility note.
 - Do not add new `super-*` or `Super*` filenames outside `src/superhuman/` unless they are explicitly classified as downstream-only work.
 - Do not rename plugin-facing contracts casually. Anything under `openclaw/plugin-sdk/*`, `@openclaw/*`, `openclaw.plugin.json`, `openclaw.install.*`, `openclaw.channel.*`, or documented discovery/install flows is compatibility-sensitive by default.
 - Do not move public docs into a second published tree. `docs/` remains the only public docs root.
-- Do not treat unresolved canonical values as decided in shipped user-facing surfaces.
+- Do not casually override the ratified canonical values in shipped user-facing surfaces.
 
 ## Phase 1 Deliverables
 
@@ -96,7 +96,7 @@ Phase 1 is complete only when all of the following are true:
 
 ## Current Gate Result
 
-Phase 1 is in progress.
-
-It is not yet complete because the CLI binary, npm package, repository URL, docs domain, and website URL still require operator input.
 Phase 1 is complete.
+
+Its deliverables are present in this directory and the foundational naming set is ratified for this migration wave.
+The freeze rules above remain active as standing guardrails for later phases; they are no longer blockers waiting on unresolved names.

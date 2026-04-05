@@ -1,5 +1,8 @@
 # Superhuman UX Research (revised)
 
+This is the retained UX audit snapshot from the architecture UX exploration.
+It supersedes [Superhuman UX Research.md](Superhuman%20UX%20Research.md).
+
 ## Prompt
 
 You are doing a product-level UX audit of Superhuman’s user-facing interaction model.

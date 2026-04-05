@@ -9,57 +9,57 @@ Detailed string replacement work belongs to later phases after the canonical val
 
 ## Classification Summary
 
-| Surface                                    | Bucket                   | Current state                                       | Migration note                                                         |
-| ------------------------------------------ | ------------------------ | --------------------------------------------------- | ---------------------------------------------------------------------- |
-| Root package metadata                      | public identity          | OpenClaw-branded                                    | Must move once CLI/package/repo URLs are chosen.                       |
-| README and root repo front door            | public identity          | OpenClaw-branded                                    | Must move in Phase 3.                                                  |
-| Mintlify docs config and homepage          | public identity          | OpenClaw-branded                                    | Must move in Phase 3 after docs domain is chosen.                      |
-| Control UI shell                           | public identity          | OpenClaw-branded                                    | Must move in Phase 3 with storage-key migration in Phase 4.            |
-| App display names and bundle-facing labels | public identity          | OpenClaw-branded                                    | Must move in Phase 3 with app/runtime migration planning.              |
-| CLI binary and runtime messages            | public identity          | OpenClaw-branded                                    | Must move in Phase 4 after canonical CLI is chosen.                    |
-| Config paths, state paths, env vars        | public identity          | OpenClaw defaults active                            | Must migrate in Phase 4 with compatibility behavior.                   |
-| `openclaw/plugin-sdk/*`                    | compatibility namespace  | active public contract                              | Keep during this migration wave unless versioned replacement ships.    |
-| `@openclaw/*` plugin packages              | compatibility namespace  | active ecosystem contract                           | Keep during this migration wave unless explicit alias/migration ships. |
-| `openclaw.plugin.json` manifests           | compatibility namespace  | active discovery contract                           | Keep during this migration wave.                                       |
-| Generic host/core under `src/`             | shared core              | mostly upstream-shaped with some downstream leakage | Preserve upstream-sync shape and reduce downstream imports later.      |
-| `src/superhuman/`                          | downstream product layer | present and growing                                 | Keep as the product namespace; normalize later.                        |
+| Surface                                    | Bucket                   | Current state                                       | Migration note                                                                  |
+| ------------------------------------------ | ------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Root package metadata                      | public identity          | Superhuman-first with OpenClaw compatibility alias  | package/repo/bin identity moved; compatibility alias retained.                  |
+| README and root repo front door            | public identity          | Partially migrated                                  | Superhuman-first top-level identity exists; deep cleanup still needed.          |
+| Mintlify docs config and homepage          | public identity          | Partially migrated                                  | docs shell is Superhuman-first; deeper docs cleanup still needed.               |
+| Control UI shell                           | public identity          | Partially migrated                                  | title/tag/storage migration landed; user-facing copy still uneven.              |
+| App display names and bundle-facing labels | public identity          | Mixed                                               | visible app branding is moving; bundle/package ids remain sensitive.            |
+| CLI binary and runtime messages            | public identity          | Mixed                                               | `superhuman` is canonical; `openclaw` alias remains and some help text lingers. |
+| Config paths, state paths, env vars        | public identity          | Superhuman-first with compatibility reads           | canonical defaults moved; legacy reads remain by design.                        |
+| `openclaw/plugin-sdk/*`                    | compatibility namespace  | active public contract                              | Keep during this migration wave unless versioned replacement ships.             |
+| `@openclaw/*` plugin packages              | compatibility namespace  | active ecosystem contract                           | Keep during this migration wave unless explicit alias/migration ships.          |
+| `openclaw.plugin.json` manifests           | compatibility namespace  | active discovery contract                           | Keep during this migration wave.                                                |
+| Generic host/core under `src/`             | shared core              | mostly upstream-shaped with some downstream leakage | Preserve upstream-sync shape and reduce downstream imports later.               |
+| `src/superhuman/`                          | downstream product layer | present and growing                                 | Keep as the product namespace; normalize later.                                 |
 
 ## Public Identity Surfaces
 
 ### Repository and package surfaces
 
-| Surface                                       | Representative files                                                                                                     | Current identity                                    |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| package name, homepage, bugs, repository, bin | `package.json`                                                                                                           | `openclaw`, `openclaw` binary, OpenClaw GitHub URLs |
-| root executable entrypoint                    | `openclaw.mjs`                                                                                                           | OpenClaw command/help/error text                    |
-| release and publish scripts                   | `scripts/openclaw-npm-release-check.ts`, `scripts/openclaw-npm-postpublish-verify.ts`, `scripts/openclaw-npm-publish.sh` | OpenClaw release naming and publish flow            |
-| contributor and issue front doors             | `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/*`                                                                            | OpenClaw product framing                            |
+| Surface                                       | Representative files                                                                                                     | Current identity                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| package name, homepage, bugs, repository, bin | `package.json`                                                                                                           | `@lpfchan/superhuman`, `superhuman` canonical bin, `openclaw` alias retained |
+| root executable entrypoint                    | `openclaw.mjs`, `superhuman.mjs`                                                                                         | Superhuman-first with legacy alias warning                                   |
+| release and publish scripts                   | `scripts/openclaw-npm-release-check.ts`, `scripts/openclaw-npm-postpublish-verify.ts`, `scripts/openclaw-npm-publish.sh` | OpenClaw release naming and publish flow                                     |
+| contributor and issue front doors             | `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/*`                                                                            | OpenClaw product framing                                                     |
 
 ### Documentation surfaces
 
-| Surface            | Representative files | Current identity                                                     |
-| ------------------ | -------------------- | -------------------------------------------------------------------- |
-| docs site metadata | `docs/docs.json`     | site name, description, navbar, repo/release links point to OpenClaw |
-| docs homepage      | `docs/index.md`      | OpenClaw title, onboarding copy, config path, screenshots            |
-| docs body copy     | `docs/**/*.md`       | product-facing OpenClaw references widespread                        |
-| root README        | `README.md`          | OpenClaw product identity, install commands, docs URLs               |
+| Surface            | Representative files | Current identity                                                            |
+| ------------------ | -------------------- | --------------------------------------------------------------------------- |
+| docs site metadata | `docs/docs.json`     | site name, description, navbar, repo/release links are Superhuman-first     |
+| docs homepage      | `docs/index.md`      | Superhuman homepage with some residual copy cleanup remaining               |
+| docs body copy     | `docs/**/*.md`       | mixed; many deeper operator and channel docs still need cleanup             |
+| root README        | `README.md`          | Superhuman front door with residual deep-link and command cleanup remaining |
 
 ### UI and app surfaces
 
-| Surface                          | Representative files                               | Current identity                                                                                             |
-| -------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Control UI title and element tag | `ui/index.html`                                    | `OpenClaw Control`, `openclaw-app`, `openclaw.control.settings.v1`                                           |
-| iOS app display surfaces         | `apps/ios/Sources/Info.plist`                      | `CFBundleDisplayName=OpenClaw`, `openclaw` URL scheme, `_openclaw-gw._tcp` Bonjour service                   |
-| macOS app display surfaces       | `apps/macos/Sources/OpenClaw/Resources/Info.plist` | `CFBundleExecutable=OpenClaw`, `CFBundleName=OpenClaw`, `openclaw` URL scheme, `ai.openclaw.mac` identifiers |
-| Android app identity             | `apps/android/app/build.gradle.kts`                | `applicationId=ai.openclaw.app`, `openclaw-*.apk` output names, `OPENCLAW_*` signing properties              |
+| Surface                          | Representative files                               | Current identity                                                                                   |
+| -------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Control UI title and element tag | `ui/index.html`                                    | `Superhuman Control`, `superhuman-app`, `superhuman.control.settings.v1` with legacy fallback keys |
+| iOS app display surfaces         | `apps/ios/Sources/Info.plist`                      | mixed; branding direction is Superhuman, low-level identifiers remain legacy                       |
+| macOS app display surfaces       | `apps/macos/Sources/OpenClaw/Resources/Info.plist` | mixed; `CFBundleName=Superhuman`, low-level identifiers remain legacy                              |
+| Android app identity             | `apps/android/app/build.gradle.kts`                | mixed; app/package ids remain `ai.openclaw.app`, visible branding still being cleaned up           |
 
 ### Runtime and operator surfaces
 
-| Surface                    | Representative files                                                   | Current identity                                             |
-| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
-| default state/config roots | `src/config/paths.ts`                                                  | `~/.openclaw/openclaw.json` with legacy `.clawdbot` fallback |
-| env var namespace          | `src/config/paths.ts`, `render.yaml`, `test/test-env.ts`, many scripts | `OPENCLAW_*`                                                 |
-| operator/runtime messaging | `openclaw.mjs`, scripts, docs                                          | OpenClaw-first command/help/install text                     |
+| Surface                    | Representative files                                                   | Current identity                                                               |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| default state/config roots | `src/config/paths.ts`                                                  | `~/.superhuman/superhuman.json` with legacy `.openclaw` / `.clawdbot` fallback |
+| env var namespace          | `src/config/paths.ts`, `render.yaml`, `test/test-env.ts`, many scripts | mixed; `SUPERHUMAN_*` exists for path roots, many legacy env names remain      |
+| operator/runtime messaging | `openclaw.mjs`, scripts, docs                                          | mixed; canonical CLI is Superhuman but many docs/messages still need cleanup   |
 
 ## Compatibility Namespace Surfaces
 

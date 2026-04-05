@@ -34,6 +34,7 @@ The goal is to classify the public docs tree so future cleanup can happen withou
 - `architecture/` is now the internal planning and migration root.
 - Provenance and migration pages are public.
 - Compatibility namespaces and plugin compatibility contracts now have dedicated public pages.
+- Public docs cleanup is still incomplete in deeper gateway, install, and channel/operator pages.
 
 ## Residual Cleanup Queue
 
