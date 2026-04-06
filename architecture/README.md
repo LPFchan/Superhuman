@@ -16,11 +16,12 @@ It holds both the active source-of-truth docs and the historical evidence that l
 9. [Upgrade Validation Report](upgrade-validation-report.md) for the OpenClaw-to-Superhuman runtime migration evidence.
 10. [Release Audit Checklist](release-audit-checklist.md) for pre-release identity, upgrade, compatibility, and verification review.
 11. [Upstream Intake Policy](upstream-intake-policy.md) for the accept, adapt, or decline operating model.
-12. [Weekly Upstream Intake Template](weekly-upstream-intake-template.md) for logging accept, adapt, or decline decisions during OpenClaw sync review.
-13. [Autonomous Maintenance Boundary](autonomous-maintenance-boundary.md) for the explicit escalation and approval boundary.
-14. [detailed-execution-packet.md](detailed-execution-packet.md) for the consolidated detailed implementation packet that replaces the old per-phase execution docs.
-15. [superhuman-architecture-technical.md](superhuman-architecture-technical.md) for the detailed target-system architecture.
-16. [superhuman-architecture-simple.md](superhuman-architecture-simple.md) for the simpler architectural summary.
+12. [upstream-intake/README.md](upstream-intake/README.md) for the canonical weekly upstream intake package, templates, registers, and report artifacts.
+13. [Weekly Upstream Intake Template](weekly-upstream-intake-template.md) as the compatibility entry point that redirects to the canonical intake package.
+14. [Autonomous Maintenance Boundary](autonomous-maintenance-boundary.md) for the explicit escalation and approval boundary.
+15. [detailed-execution-packet.md](detailed-execution-packet.md) for the consolidated detailed implementation packet that replaces the old per-phase execution docs.
+16. [superhuman-architecture-technical.md](superhuman-architecture-technical.md) for the detailed target-system architecture.
+17. [superhuman-architecture-simple.md](superhuman-architecture-simple.md) for the simpler architectural summary.
 
 ## Historical evidence and implementation snapshots
 
