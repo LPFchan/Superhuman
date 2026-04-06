@@ -114,8 +114,6 @@ Prefer a short, conversational mini-brief for each operator-facing item, optiona
 
 ## Decision Rules
 
-- Prefer upstream-shaped implementations when the fix belongs to shared core and does not conflict with an established Superhuman-owned solution.
-- Keep Superhuman-owned implementations when the behavior is downstream-specific, then adapt upstream ideas into that shape.
 - If the fix belongs to shared core, prefer the upstream-shaped implementation.
 - If the local fix is tied into Superhuman-only surfaces, keep the local version and adapt upstream ideas into it.
 - If the upstream patch changes policy, decide the policy first by escalating to the operator, then choose the implementation that matches that decision.

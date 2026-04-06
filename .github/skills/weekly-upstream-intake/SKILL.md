@@ -37,21 +37,8 @@ Use this skill when Superhuman needs a repeatable review of upstream OpenClaw ch
    - Separate product-shaping work from routine bug fixes.
 
 4. Analyze each candidate deeply.
-   - What does it actually mean?
-   - What exact vendor, provider, feature, contract, or path is changing?
-   - What exact local Superhuman surface is affected?
-   - What is the before state, after state, and concrete consequence?
-   - What is not changing?
-   - What changes for end users or operators?
-   - Is it breaking or migration-sensitive?
-   - How relevant is it to Superhuman right now?
-   - Is it duplicating local work?
-   - Which implementation should win if there is overlap?
-   - What are the upside, downside, and maintenance tradeoffs?
-   - Is there any security or hardening conflict with an existing Superhuman implementation?
-   - What compatibility details matter if it lands?
-   - Is this a policy change, an implementation change, or both?
-   - What literal user or operator scenario explains the impact best?
+   - Follow the drill-down and ambiguity rules in [upstream-intake.instructions.md](../../instructions/upstream-intake.instructions.md) and [architecture/upstream-intake/intake-method.md](../../../architecture/upstream-intake/intake-method.md).
+   - Make sure each candidate covers the exact upstream and local surfaces, the before/after/consequence, what is not changing, overlap or collision with local work, tradeoffs, compatibility details, and at least one literal user or operator scenario.
    - If any of this depends on vendor policy, pricing, legal terms, or external product behavior, use internet lookup and prefer official sources.
 
 5. Decide `accept`, `adapt`, or `decline`.
@@ -60,41 +47,15 @@ Use this skill when Superhuman needs a repeatable review of upstream OpenClaw ch
 
 6. Fill the canonical template.
    - Use [architecture/upstream-intake/weekly-upstream-intake-template.md](../../../architecture/upstream-intake/weekly-upstream-intake-template.md).
+   - Use [architecture/upstream-intake/intake-method.md](../../../architecture/upstream-intake/intake-method.md) to keep the analysis and recommendation shape consistent.
    - Write the full record under [architecture/upstream-intake/reports/internal-records/README.md](../../../architecture/upstream-intake/reports/internal-records/README.md).
    - Keep rationale short but concrete.
 
 7. Produce the operator brief.
    - Use [architecture/upstream-intake/operator-weekly-brief-template.md](../../../architecture/upstream-intake/operator-weekly-brief-template.md) for the lighter summary.
    - Store it as a separate artifact under [architecture/upstream-intake/reports/operator-briefs/README.md](../../../architecture/upstream-intake/reports/operator-briefs/README.md).
-   - Put unresolved operator-facing calls before routine autonomous decisions.
-   - The internal record should hold the exhaustive field-by-field reasoning.
-   - The operator brief should translate that reasoning into natural language, not mirror every internal-record label.
-
-## Required Operator Brief Shape
-
-### Decisions Made Autonomously
-
-For each item, include:
-
-- what it actually means
-- why it was safe to decide autonomously
-- what action follows from the decision
-
-### Decisions Requiring Operator Input
-
-For each item, include:
-
-- the concrete decision the operator is being asked to make
-- the exact vendor, provider, feature, or path affected
-- what it means in simple terms
-- what is not changing
-- effect on architecture or user experience
-- realistic options
-- recommended direction
-- blocked follow-up work
-
-Present that material as a short conversational mini-brief.
-Do not turn the operator brief into a field dump copied from the internal record unless the user explicitly asks for that shape.
+   - Follow the operator brief template and instruction file instead of restating their field or formatting rules here.
+   - Keep the full reasoning in the internal record; the operator brief is the shorter human-facing translation.
 
 ## Escalation Triggers
 
