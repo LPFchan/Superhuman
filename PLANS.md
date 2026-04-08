@@ -20,14 +20,14 @@ This document contains accepted future direction only.
 - Earliest likely start: after migration-cleanup gating and root repo-surface adoption settle.
 - Related ids: `RSH-20260409-001`, `SPEC.md`, `IBX-20260409-003`
 
-### Root Repo-Managed Memory And Governance
+### Repo-Template As Canonical Managed-Repo Model
 
-- Outcome: Superhuman itself uses the repo-template framework at the repository root, with root truth/status/plan/inbox/research/decision/worklog surfaces.
-- Why this is accepted: the project’s own repo must model the discipline Superhuman is supposed to provide.
-- Expected value: coherent internal memory, durable provenance, and a canonical operating backbone for future agents.
-- Preconditions: retire architecture-local mirrors and root-canonicalize upstream intake.
+- Outcome: Superhuman itself uses repo-template at the repository root and treats the latest `LPFchan/repo-template` as the default operating model for repos it creates, adopts, or manages.
+- Why this is accepted: a project-workspace product needs one repeatable repo operating system across its portfolio rather than bespoke governance per repo.
+- Expected value: coherent bootstrap and adoption behavior, durable provenance, and the same memory surfaces across new and existing managed repos.
+- Preconditions: preserve stronger repo-specific workflow rules and explicit local constraints when merging the model into a real repo.
 - Earliest likely start: now
-- Related ids: `DEC-20260409-002`, `DEC-20260409-003`, `LOG-20260409-003`
+- Related ids: `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-006`, `LOG-20260409-003`, `LOG-20260409-010`
 
 ### Mobile Cockpit First
 
@@ -36,7 +36,16 @@ This document contains accepted future direction only.
 - Expected value: coherent cross-device access to the same workspace without prematurely forcing Cursor-on-a-phone expectations.
 - Preconditions: work-first UI model and root project memory surfaces must be stronger first.
 - Earliest likely start: after the work-first recomposition has a stable desktop/control-plane shape.
-- Related ids: `RSH-20260409-001`, `RSH-20260409-002`
+- Related ids: `RSH-20260409-001`, `RSH-20260409-002`, `RSH-20260409-007`
+
+### Messenger Capture, Approval, And Status Flows
+
+- Outcome: messenger surfaces become first-class channels for intake, approvals, summaries, status updates, and quick redirection without becoming canonical truth-authoring surfaces.
+- Why this is accepted: the operator needs lightweight control and capture from anywhere, but durable project truth still needs orchestrated routing into repo-native memory.
+- Expected value: faster capture, faster approvals, and better operator responsiveness without collapsing the workspace back into generic chat.
+- Preconditions: orchestrator routing remains canonical and repo truth stays in the managed surfaces.
+- Earliest likely start: alongside early workspace-surface recomposition, with deeper polish after the desktop work surface is stronger.
+- Related ids: `RSH-20260409-006`, `RSH-20260409-007`, `IBX-20260409-003`
 
 ### Upstream Intake As A First-Class Operating Surface
 
@@ -60,10 +69,10 @@ This document contains accepted future direction only.
 
 ### Near Term
 
-- Initiative: root repo-managed surface adoption
-  - Why now: it makes the project’s own memory model real instead of architectural theory
-  - Dependencies: `DEC-20260409-002`, `DEC-20260409-003`
-  - Related ids: `LOG-20260409-003`
+- Initiative: managed-repo baseline ratification
+  - Why now: Superhuman needs one canonical repo-management default before it starts creating or adopting more repos under its own workflow model
+  - Dependencies: `DEC-20260409-002`, `DEC-20260409-006`
+  - Related ids: `LOG-20260409-010`
 - Initiative: release-candidate blocker closeout
   - Why now: current migration posture is late-cleanup and explicitly not yet release-ready
   - Dependencies: upgrade verification, docs cleanup, UI/app cleanup, compatibility checks
@@ -79,6 +88,14 @@ This document contains accepted future direction only.
   - Why later: current runtime and queue/approval primitives should be recomposed into a work-first front door
   - Dependencies: `RSH-20260409-001`, `RSH-20260409-002`
   - Related ids: `IBX-20260409-003`
+- Initiative: mobile cockpit v1
+  - Why later: mobile should deliver capture, approvals, monitoring, and redirection once the workspace model is clearer without chasing full IDE parity
+  - Dependencies: `RSH-20260409-006`, `RSH-20260409-007`
+  - Related ids: `RSH-20260409-007`
+- Initiative: messenger intake and control flows
+  - Why later: the operator should be able to capture, approve, redirect, and receive status from anywhere without making messenger the source of truth
+  - Dependencies: `RSH-20260409-006`, `RSH-20260409-007`
+  - Related ids: `RSH-20260409-007`, `IBX-20260409-003`
 - Initiative: unified work item detail and visible trust posture
   - Why later: approvals, queue, transcript, and task state need one coherent operator surface
   - Dependencies: work-first product recomposition

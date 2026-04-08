@@ -4,9 +4,11 @@ This document is the canonical repo contract for Superhuman.
 
 ## Purpose
 
-Superhuman is adopting the `repo-template` framework for itself.
+Superhuman uses the latest [`LPFchan/repo-template`](https://github.com/LPFchan/repo-template) as its canonical repo operating model.
 
 That means this repository is no longer using `architecture/` as an architecture-side draft of repo operating surfaces. The canonical repo-native surfaces now live at the repository root.
+
+That same baseline is also the default way Superhuman should create, adopt, and manage other repos unless the operator explicitly approves a different local contract.
 
 The goal is to let Superhuman run as a long-lived project without losing coherence across:
 
@@ -17,6 +19,27 @@ The goal is to let Superhuman run as a long-lived project without losing coheren
 - explicit decisions
 - execution history
 - upstream intake
+
+## Canonical Managed-Repo Baseline
+
+For repos beyond Superhuman itself, the default rule is:
+
+- use the latest `LPFchan/repo-template` scaffold and operating rules as the baseline
+- keep a local `REPO.md` in each managed repo as that repo's canonical contract
+- preserve stronger repo-specific workflow rules, CI, commands, and product truth when merging the model into an existing repo
+- do not vendor template packaging blindly when the target repo already has real project structure
+- do not invent a bespoke repo-memory system when repo-template already fits the need
+
+Practical defaults:
+
+- New repo created by Superhuman:
+  - instantiate the current repo-template scaffold from the start
+  - seed `REPO.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, and `INBOX.md`
+  - keep `upstream-intake/` active, dormant, or omitted based on the repo's real needs
+- Existing repo adopted or managed by Superhuman:
+  - merge repo-template into the real repo with the smallest viable diff
+  - preserve stronger local rules and explicit product constraints
+  - record intentional divergences in that repo's `REPO.md` or decision history
 
 ## Relationship To Other Root Docs
 
@@ -231,6 +254,7 @@ Rules:
 - Superhuman is single-operator-first.
 - Repo-local canonical truth lives in versioned docs.
 - Off-Git operational memory keeps chat history, messenger traffic, and transient context.
+- For repos Superhuman creates, adopts, or manages, the latest `LPFchan/repo-template` baseline is canonical unless the operator explicitly approves a different local contract.
 - The current public product is still a personal AI assistant across channels, devices, and control surfaces.
 - The deeper Superhuman direction is a durable project workspace with repo-native memory, orchestrated agent work, and synchronized access across desktop and mobile.
 - That deeper direction belongs in `SPEC.md` and `PLANS.md`, not only in chat.

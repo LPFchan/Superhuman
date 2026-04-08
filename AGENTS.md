@@ -4,6 +4,8 @@ This repository is Superhuman, a repo-template-managed fork that still preserves
 
 `REPO.md` is the canonical repo contract. Root `CLAUDE.md` is a thin compatibility shim that points back to this file through `AGENTS.md`.
 
+Superhuman also treats the latest `LPFchan/repo-template` as the default operating model for any repo it creates, adopts, or manages unless the operator explicitly approves a different local contract.
+
 ## Read First
 
 Read these before substantial work:
@@ -21,6 +23,7 @@ If a touched subtree has its own `AGENTS.md`, read that too and treat it as bind
 
 - Current public reality: Superhuman ships as a self-hosted personal AI assistant across channels, the web, and paired devices.
 - Accepted direction: Superhuman is becoming a durable project workspace and operator cockpit with repo-native memory and orchestrated agents.
+- Managed-repo posture: new repos should start from repo-template, and existing repos should adopt it with the smallest viable diff rather than inventing bespoke governance.
 - Keep both truths visible. Do not write public-facing copy as if the workspace thesis is already fully shipped, and do not hide the accepted direction in internal artifacts.
 - Preserve OpenClaw lineage and plugin compatibility as explicit product commitments, not as embarrassing leftovers.
 
@@ -38,6 +41,13 @@ If a touched subtree has its own `AGENTS.md`, read that too and treat it as bind
 - `architecture/`: evidence, migration material, and archive context, not the canonical operating layer
 
 Use the correct surface for the job. Do not collapse truth, plans, research, decisions, worklogs, inbox items, and upstream review into one mixed document.
+
+## Managed Repo Default
+
+- When Superhuman creates a new repo, instantiate the latest repo-template scaffold first and then layer repo-specific truth and workflows on top.
+- When Superhuman adopts or manages an existing repo, merge the latest repo-template baseline with the smallest viable diff instead of overwriting real project structure or stronger local workflow rules.
+- Each managed repo should keep its own local `REPO.md` as the canonical rules layer for that repo.
+- If a managed repo already has an operator-approved local contract, follow that repo's local `REPO.md` and `AGENTS.md` rather than forcing Superhuman's own root docs onto it.
 
 Before editing a repo artifact, read the matching local guide first. These are binding by default when they define section order, required provenance, or canonical examples:
 
@@ -73,6 +83,7 @@ High-value subtree guides live at:
 
 - Prefer adding Superhuman-specific behavior in `src/superhuman/` or behind explicit seams instead of scattering fork policy across generic shared core.
 - Preserve plugin and SDK compatibility by default. Extensions should cross package boundaries through `openclaw/plugin-sdk/*`, manifests, and local barrels such as `api.ts` or `runtime-api.ts`, not by deep-importing `src/**` or other extensions' internals.
+- When designing repo-management behavior for other repos, reuse repo-template's scaffold, routing model, and provenance rules unless the target repo already has an operator-approved stronger equivalent.
 - Treat protocol and public SDK changes as contract changes. Favor additive evolution and document any compatibility-sensitive seam.
 - If you change shared routing, onboarding, or message flow, consider all built-in and bundled-plugin channel surfaces rather than fixing only one path.
 - Use `plugin` / `plugins` in docs and UI copy. Keep legacy `openclaw` identifiers only where compatibility, package names, CLI aliases, or SDK contracts require them.
