@@ -1,4 +1,4 @@
-# Weekly Report Artifacts
+# Upstream Intake Report Artifacts
 
 Store completed upstream intake artifacts in this directory.
 By default, each review window should create two separate files:
@@ -32,6 +32,8 @@ Each weekly review should leave behind:
 
 - the full intake record in [internal-records/](internal-records/README.md) using [../weekly-upstream-intake-template.md](../weekly-upstream-intake-template.md)
 - a separate concise operator-facing summary in [operator-briefs/](operator-briefs/README.md) using [../operator-weekly-brief-template.md](../operator-weekly-brief-template.md)
-- links to any follow-up PRs, issues, or ADRs
+- links to any follow-up PRs, issues, ADRs, or notes
+
+The child directory `README.md` files include the canonical example shapes to imitate.
 
 Do not store one-off chat summaries here unless they have been normalized into the weekly intake format.

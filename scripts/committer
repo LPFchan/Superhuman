@@ -4,19 +4,61 @@ set -euo pipefail
 # Disable glob expansion to handle brackets in file paths
 set -f
 usage() {
-  printf 'Usage: %s [--force] "commit message" "file" ["file" ...]\n' "$(basename "$0")" >&2
+  printf 'Usage: %s [--force] [--project id] [--agent id] [--role role] [--artifacts ids] [--exception bootstrap|migration] "commit message" "file" ["file" ...]\n' "$(basename "$0")" >&2
   exit 2
 }
 
-if [ "$#" -lt 2 ]; then
-  usage
-fi
-
 force_delete_lock=false
-if [ "${1:-}" = "--force" ]; then
-  force_delete_lock=true
-  shift
-fi
+project=${COMMIT_PROJECT:-superhuman}
+agent=${COMMIT_AGENT:-${CODEX_THREAD_ID:-}}
+role=${COMMIT_ROLE:-orchestrator}
+artifacts=${COMMIT_ARTIFACTS:-}
+exception=${COMMIT_EXCEPTION:-}
+
+while [ "$#" -gt 0 ]; do
+  case "${1:-}" in
+    --force)
+      force_delete_lock=true
+      shift
+      ;;
+    --project)
+      [ "$#" -ge 2 ] || usage
+      project=$2
+      shift 2
+      ;;
+    --agent)
+      [ "$#" -ge 2 ] || usage
+      agent=$2
+      shift 2
+      ;;
+    --role)
+      [ "$#" -ge 2 ] || usage
+      role=$2
+      shift 2
+      ;;
+    --artifacts)
+      [ "$#" -ge 2 ] || usage
+      artifacts=$2
+      shift 2
+      ;;
+    --exception)
+      [ "$#" -ge 2 ] || usage
+      exception=$2
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      printf 'Error: unknown option: %s\n' "$1" >&2
+      usage
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 if [ "$#" -lt 2 ]; then
   usage
@@ -38,6 +80,15 @@ fi
 if [ "$#" -eq 0 ]; then
   usage
 fi
+
+message_has_trailer() {
+  local key=$1
+  printf '%s\n' "$commit_message" | grep -Eq "^$key: .+"
+}
+
+message_has_exception() {
+  printf '%s\n' "$commit_message" | grep -Eqi '^exception: (bootstrap|migration)$'
+}
 
 path_exists_or_tracked() {
   local candidate=$1
@@ -189,10 +240,45 @@ if git diff --staged --quiet; then
   exit 1
 fi
 
+commit_text=$commit_message
+
+if message_has_exception || message_has_trailer "project" || message_has_trailer "agent" || message_has_trailer "role" || message_has_trailer "artifacts"; then
+  if [ -n "$exception" ] || [ -n "${artifacts:-}" ] || [ -n "${project:-}" ] || [ -n "${agent:-}" ] || [ -n "${role:-}" ]; then
+    :
+  fi
+else
+  if [ -n "$exception" ]; then
+    case "$exception" in
+      bootstrap|migration) ;;
+      *)
+        printf 'Error: --exception must be "bootstrap" or "migration"\n' >&2
+        exit 1
+        ;;
+    esac
+    commit_text=$(printf '%s\n\nexception: %s\n' "$commit_message" "$exception")
+  else
+    if [ -z "$project" ] || [ -z "$agent" ] || [ -z "$role" ] || [ -z "$artifacts" ]; then
+      printf 'Error: commit provenance is required. Provide --artifacts plus agent context (or set CODEX_THREAD_ID / COMMIT_AGENT), or use --exception bootstrap|migration.\n' >&2
+      exit 1
+    fi
+    case "$role" in
+      orchestrator|worker|subagent|operator) ;;
+      *)
+        printf 'Error: invalid --role value: %s\n' "$role" >&2
+        exit 1
+        ;;
+    esac
+    commit_text=$(printf '%s\n\nproject: %s\nagent: %s\nrole: %s\nartifacts: %s\n' "$commit_message" "$project" "$agent" "$role" "$artifacts")
+  fi
+fi
+
 committed=false
-if run_git_with_lock_retry "commit" git commit -m "$commit_message" -- "${files[@]}"; then
+commit_message_file=$(mktemp)
+printf '%s\n' "$commit_text" > "$commit_message_file"
+if run_git_with_lock_retry "commit" git commit -F "$commit_message_file" -- "${files[@]}"; then
   committed=true
 fi
+rm -f "$commit_message_file"
 
 if [ "$committed" = false ]; then
   exit 1
