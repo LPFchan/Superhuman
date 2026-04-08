@@ -14,8 +14,8 @@ Every reviewed upstream change must be classified as one of:
 - `adapt`
 - `decline`
 
-Record each decision in `architecture/weekly-upstream-intake-template.md`.
-Prefer storing the real working artifact in `architecture/upstream-intake/weekly-upstream-intake-template.md` and the weekly summary in `architecture/upstream-intake/operator-weekly-brief-template.md`.
+Record each decision through the root canonical intake package.
+Use root `upstream-intake/weekly-upstream-intake-template.md` for the full record and root `upstream-intake/operator-weekly-brief-template.md` for the paired operator brief.
 
 ## Default Decision Rules
 

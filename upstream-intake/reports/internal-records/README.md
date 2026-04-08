@@ -4,8 +4,8 @@ Store the full internal weekly upstream intake records in this folder.
 
 Recommended naming:
 
-- `YYYY-MM-DD-<scope>.md`
+- `UPS-YYYYMMDD-NNN-<scope>.md`
 
 Example:
 
-- `2026-04-07-v2026.4.5.md`
+- `UPS-20260407-001-v2026.4.5.md`

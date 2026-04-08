@@ -4,8 +4,8 @@ Store the lighter operator-facing weekly upstream intake summaries in this folde
 
 Recommended naming:
 
-- `YYYY-MM-DD-<scope>-operator-brief.md`
+- `UPS-YYYYMMDD-NNN-<scope>-operator-brief.md`
 
 Example:
 
-- `2026-04-07-v2026.4.5-operator-brief.md`
+- `UPS-20260407-001-v2026.4.5-operator-brief.md`

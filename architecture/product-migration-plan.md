@@ -516,7 +516,7 @@ Ship the new identity cleanly and define the maintenance model that keeps upstre
   - plugin-facing contract changes require compatibility review and regression coverage before merge
   - new shared-core changes may not import downstream logic without explicit bridge approval
 - Write and maintain an explicit accept, adapt, or decline rubric for weekly upstream intake decisions.
-- Use `architecture/weekly-upstream-intake-template.md` to record each weekly upstream intake decision.
+- Use root `upstream-intake/weekly-upstream-intake-template.md` to record each weekly upstream intake decision.
 - Define the autonomous maintenance boundary: what the agent may do without asking, what requires operator approval, what every escalation must include, and how blocked decisions are re-raised.
 - Create a post-migration audit checklist that runs before each release.
 
@@ -919,7 +919,7 @@ The agent handles recurring repo stewardship, but it must escalate whenever the 
 ### Weekly Upstream Intake Decision Rubric
 
 Use this rubric during the weekly intake review.
-Record each review in `architecture/weekly-upstream-intake-template.md`.
+Record each review in root `upstream-intake/weekly-upstream-intake-template.md`.
 
 #### Accept
 

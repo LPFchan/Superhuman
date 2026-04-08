@@ -3,10 +3,13 @@
 Use this template during the weekly OpenClaw upstream intake review.
 Use the same template when a review item must be escalated to the operator for a critical decision.
 
-This file lives in `architecture/upstream-intake/` as the canonical weekly upstream intake template.
+This file lives in root `upstream-intake/` as the canonical weekly upstream intake template.
 
 ## Review Metadata
 
+- Review id:
+- Opened: `YYYY-MM-DD HH-mm-ss KST`
+- Recorded by agent:
 - Review date:
 - Reviewer:
 - Upstream window reviewed:

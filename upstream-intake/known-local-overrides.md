@@ -23,7 +23,7 @@ Do not use this file for temporary experiments or unreviewed preferences.
 - Why Superhuman diverged: Superhuman explicitly wants local CLI or desktop-tool reuse as part of the product promise, while upstream is narrowing this surface for product and vendor-policy reasons
 - Collision rule to apply during intake: keep generic local CLI backend support as a Superhuman-owned product surface; absorb upstream caution around vendor-specific paths, especially Anthropic policy-sensitive usage
 - Revisit trigger: if vendor terms change further or Superhuman later decides to narrow the local-runtime promise
-- Related decision record: `architecture/upstream-intake/reports/internal-records/2026-04-07-v2026.4.5.md`
+- Related decision record: `upstream-intake/reports/internal-records/UPS-20260407-001-v2026.4.5.md`
 
 - Area: Reply-dispatch public seam preservation
 - Local surface: `src/plugin-sdk/reply-dispatch-runtime.ts` and channel-plugin usage of shared dispatcher functions
@@ -31,4 +31,4 @@ Do not use this file for temporary experiments or unreviewed preferences.
 - Why Superhuman diverged: the architectural direction is aligned, but Superhuman already exposes a public dispatcher seam that should not churn unnecessarily
 - Collision rule to apply during intake: preserve the current public reply-dispatch seam while adapting upstream genericization ideas into the shared-core implementation
 - Revisit trigger: only if upstream evolution requires a new public contract with clear compatibility benefit
-- Related decision record: `architecture/upstream-intake/reports/internal-records/2026-04-07-v2026.4.5.md`
+- Related decision record: `upstream-intake/reports/internal-records/UPS-20260407-001-v2026.4.5.md`
