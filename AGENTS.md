@@ -2,13 +2,13 @@
 
 This repository is Superhuman, a repo-template-managed fork that still preserves explicit OpenClaw lineage and compatibility commitments.
 
-`repo-operating-model.md` is the canonical repo-operating ruleset. Root `CLAUDE.md` is a thin compatibility shim that points back to this file.
+`REPO.md` is the canonical repo contract. Root `CLAUDE.md` is a thin compatibility shim that points back to this file through `AGENTS.md`.
 
 ## Read First
 
 Read these before substantial work:
 
-- `repo-operating-model.md`
+- `REPO.md`
 - `SPEC.md`
 - `STATUS.md`
 - `PLANS.md`

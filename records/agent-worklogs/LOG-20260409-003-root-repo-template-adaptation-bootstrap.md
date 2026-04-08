@@ -10,7 +10,7 @@ This log records the bootstrap migration that made Superhuman itself a repo-temp
 
 ## Work Performed
 
-- Established root canonical operating surfaces: `repo-operating-model.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, `INBOX.md`, `research/`, `records/decisions/`, `records/agent-worklogs/`, and root `upstream-intake/`.
+- Established root canonical operating surfaces: `REPO.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, `INBOX.md`, `research/`, `records/decisions/`, `records/agent-worklogs/`, and root `upstream-intake/`.
 - Promoted `architecture/upstream-intake/` to root `upstream-intake/` and converted architecture-local entry points into pointers rather than mirrors.
 - Seeded initial `DEC-*`, `RSH-*`, `LOG-*`, and `UPS-*` records so active and archived architecture material is accounted for by the new root system.
 - Marked `architecture/` as the evidence, migration, UX, and historical tree instead of a second canonical repo-operating layer.
@@ -27,5 +27,5 @@ This log records the bootstrap migration that made Superhuman itself a repo-temp
 
 - `records/decisions/DEC-20260409-002-repo-template-adoption-for-superhuman.md`
 - `records/decisions/DEC-20260409-003-root-upstream-intake-canonicalization.md`
-- `repo-operating-model.md`
+- `REPO.md`
 - `STATUS.md`

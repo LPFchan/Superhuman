@@ -32,7 +32,7 @@ Superhuman keeps bounded autonomous maintenance: low-risk shared-core fixes, foc
 
 ## Related Artifacts
 
-- `repo-operating-model.md`
+- `REPO.md`
 - `PLANS.md`
 - `INBOX.md`
 - `upstream-intake/decision-carry-forward.md`

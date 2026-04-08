@@ -17,7 +17,7 @@ Superhuman adopts the repo-template framework for itself at the repository root.
 
 ## Consequences
 
-- The canonical repo-managed surfaces live at the repository root: `repo-operating-model.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, `INBOX.md`, `research/`, `records/`, and `upstream-intake/`.
+- The canonical repo-managed surfaces live at the repository root: `REPO.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, `INBOX.md`, `research/`, `records/`, and `upstream-intake/`.
 - `architecture/` becomes the internal evidence, migration, research, and historical snapshot tree.
 - Superhuman adopts repo-template’s framework, not its packaging. Template-specific `scaffold/`, template `skills/`, and `recreate-prompt.md` do not belong in this repo.
 
@@ -31,7 +31,7 @@ Superhuman adopts the repo-template framework for itself at the repository root.
 
 ## Related Artifacts
 
-- `repo-operating-model.md`
+- `REPO.md`
 - `SPEC.md`
 - `STATUS.md`
 - `PLANS.md`

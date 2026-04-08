@@ -4,7 +4,7 @@ The canonical managed surfaces now live at the repository root rather than in an
 
 Use these root docs and directories instead:
 
-- [`../../repo-operating-model.md`](../../repo-operating-model.md)
+- [`../../REPO.md`](../../REPO.md)
 - [`../../SPEC.md`](../../SPEC.md)
 - [`../../STATUS.md`](../../STATUS.md)
 - [`../../PLANS.md`](../../PLANS.md)

@@ -1,6 +1,6 @@
 # Repo Operating Model (Retired Entry Point)
 
-The canonical repo-operating rules now live at [`../repo-operating-model.md`](../repo-operating-model.md).
+The canonical repo contract now lives at [`../REPO.md`](../REPO.md).
 
 Superhuman's canonical managed surfaces now live at the repository root:
 

@@ -1,6 +1,6 @@
-# Superhuman Repo Operating Model
+# Superhuman Repo Contract
 
-This document is the canonical repo-native operating model for Superhuman.
+This document is the canonical repo contract for Superhuman.
 
 ## Purpose
 
@@ -26,7 +26,7 @@ The root docs have different jobs on purpose:
 | ------------------------- | ----------------------------------------------------- |
 | `README.md`               | Public product front door                             |
 | `PROVENANCE.md`           | Legal and historical lineage                          |
-| `repo-operating-model.md` | Canonical repo-operating rules                        |
+| `REPO.md`                 | Canonical repo contract                               |
 | `SPEC.md`                 | Durable truth about what Superhuman is supposed to be |
 | `STATUS.md`               | Current operational reality                           |
 | `PLANS.md`                | Accepted future direction                             |
@@ -191,7 +191,7 @@ Every stable-ID-bearing artifact should open with:
 
 ## Commit Provenance
 
-Commit provenance is documented here as the canonical policy. It is not yet hook-enforced.
+Commit provenance is documented here as the canonical policy and is enforced locally plus in CI.
 
 After a commit is made under this operating model, it should include these lowercase trailers:
 

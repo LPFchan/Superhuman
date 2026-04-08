@@ -6,7 +6,7 @@ The canonical repo-managed operating surfaces now live at the repository root, n
 
 ## Root Canonical Surfaces
 
-1. [`../repo-operating-model.md`](../repo-operating-model.md) for the canonical repo-operating rules.
+1. [`../REPO.md`](../REPO.md) for the canonical repo contract.
 2. [`../SPEC.md`](../SPEC.md) for durable product truth.
 3. [`../STATUS.md`](../STATUS.md) for current operational reality.
 4. [`../PLANS.md`](../PLANS.md) for accepted future direction.
@@ -34,7 +34,7 @@ The canonical repo-managed operating surfaces now live at the repository root, n
 14. [detailed-execution-packet.md](detailed-execution-packet.md) for the consolidated detailed implementation packet that replaces the old per-phase execution docs.
 15. [superhuman-architecture-technical.md](superhuman-architecture-technical.md) for the detailed target-system architecture.
 16. [superhuman-architecture-simple.md](superhuman-architecture-simple.md) for the simpler architectural summary.
-17. [repo-operating-model.md](repo-operating-model.md) as the retired entry point that now points to the root canonical operating model.
+17. [repo-operating-model.md](repo-operating-model.md) as the retired entry point that now points to the root canonical repo contract.
 18. [repo-templates/README.md](repo-templates/README.md) as the retired entry point that explains the canonical managed surfaces now live at the root.
 19. [upstream-intake/README.md](upstream-intake/README.md) as the retired pointer to the root `upstream-intake/` package.
 

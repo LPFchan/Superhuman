@@ -16,7 +16,7 @@ What reusable lessons from prior audits and agent feedback should remain discove
 
 ## Routing Outcome
 
-- The durable guidance from these audits is now reflected across `SPEC.md`, `PLANS.md`, `repo-operating-model.md`, and the decision set.
+- The durable guidance from these audits is now reflected across `SPEC.md`, `PLANS.md`, `REPO.md`, and the decision set.
 - The archive family stays readable in place, but this memo is the reusable root-side index for why those files still matter.
 
 ## Source Material
