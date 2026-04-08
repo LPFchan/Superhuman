@@ -93,7 +93,7 @@ It may:
 - update `SPEC.md`, `STATUS.md`, and `PLANS.md`
 - create research memos
 - create decision records
-- append or create worklogs
+- append to worklogs and create a new log only when clarity requires it
 - translate messenger intake into repo artifacts
 - escalate non-obvious product, architecture, workflow, or policy calls
 
@@ -157,9 +157,26 @@ Examples:
 - `INBOX.md` is an aggressive scratch disk. Purge entries once they are reflected elsewhere.
 - `research/` keeps curated findings only.
 - `records/decisions/` is append-only by new decision file.
-- `records/agent-worklogs/` is append-only by new log file or appended entries.
+- `records/agent-worklogs/` is append-only and should prefer appended entries on the current relevant `LOG-*`.
 - `upstream-intake/` keeps paired internal-record and operator-brief artifacts under a shared `UPS-*` review id.
 - Truth docs reflect the latest accepted state, not every intermediate thought.
+
+### Worklog Reuse Policy
+
+Do not create a new `LOG-*` just to satisfy provenance.
+
+Append to the latest relevant `LOG-*` when:
+
+- the same workstream, goal, or blocker is still in scope
+- the same execution thread is continuing
+- a new timestamped entry preserves clarity
+
+Create a new `LOG-*` only when:
+
+- the work is materially distinct from the current log's scope
+- a separate agent or subagent owns a clearly separate execution thread
+- reuse would make provenance harder to follow
+- a separate execution record would improve future retrieval
 
 ## Stable IDs
 
@@ -203,8 +220,11 @@ After a commit is made under this operating model, it should include these lower
 Rules:
 
 - `artifacts:` may list more than one stable ID, comma-separated.
-- A normal commit should always reference at least one artifact.
+- A normal commit should always reference at least one relevant artifact, whether newly created or updated.
 - Artifact-less commits should be treated as bootstrap or migration exceptions only.
+- Normal commits do not require a brand-new `LOG-*`.
+- Prefer appending to an existing relevant `LOG-*` when the same workstream is continuing.
+- Commits may reference `LOG-*`, `DEC-*`, `RSH-*`, `UPS-*`, or another relevant artifact type as appropriate.
 
 ## Superhuman-Specific Notes
 

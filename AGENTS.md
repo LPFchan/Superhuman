@@ -50,6 +50,8 @@ Before editing a repo artifact, read the matching local guide first. These are b
 
 When a repo artifact has the right substance but the wrong shape, normalize it toward the local guide with the smallest meaningful diff. Preserve repo-specific truth, IDs, dates, decisions, and historical facts.
 
+Prefer appending to the current relevant `LOG-*` instead of creating a new one unless the work is materially distinct, a separate agent or subagent owns it, or a separate execution record would improve clarity.
+
 ## Repo Map
 
 - `src/`: shared runtime, CLI, gateway, plugin SDK, and channel internals
@@ -103,6 +105,7 @@ High-value subtree guides live at:
   - `role: orchestrator|worker|subagent|operator`
   - `artifacts: <artifact-id>[, <artifact-id>...]`
 - Prefer `scripts/committer --artifacts <ID[, ID...]> "Subject" <file...>` with `CODEX_THREAD_ID` available so the helper can append compliant trailers automatically.
+- The referenced artifact should usually be the current relevant `LOG-*` or another updated durable artifact, not a freshly created log by default.
 - Use `--role` when the default `orchestrator` role is wrong.
 - Use `--exception bootstrap|migration` only for explicit bootstrap or migration commits.
 - Commit provenance is enforced locally through `git-hooks/commit-msg` and remotely through `.github/workflows/commit-standards.yml`.
