@@ -47,6 +47,15 @@ This document contains accepted future direction only.
 - Earliest likely start: alongside early workspace-surface recomposition, with deeper polish after the desktop work surface is stronger.
 - Related ids: `RSH-20260409-006`, `RSH-20260409-007`, `IBX-20260409-003`
 
+### Cross-Surface Runtime State And Agent Controls
+
+- Outcome: desktop and mobile share a live-synced conversation/run/approval state model where every generic chat has an `agent-id`, every bounded execution episode has a `run-id`, capture packets carry mutable off-Git intake, and agent control uses the operator-level verbs steer, interrupt, stop, resume, revert, fork, and handoff.
+- Why this is accepted: Superhuman needs continuity across generic chat, project chat, agent execution, subagents, mobile control, and messenger ingestion without overloading repo-template artifacts or turning the UI into a process table.
+- Expected value: continuous chats before and after triage, precise run monitoring, cleaner provenance, less overloaded first-responder behavior, and agent controls that match operator intent.
+- Preconditions: preserve repo-template as durable memory; keep chat/tool/approval transcripts off-Git; keep tool-call IDs and DB internals below product vocabulary by default.
+- Earliest likely start: before selecting a desktop or mobile fork whose internal model might fight this state contract.
+- Related ids: `DEC-20260409-007`, `RSH-20260409-007`, `LOG-20260409-011`
+
 ### Upstream Intake As A First-Class Operating Surface
 
 - Outcome: weekly upstream review remains a first-class subsystem of the workspace, not a side script.
@@ -92,6 +101,10 @@ This document contains accepted future direction only.
   - Why later: mobile should deliver capture, approvals, monitoring, and redirection once the workspace model is clearer without chasing full IDE parity
   - Dependencies: `RSH-20260409-006`, `RSH-20260409-007`
   - Related ids: `RSH-20260409-007`
+- Initiative: runtime state contract for chats, runs, capture packets, approvals, and agent controls
+  - Why later: desktop, mobile, and messenger need one off-Git state model before fork selection or UI buildout hard-codes incompatible assumptions
+  - Dependencies: `DEC-20260409-007`, `RSH-20260409-007`
+  - Related ids: `DEC-20260409-007`, `LOG-20260409-011`
 - Initiative: messenger intake and control flows
   - Why later: the operator should be able to capture, approve, redirect, and receive status from anywhere without making messenger the source of truth
   - Dependencies: `RSH-20260409-006`, `RSH-20260409-007`

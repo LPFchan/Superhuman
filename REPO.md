@@ -174,6 +174,23 @@ Examples:
 - a product choice can create `DEC-*` and update `PLANS.md`
 - implementation progress can append `LOG-*` and update `STATUS.md`
 
+## Promotion Discipline
+
+Do not mirror the same messy thought into every durable surface.
+
+Prefer this refinery:
+
+1. conversation, messenger, generic chat, or capture packet for raw shaping
+2. `INBOX.md` for ephemeral routed intake waiting for triage
+3. `research/` for reusable exploration, evidence, framing, rejected paths, and open questions
+4. `records/decisions/` for a meaningful accepted choice and why that choice won
+5. `PLANS.md` for accepted future work that survived triage
+6. `SPEC.md` for concise durable system or product truth after the argument is settled
+7. `STATUS.md` for current operational reality
+8. `upstream-intake/` only for recurring upstream review, carry-forward, upstream conflict, and operator escalation
+
+Promotion should be sparse. A research memo may stay as research forever. A decision record should exist only when a real product, architecture, workflow, trust, upstream, or repo-operating choice is made. `SPEC.md`, `STATUS.md`, and `PLANS.md` should receive concise outcomes, not copied debate.
+
 ## Write Rules
 
 - `SPEC.md`, `STATUS.md`, and `PLANS.md` should be updated only by the operator or orchestrator.
@@ -206,7 +223,9 @@ Create a new `LOG-*` only when:
 This model assumes:
 
 - `project-id` identifies the repo or workspace
-- `agent-id` identifies one conversation or run, 1:1
+- `agent-id` identifies one user-facing agent conversation
+- `run-id` identifies one bounded execution episode inside an agent conversation
+- one agent conversation may contain multiple runs
 - subagents receive their own `agent-id`
 - Off-Git systems resolve parent-child lineage, messages, events, and commit history from `agent-id`
 

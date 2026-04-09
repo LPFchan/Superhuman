@@ -4,14 +4,14 @@ This document is the canonical statement of what Superhuman is supposed to be.
 
 ## Identity
 
-| Field             | Value                                                                                                                  |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Project           | `Superhuman`                                                                                                           |
-| Canonical repo    | `https://github.com/LPFchan/Superhuman`                                                                                |
-| Project id        | `superhuman`                                                                                                           |
-| Operator          | single-operator-first                                                                                                  |
-| Last updated      | `2026-04-09`                                                                                                           |
-| Related decisions | `DEC-20260409-001`, `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-004`, `DEC-20260409-005`, `DEC-20260409-006` |
+| Field             | Value                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Project           | `Superhuman`                                                                                                                               |
+| Canonical repo    | `https://github.com/LPFchan/Superhuman`                                                                                                    |
+| Project id        | `superhuman`                                                                                                                               |
+| Operator          | single-operator-first                                                                                                                      |
+| Last updated      | `2026-04-09`                                                                                                                               |
+| Related decisions | `DEC-20260409-001`, `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-004`, `DEC-20260409-005`, `DEC-20260409-006`, `DEC-20260409-007` |
 
 ## Product Thesis
 
@@ -69,6 +69,39 @@ The operator-facing promise is: show what needs attention, what will happen next
 The directional work-item lifecycle is:
 
 `captured -> clarified -> proposed -> awaiting approval -> queued -> running -> blocked or completed`
+
+## Cross-Surface State Model
+
+The top-level product object is the project workspace, but the runtime should not collapse every interaction into one object type.
+
+Settled state boundaries:
+
+- Every desktop/mobile generic assistant chat receives an `agent-id`, even when it never touches a repo.
+- `agent-id` identifies one user-facing agent conversation.
+- `run-id` identifies one bounded execution episode inside an agent conversation.
+- One chat/agent conversation may contain multiple runs over time.
+- Subagents receive their own `agent-id` and remain linked to the host agent conversation.
+- Host agents monitor, grade, and integrate subagent output by default.
+- Subagents do not silently commit by default; commit authority must be explicit if granted.
+- Capture packets are mutable off-Git bundles until handed off, routed, discarded, or absorbed into a conversation.
+- Capture packets are not project orchestrators; first responders capture and hand off, project orchestrators interpret in repo context and decide routing.
+- Raw chat, messenger, mobile, upload, approval, notification, transcript, and tool-call history lives off-Git.
+- Approval state lives off-Git first; Git receives durable approval consequences only when they matter as execution history, decisions, plans, status, spec, or upstream outcomes.
+- Raw execution history is retained indefinitely by default as off-Git operational memory, not canonical truth.
+- Off-Git raw execution memory must support per-project export, redaction, compaction, hard delete, and periodic secret or API-token redaction.
+- Tool calls may need internal runtime identifiers, but tool-call IDs are not stable operator-facing provenance IDs by default.
+- Desktop and mobile share live-synced state for chats, runs, approvals, agent status, and relevant project context.
+- Messenger conversations remain channel-native; orchestrator-visible messenger input is recorded off-Git and can produce capture packets or routed project artifacts.
+
+Product-level agent controls are:
+
+- `steer`: add operator guidance for the next safe gap.
+- `interrupt`: stop the current trajectory as soon as safely possible and deliver a new operator message before continuing.
+- `stop`: end the active run without implying revert.
+- `resume`: continue from a stopped, blocked, waiting, completed, or prior conversation state.
+- `revert`: explicitly undo agent-made workspace changes where possible.
+- `fork`: branch a new agent/conversation from existing context.
+- `handoff`: transfer responsibility to another agent, model, device, or surface while preserving lineage.
 
 ## Canonical Interaction Model
 

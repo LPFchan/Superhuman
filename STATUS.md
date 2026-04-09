@@ -4,14 +4,14 @@ This document tracks current operational truth for the repo and product.
 
 ## Snapshot
 
-| Field                         | Value                                                                                                                  |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Last updated                  | `2026-04-09`                                                                                                           |
-| Overall posture               | `active`                                                                                                               |
-| Current focus                 | Close the release gate and resolve the three operator decisions that define Superhuman's next chapter                  |
-| Highest-priority blocker      | Remaining public-surface cleanup and final verification keep this migration wave short of release-candidate readiness  |
-| Next operator decision needed | `IBX-20260409-002`, `IBX-20260409-003`, and `IBX-20260409-004`                                                         |
-| Related decisions             | `DEC-20260409-001`, `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-004`, `DEC-20260409-005`, `DEC-20260409-006` |
+| Field                         | Value                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Last updated                  | `2026-04-09`                                                                                                                               |
+| Overall posture               | `active`                                                                                                                                   |
+| Current focus                 | Close the release gate and resolve the three operator decisions that define Superhuman's next chapter                                      |
+| Highest-priority blocker      | Remaining public-surface cleanup and final verification keep this migration wave short of release-candidate readiness                      |
+| Next operator decision needed | `IBX-20260409-002`, `IBX-20260409-003`, and `IBX-20260409-004`                                                                             |
+| Related decisions             | `DEC-20260409-001`, `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-004`, `DEC-20260409-005`, `DEC-20260409-006`, `DEC-20260409-007` |
 
 ## Current State Summary
 
@@ -35,11 +35,11 @@ Superhuman is no longer at the raw rebrand stage. The repo is already Superhuman
 - Goal: shift Superhuman from admin-first and chat-first composition toward a work-first project workspace
 - Status: `not started`
 - Why this matters now: the repo has strong internal primitives, but the UX framing still under-expresses the product direction
-- Current work: direction is accepted in research and planning, and concrete desktop/mobile/messenger IA exploration is now in progress
+- Current work: direction is accepted in research and planning; concrete desktop/mobile/messenger IA exploration is in progress; the first cross-surface state and agent-control contract is accepted
 - Exit criteria: work, approvals, queue, runs, and outcomes become first-class user-facing surfaces
-- Dependencies: `RSH-20260409-001`, `RSH-20260409-002`, `RSH-20260409-007`, `PLANS.md`
+- Dependencies: `RSH-20260409-001`, `RSH-20260409-002`, `RSH-20260409-007`, `DEC-20260409-007`, `PLANS.md`
 - Risks: current public framing remains narrower than the intended product
-- Related ids: `RSH-20260409-001`, `RSH-20260409-002`, `RSH-20260409-007`, `IBX-20260409-003`
+- Related ids: `RSH-20260409-001`, `RSH-20260409-002`, `RSH-20260409-007`, `DEC-20260409-007`, `IBX-20260409-003`
 
 ### Upstream Compatibility And Maintenance Discipline
 
@@ -54,6 +54,10 @@ Superhuman is no longer at the raw rebrand stage. The repo is already Superhuman
 
 ## Recent Changes To Project Reality
 
+- Date: `2026-04-09`
+  - Change: cross-surface state and agent-control policy was accepted into canonical truth
+  - Why it matters: desktop/mobile generic chat, project chat, runs, subagents, capture packets, approvals, messenger input, and repo artifacts now have a shared identity/provenance model before fork selection or UI buildout
+  - Related ids: `DEC-20260409-007`, `RSH-20260409-007`, `LOG-20260409-011`
 - Date: `2026-04-09`
   - Change: cross-surface desktop/mobile/messenger IA research was started as an explicit in-progress research lane
   - Why it matters: the workspace thesis now has a dedicated surface-planning thread without prematurely freezing the desktop information architecture
