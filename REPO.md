@@ -34,11 +34,13 @@ Practical defaults:
 
 - New repo created by Superhuman:
   - instantiate the current repo-template scaffold from the start
-  - seed `REPO.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, and `INBOX.md`
+  - seed `REPO.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, `INBOX.md`, `skills/README.md`, and the required repo-template procedure skills
   - keep `upstream-intake/` active, dormant, or omitted based on the repo's real needs
+  - include `skills/upstream-intake/SKILL.md` when `upstream-intake/` is active
 - Existing repo adopted or managed by Superhuman:
   - merge repo-template into the real repo with the smallest viable diff
   - preserve stronger local rules and explicit product constraints
+  - keep repo-template procedure skills at repo-root `skills/`, merging with the repo's existing skill tree when it has one
   - record intentional divergences in that repo's `REPO.md` or decision history
 
 ## Relationship To Other Root Docs
@@ -57,6 +59,7 @@ The root docs have different jobs on purpose:
 | `research/`               | Curated research worth future retrieval               |
 | `records/decisions/`      | Durable decisions with rationale                      |
 | `records/agent-worklogs/` | Execution history                                     |
+| `skills/`                 | Required procedures for repeatable repo workflows     |
 | `upstream-intake/`        | Canonical upstream review and maintenance surface     |
 
 `README.md` stays public and product-facing.
@@ -75,7 +78,27 @@ Superhuman uses these root surfaces as its canonical project backbone:
 | `research/`               | Curated research memos                                   | append by new file      |
 | `records/decisions/`      | Durable decision records                                 | append-only by new file |
 | `records/agent-worklogs/` | Execution history for agents and runs                    | append-only             |
+| `skills/`                 | Required procedure skills for repeatable repo workflows  | edit by skill           |
 | `upstream-intake/`        | Canonical upstream intake, review, and escalation system | append by cadence       |
+
+## Procedure Skills
+
+`skills/` is a required repo-native procedure layer.
+
+In Superhuman, root `skills/` is also the existing skill catalog for assistant capabilities. Preserve that catalog. Add repo-template procedure skills beside it; do not move the tree under `scaffold/` and do not replace local skill packages with the template baseline.
+
+Before running a repeatable repo workflow, read the relevant `skills/<name>/SKILL.md`, even if the current agent runtime does not auto-load repo skills.
+
+Required repo-template procedure skills:
+
+- `skills/repo-orchestrator/SKILL.md` for routing work into truth, status, plans, inbox, research, decisions, worklogs, upstream review, and commit provenance
+- `skills/daily-inbox-pressure-review/SKILL.md` for focus-protecting `INBOX.md`, `IBX-*`, and capture-packet triage
+
+Conditional procedure skills active in this repo:
+
+- `skills/upstream-intake/SKILL.md` because Superhuman keeps root `upstream-intake/` active
+
+`SKILL.md` files define bounded reusable procedures. Repo-wide policy stays in `REPO.md`; durable product truth stays in `SPEC.md`.
 
 ## Separation Rules
 
@@ -112,6 +135,7 @@ The orchestrator owns synthesis and routing.
 It may:
 
 - triage inbox items
+- run daily inbox pressure reviews
 - classify work into the right artifact layer
 - update `SPEC.md`, `STATUS.md`, and `PLANS.md`
 - create research memos

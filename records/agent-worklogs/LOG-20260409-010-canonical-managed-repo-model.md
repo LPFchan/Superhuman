@@ -42,3 +42,31 @@ Broaden Superhuman's repo-template posture from "used by this repo" to "the defa
   - a new `DEC-*` records the policy so future repos can retrieve the rationale instead of inferring it from chat
 - Blockers: none
 - Next: if desired, add a dedicated procedural skill or workflow for repo-template-based repo creation and adoption
+
+## Entry 2026-04-09 20-35-08 KST
+
+- Action: merged the new mandatory repo-template skills layer into Superhuman's existing root `skills/` tree
+- Files touched:
+  - `AGENTS.md`
+  - `REPO.md`
+  - `skills/README.md`
+  - `skills/repo-orchestrator/SKILL.md`
+  - `skills/daily-inbox-pressure-review/SKILL.md`
+  - `skills/upstream-intake/SKILL.md`
+  - `records/agent-worklogs/LOG-20260409-010-canonical-managed-repo-model.md`
+- Checks run:
+  - `sed -n '1,260p' ~/Documents/repo-template/scaffold/skills/README.md`
+  - `sed -n '1,360p' ~/Documents/repo-template/scaffold/skills/repo-orchestrator/SKILL.md`
+  - `sed -n '1,320p' ~/Documents/repo-template/scaffold/skills/daily-inbox-pressure-review/SKILL.md`
+  - `sed -n '1,360p' ~/Documents/repo-template/scaffold/skills/upstream-intake/SKILL.md`
+  - `cmp -s` against the three repo-template baseline `SKILL.md` files
+  - repo-relative `SKILL.md` Markdown link resolver
+  - stale optional/scaffold wording search across the touched instruction and skill surfaces
+  - `git diff --check`
+- Output:
+  - root `skills/README.md` now explains that Superhuman's existing skill catalog also carries required repo-template procedure skills
+  - added `repo-orchestrator`, `daily-inbox-pressure-review`, and `upstream-intake` procedure skills at root `skills/`
+  - `AGENTS.md` now makes `skills/README.md` a read-first file and points agents at the relevant `SKILL.md` before repeatable repo workflows
+  - `REPO.md` now treats `skills/` as a required procedure layer without moving or replacing Superhuman's existing skill catalog
+- Blockers: none for the skills baseline; separate cross-surface IA/state edits were already dirty and intentionally left intact
+- Next: use `skills/repo-orchestrator/SKILL.md` as the first procedural target for repo-artifact routing work

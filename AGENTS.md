@@ -15,9 +15,12 @@ Read these before substantial work:
 - `STATUS.md`
 - `PLANS.md`
 - `INBOX.md`
+- `skills/README.md`
 - `PROVENANCE.md` when lineage, compatibility, or historical posture matters
 
 If a touched subtree has its own `AGENTS.md`, read that too and treat it as binding for that path.
+
+Before running a repeatable repo workflow, read the relevant `skills/<name>/SKILL.md`. Treat skills as repo-native procedures even when the agent runtime does not auto-load them.
 
 ## Product Truth
 
@@ -58,6 +61,12 @@ Before editing a repo artifact, read the matching local guide first. These are b
 - `upstream-intake/reports/internal-records/README.md`
 - `upstream-intake/reports/operator-briefs/README.md`
 
+Read these repo-template procedure skills when relevant:
+
+- `skills/repo-orchestrator/SKILL.md` for artifact routing, truth/status/plans promotion, decisions, research, inbox, worklog, and commit-provenance routing
+- `skills/daily-inbox-pressure-review/SKILL.md` for focus-protecting inbox and capture-packet triage
+- `skills/upstream-intake/SKILL.md` for recurring upstream review and its paired internal/operator reports
+
 When a repo artifact has the right substance but the wrong shape, normalize it toward the local guide with the smallest meaningful diff. Preserve repo-specific truth, IDs, dates, decisions, and historical facts.
 
 Prefer appending to the current relevant `LOG-*` instead of creating a new one unless the work is materially distinct, a separate agent or subagent owns it, or a separate execution record would improve clarity.
@@ -69,7 +78,7 @@ Prefer appending to the current relevant `LOG-*` instead of creating a new one u
 - `extensions/`: bundled plugins and extension surfaces
 - `apps/`: macOS, iOS, and Android clients
 - `docs/`: public documentation
-- `skills/`: reusable repo workflows and helpers
+- `skills/`: bundled Superhuman skills plus required repo-template procedure skills
 
 High-value subtree guides live at:
 
