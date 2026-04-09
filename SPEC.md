@@ -17,6 +17,8 @@ This document is the canonical statement of what Superhuman is supposed to be.
 
 Superhuman is a framework for running ambitious projects without losing coherence. Today it ships as a personal AI assistant you run on your own devices, with a gateway that spans chat apps, the web dashboard, and paired devices. Its deeper product direction is to become a durable project workspace with a canonical home for memory, direction, research, and execution, so operators can prompt, summon, monitor, and steer agentic work across devices without scattering truth across chat transcripts and admin panels.
 
+The inherited OpenClaw promise still matters: this is an AI that actually does things. It runs on the operator's devices, in the operator's channels, under the operator's rules. Superhuman extends that promise from "assistant that can act" toward "workspace that can remember, decide, research, maintain, and ship."
+
 ## Current Public Reality And Directional Truth
 
 | Layer                  | What is true                                                                                                                                                                                     |
@@ -26,6 +28,12 @@ Superhuman is a framework for running ambitious projects without losing coherenc
 | Managed repo baseline  | The latest `LPFchan/repo-template` is the default operating model for repos Superhuman creates or manages; local repo contracts may extend it but should not casually replace its core surfaces. |
 | Compatibility posture  | OpenClaw lineage and plugin ecosystem compatibility remain explicit product commitments, not temporary migration leftovers.                                                                      |
 | Safety posture         | Strong defaults, visible approvals, explicit trust boundaries, and operator-controlled autonomy remain non-negotiable.                                                                           |
+
+## Current Runtime Spine
+
+Superhuman currently stands on a gateway, CLI, web/control UI, messaging channels, paired-device flows, model providers, a plugin runtime, queued/background work, approvals, and repo-local maintainer tooling. Those are product primitives, not throwaway migration scaffolding.
+
+The current shipping experience is still terminal/setup-oriented and assistant-first. That is acceptable while security, auth, permissions, and gateway behavior are maturing. The product should get easier to enter over time, but onboarding must not hide critical security or trust decisions from the operator.
 
 ## Primary User And Context
 
@@ -50,6 +58,18 @@ Inside a project workspace, the operator should be able to:
 
 `work items`, `agent runs`, and `messages` are supporting objects inside the workspace, not the top-level product identity.
 
+## Operator Attention And Work Items
+
+The durable workspace is the top-level object; the `work item` is the main attention object inside it.
+
+A work item should be a visible, inspectable unit of intent: source, summary, proposed action, trust level, approval state, queue/run state, artifacts, timeline, blockers, and final outcome. It may be backed by messages, a session, queued follow-ups, approval requests, background tasks, worklogs, commits, and repo-template artifacts, but the operator should not have to reconstruct one unit of work from backend nouns.
+
+The operator-facing promise is: show what needs attention, what will happen next, and what already happened.
+
+The directional work-item lifecycle is:
+
+`captured -> clarified -> proposed -> awaiting approval -> queued -> running -> blocked or completed`
+
 ## Canonical Interaction Model
 
 1. Capture work from desktop, mobile, messenger, or a direct operator prompt.
@@ -71,6 +91,14 @@ Inside a project workspace, the operator should be able to:
 | Upstream-compatible evolution   | Superhuman still benefits from upstream OpenClaw fixes and ecosystem continuity        | Provenance and plugin compatibility must stay explicit                                       |
 | Safety and operator control     | Higher autonomy only works if risk boundaries remain legible                           | Trust mode, approvals, and escalation rules must remain visible and deliberate               |
 
+## Safety, Plugins, Memory, And Bridges
+
+Security is a deliberate product tradeoff: keep Superhuman powerful enough for real work while making risky paths explicit, reviewable, and operator-controlled.
+
+Core should stay lean. Optional capability should usually live behind plugin/SDK contracts rather than by adding provider-specific, channel-specific, or skill-specific behavior to unrelated core surfaces. Memory is a special capability: it should become a dependable recommended path, but conversation history and canonical project truth must remain different things.
+
+MCP-style integrations should stay decoupled from core runtime unless the operator explicitly accepts a deeper product-level commitment. Bridge-based integration is preferred over turning core into a catch-all runtime for every external protocol.
+
 ## Invariants
 
 - `README.md` is the public front door; `SPEC.md` is the canonical internal truth surface.
@@ -83,6 +111,7 @@ Inside a project workspace, the operator should be able to:
 - The repo keeps truth, status, plans, research, decisions, and execution history in separate surfaces.
 - Single-operator-first ownership is the default product posture for now.
 - Mobile should mature as a project cockpit before it tries to become a full mobile IDE.
+- Trust mode, approvals, risky-tool consequences, and autonomy boundaries should be visible where work is requested and monitored, not hidden in a distant settings page.
 
 ## Non-Goals
 
@@ -91,19 +120,23 @@ Inside a project workspace, the operator should be able to:
 - Treating plugin compatibility as an accidental leftover instead of a product contract.
 - Making admin or topology views the primary user-facing identity of the product.
 - Turning mobile into a full coding IDE before the workspace and cockpit model is strong.
+- Hiding setup, auth, permissions, or security posture behind convenience wrappers before the underlying trust model is legible.
+- Adding a heavy default manager-of-managers architecture that duplicates existing agent, tool, approval, queue, task, and repo-memory primitives.
 
 ## Main Surfaces
 
-| Surface                         | Purpose                                                    | Notes                                                         |
-| ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| `README.md`                     | Public product front door                                  | Personal-assistant-first today                                |
-| Gateway and channels            | Persistent runtime shell                                   | Current shipping assistant surface                            |
-| Control UI                      | Visual operations and oversight surface                    | Needs to evolve from admin-first toward work-first            |
-| Mobile clients                  | Project cockpit surface                                    | Prioritize capture, approvals, monitoring, and redirection    |
-| Messenger surfaces              | Capture and control channels                               | Not canonical truth-authoring surfaces                        |
-| Repo-managed workspace surfaces | Truth, status, plans, inbox, research, decisions, worklogs | Canonical internal project memory                             |
-| `upstream-intake/`              | Upstream review and operator escalation                    | Active because Superhuman remains downstream of OpenClaw      |
-| `src/superhuman/`               | Deliberate downstream product boundary                     | Keeps Superhuman-specific behavior out of generic shared core |
+| Surface                         | Purpose                                                    | Notes                                                          |
+| ------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `README.md`                     | Public product front door                                  | Personal-assistant-first today                                 |
+| Gateway and channels            | Persistent runtime shell                                   | Current shipping assistant surface                             |
+| Today or Work surface           | Operator attention surface                                 | Directional: approvals, active runs, blockers, queue, outcomes |
+| Work item detail                | Canonical detail for one unit of intent                    | Directional: transcript, plan, approvals, run timeline, output |
+| Control UI                      | Visual operations and oversight surface                    | Keep useful control, but subordinate it to attention/work      |
+| Mobile clients                  | Project cockpit surface                                    | Prioritize capture, approvals, monitoring, and redirection     |
+| Messenger surfaces              | Capture and control channels                               | Not canonical truth-authoring surfaces                         |
+| Repo-managed workspace surfaces | Truth, status, plans, inbox, research, decisions, worklogs | Canonical internal project memory                              |
+| `upstream-intake/`              | Upstream review and operator escalation                    | Active because Superhuman remains downstream of OpenClaw       |
+| `src/superhuman/`               | Deliberate downstream product boundary                     | Keeps Superhuman-specific behavior out of generic shared core  |
 
 ## Success Criteria
 

@@ -10,17 +10,19 @@ Recorded by agent: 019d6f5a-4b00-7390-a9c6-4527c1baa692
 - Trigger: extend `RSH-20260409-006` into a more concrete cross-surface IA exploration while keeping the work explicitly provisional
 - Related ids: RSH-20260409-006, IBX-20260409-003
 
-## Research Question
+## Question
 
 How should Superhuman divide responsibility across desktop, mobile, and messenger so all three feel like entrypoints into the same project workspace instead of three disconnected shells?
 
-## Why This Belongs To This Repo
+## Context
 
 Superhuman's workspace thesis is now accepted, but the product still lacks a concrete surface map. Without an explicit IA exploration, future work risks either freezing an arbitrary desktop navigation too early or building mobile and messenger as shallow bolt-ons.
 
 This research belongs in the repo because it will shape future control-surface recomposition, mobile scope, messenger integrations, and how canonical project memory is made legible to the operator.
 
-## Findings
+This is a provisional surface map. It should guide exploration, not become a frozen tab list.
+
+## Surface Strategy
 
 - Desktop should be the primary high-bandwidth workspace surface.
 - Mobile should be a project cockpit first, optimized for capture, approvals, monitoring, summaries, and redirection.
