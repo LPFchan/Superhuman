@@ -8,9 +8,24 @@ Recorded by agent: 019d6f5a-4b00-7390-a9c6-4527c1baa692
 - Status: in progress
 - Question: Which forkable desktop or desktop-adjacent agentic coding/workspace surface is the best next substrate for Superhuman's desktop-first project cockpit?
 - Trigger: operator requested a desktop-first fork evaluation after checkpointing the cross-surface IA and state model
-- Related ids: RSH-20260409-006, RSH-20260409-007, DEC-20260409-007, LOG-20260409-012
+- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013
 - Scope: first-wave rubric, source/readme/license/health review, light local smoke where feasible
 - Out of scope: final screen IA, mobile fork search, messenger fork search, committing to a fork candidate
+
+## Amendment 2026-04-09: Separate GUI From Coding Harness
+
+Status: this memo remains the desktop GUI / operator-surface evaluation. It is no longer responsible for deciding the agentic coding harness.
+
+Operator correction:
+
+- Layer 0 and 1 belong in `RSH-20260409-009`: OpenClaw, Claude Code, Hermes Agent, hardened Superhuman, Letta as a stateful system, Terminal-Bench/Harbor harnesses, and benchmark-performance options.
+- Layer 2 belongs here: desktop GUI, project cockpit, agent-operation surface, review/merge/monitor UX, local app shell, and code/file/diff evidence views.
+
+Consequence:
+
+- The OpenHands recommendation below predates the Conductor, T3 Code, and Letta GUI/app addition.
+- Do not treat the current ranked shortlist as final until `pingdotgg/t3code`, Conductor, Letta's GUI/app, and any other project-cockpit references are compared against the same desktop rubric.
+- If a candidate's main value is memory, benchmark score, terminal-loop quality, or execution backend, put the deep evaluation in `RSH-20260409-009` and reference it here only for GUI implications.
 
 ## Recommendation
 
@@ -35,6 +50,7 @@ If that spike fails, the fallback should not be "panic-fork VS Code." The fallba
 - Best open approval/diff/terminal reference: `cline/cline` and `RooCodeInc/Roo-Code`; excellent agent-task loops, but VS Code extensions rather than Superhuman desktop.
 - Best session/permission/API reference: `charmbracelet/crush`; very interesting workspace/session/agent HTTP API, but current license is not an immediate open-source fork fit.
 - Best closed/reference UX: Codex desktop for chat-first portfolio sidebar and home prompt; Cursor only as an IDE-side contrast/reference.
+- Added late for desktop re-rank: Conductor as closed Mac/worktree/merge/operator reference; `pingdotgg/t3code` as open minimal web/desktop GUI around Codex and Claude; Letta GUI/app as state/memory inspector surface for Letta agents.
 - Best fallback if desktop fork fails: Superhuman-native desktop shell around Superhuman's own project/workspace/agent runtime; embed contextual file/code/diff/terminal views instead of forking an IDE.
 
 ## Evidence Level
@@ -51,8 +67,11 @@ Legend: `5` strong fit, `3` usable with surgery, `1` poor fit or high risk, `R` 
 
 | Candidate                  | Posture                         | Agent Chat | Portfolio / Session | File / Diff / Terminal | Approvals / Control | State Fit | Repo-Template Fit | Extension Seams | Desktop Burden | Mobile / Sync Path | License | Health | Surgery Risk |
 | -------------------------- | ------------------------------- | ---------: | ------------------: | ---------------------: | ------------------: | --------: | ----------------: | --------------: | -------------: | -----------------: | ------: | -----: | -----------: |
+| `pingdotgg/t3code`         | Added late; needs re-rank       |          4 |                   3 |                      3 |                   3 |         3 |                 2 |               3 |              4 |                  2 |       5 |      4 |            3 |
 | `OpenHands/OpenHands`      | Spike first                     |          4 |                   3 |                      4 |                   4 |         3 |                 3 |               3 |              2 |                  3 |       4 |      5 |            3 |
 | `dyad-sh/dyad`             | Runner-up desktop shell         |          3 |                   3 |                      4 |                   3 |         4 |                 2 |               3 |              4 |                  1 |       3 |      4 |            3 |
+| Conductor                  | Closed reference UX             |          4 |                   4 |                      4 |                   4 |         3 |                 2 |               2 |              R |                  1 |       R |      4 |            R |
+| Letta GUI / app            | State inspector reference       |          3 |                   2 |                      2 |                   3 |         5 |                 2 |               4 |              2 |                  4 |       4 |      4 |            2 |
 | `cline/cline`              | Reference / possible extraction |          5 |                   2 |                      5 |                   5 |         3 |                 3 |               5 |              2 |                  1 |       5 |      5 |            2 |
 | `RooCodeInc/Roo-Code`      | Reference / possible extraction |          4 |                   2 |                      5 |                   5 |         3 |                 3 |               5 |              2 |                  1 |       5 |      5 |            2 |
 | `charmbracelet/crush`      | Reference; do not fork yet      |          4 |                   3 |                      4 |                   4 |         4 |                 3 |               4 |              2 |                  3 |       1 |      5 |            3 |
@@ -65,6 +84,39 @@ Legend: `5` strong fit, `3` usable with surgery, `1` poor fit or high risk, `R` 
 | `opencode-ai/opencode`     | Reject archived project         |          R |                   R |                      R |                   R |         R |                 R |               R |              R |                  R |       5 |      1 |            R |
 
 ## Candidate Cards
+
+### T3 Code
+
+- Source: https://github.com/pingdotgg/t3code
+- Product: https://t3.codes
+- Checked health: ~8.6k stars, ~1.5k forks, pushed 2026-04-09.
+- License note: GitHub metadata reports MIT.
+- Relevant shape: minimal web GUI for coding agents; currently supports Codex and Claude; can be run with `npx t3`; packaged desktop app is distributed; monorepo has web/server/desktop paths, local NDJSON span trace file, provider event files, OTLP export path, desktop smoke script, and desktop artifact build scripts.
+- Superhuman fit: highly relevant because it is intentionally a GUI around external coding harnesses rather than a full IDE or all-in-one runtime.
+- Main risk: early project; README says to expect bugs and that contributions are not accepted yet. It may be too narrow if Superhuman needs portfolio/project/orchestrator/repo-template memory rather than a prettier external-CLI terminal.
+- Fork posture: re-rank against OpenHands before the next GUI spike; treat as a serious desktop/web GUI candidate and as an observability reference.
+
+### Conductor
+
+- Product: https://www.conductor.build/
+- Docs: https://docs.conductor.build/
+- Source: no forkable source found in this pass.
+- License note: closed/reference only unless source or explicit licensing appears later.
+- Relevant shape: Mac app for running teams of Codex and Claude Code agents in isolated workspaces; homepage describes repo add, cloned local workspace, parallel agents, at-a-glance work state, diff viewer, scripts, testing, todos, MCP, slash commands, checkpoints, review and merge; FAQ says each Conductor workspace is a git worktree.
+- Superhuman fit: very relevant reference for operator-level "conducting" of multiple coding agents and worktree-backed review/merge.
+- Main risk: Mac-first and closed. Product seems anchored in worktrees and coding-agent teams, not all-project workspace, mobile/messenger capture, repo-template truth, or single unified off-Git state.
+- Fork posture: reference UX and workflow model; not a fork candidate in this pass.
+
+### Letta GUI / State Inspector
+
+- Product: https://docs.letta.com/
+- Code system: https://github.com/letta-ai/letta and https://github.com/letta-ai/letta-code
+- Checked health: `letta-ai/letta` ~22k stars; `letta-ai/letta-code` ~2.1k stars; both active in this pass.
+- License note: GitHub metadata and package metadata report Apache 2.0 for Letta Code; verify the GUI/web/app subcomponents before forking any UI.
+- Relevant shape: stateful-agent platform with API, SDKs, agent memory, persisted agent state, Letta Code CLI, remote/headless modes, and likely web/cloud state inspection through Letta's app/API. The GUI value to Superhuman is not "code editor"; it is state/memory/agent inspection.
+- Superhuman fit: strong conceptual reference for long-lived agent state and inspecting durable agent identity; could inform Superhuman's off-Git raw memory and agent/run state browser.
+- Main risk: the Letta memory/server object model can fight Superhuman's repo-template boundary if imported wholesale. In RSH-008, evaluate only GUI/state-inspection implications; evaluate the full Letta system in `RSH-20260409-009`.
+- Fork posture: added as late GUI/state reference; needs locator for the exact open/forkable GUI component before being considered a desktop fork target.
 
 ### OpenHands Local GUI
 
@@ -195,6 +247,13 @@ Legend: `5` strong fit, `3` usable with surgery, `1` poor fit or high risk, `R` 
 - Fork posture: reject; evaluate Crush instead.
 
 ## Smoke-Test Notes
+
+### Late Source Notes: Conductor, T3 Code, Letta
+
+- Conductor source: read public homepage/docs text. Confirmed closed/reference posture, Codex + Claude Code positioning, local Mac app, isolated workspaces, worktree FAQ, diff/scripts/testing/todos/MCP/slash/checkpoint docs nav.
+- T3 Code source: inspected GitHub metadata, README, package manifest, and observability docs. Confirmed open MIT project, minimal web GUI for Codex/Claude, `npx t3` and desktop distribution path, desktop build/test scripts, server trace NDJSON and OTLP observability model.
+- Letta source: inspected `letta-ai/letta`, `letta-ai/letta-code`, Letta Code README/docs. Confirmed Letta Code is memory-first/stateful CLI, while the GUI relevance needs a more precise locator.
+- Outcome: the desktop GUI ranking needs a re-rank before the previously proposed OpenHands GUI spike.
 
 ### Crush CLI
 
