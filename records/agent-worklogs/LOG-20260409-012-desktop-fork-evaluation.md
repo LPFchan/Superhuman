@@ -81,3 +81,42 @@ Produce a desktop-first fork evaluation without freezing the final desktop IA an
 - Output: confirmed index was empty before the scoped commit and whitespace check passed
 - Blockers: none for this commit; unrelated dirty repo-management files remain intentionally out of scope
 - Next: commit exactly RSH-008 and LOG-012 with provenance trailers
+
+## Entry 2026-04-10 00-12-22 KST
+
+- Action: incorporated operator supplementary handoff into the ongoing desktop GUI / operator-surface research lane
+- Files touched: research/RSH-20260409-008-desktop-agentic-surface-fork-evaluation.md; records/agent-worklogs/LOG-20260409-012-desktop-fork-evaluation.md
+- Checks run: `git status --short`; `git log -1 --oneline`; targeted `SPEC.md` `rg`; targeted reads of RSH-008/LOG-012/LOG-013; `git diff --check`; targeted `rg` for stale matrix column names, OpenCode correction, HTTP/WebSocket dependency, Helmor/watch entry, closed-reference section, and added candidate headings
+- Output:
+  - reframed desktop candidate selection around Superhuman server/runtime API replacement rather than inheriting a candidate backend
+  - renamed score-matrix intent from state/backend ownership to API seam clarity and local state thickness
+  - changed the recommendation from "OpenHands-first fork spike" to "design/verify desktop-server API boundary, then do a replacement-seam spike"
+  - added handoff-seeded cards for OpenWork, Jean, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, and active OpenCode
+  - added closed/non-fork references, Helmor watch entry, supplementary stubs, archived OpenCode correction, and the desktop-server HTTP/WebSocket open question
+- Blockers: new operator-handoff candidates still need primary-source README/license/source verification before an accepted fork decision
+- Next: run final status/diff sanity and ask whether to checkpoint this updated RSH-008 pass or continue into targeted candidate verification
+
+## Entry 2026-04-10 00-16-46 KST
+
+- Action: rewrote RSH-008 as one curated in-progress research memo instead of an amendment stack
+- Files touched: research/RSH-20260409-008-desktop-agentic-surface-fork-evaluation.md; records/agent-worklogs/LOG-20260409-012-desktop-fork-evaluation.md
+- Checks run: full read of current RSH-008 before rewrite; `date`; `git status --short`; `git diff --stat`
+- Output: collapsed historical amendments into current recommendation, product boundary, matrix, shortlist, verification status, reference lists, preserve/replace policy, next work, and open questions
+- Blockers: handoff-only candidates remain unverified; a desktop-server API contract is still the prerequisite for a meaningful fork spike
+- Next: run markdown/diff sanity and ask operator whether to keep the clean rewrite
+
+## Entry 2026-04-10 00-19-00 KST
+
+- Action: removed the remaining "stub" phrasing from the cleaned research memo
+- Files touched: research/RSH-20260409-008-desktop-agentic-surface-fork-evaluation.md; records/agent-worklogs/LOG-20260409-012-desktop-fork-evaluation.md
+- Checks run: targeted skim of rewritten RSH-008
+- Output: kept low-information handoff-only names as an unverified queue rather than placeholder cards
+- Next: run final whitespace/status sanity
+
+## Entry 2026-04-10 00-19-52 KST
+
+- Action: ran final sanity on the clean RSH-008 rewrite
+- Files touched: records/agent-worklogs/LOG-20260409-012-desktop-fork-evaluation.md
+- Checks run: `rg` over RSH-008 for amendment/stub/old-matrix headings; `git diff --check`; `git status --short`; `git diff --stat`
+- Output: RSH-008 has no amendment sections, no candidate-card heading, no score-matrix heading, no "stub only" phrasing, and no old State Fit / Backend Burden / Desktop Burden labels; whitespace check passed; diff is limited to RSH-008 and LOG-012
+- Next: operator review of the cleaned RSH-008

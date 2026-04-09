@@ -6,348 +6,229 @@ Recorded by agent: 019d6f5a-4b00-7390-a9c6-4527c1baa692
 ## Metadata
 
 - Status: in progress
-- Question: Which forkable desktop or desktop-adjacent agentic coding/workspace surface is the best next substrate for Superhuman's desktop-first project cockpit?
+- Question: Which forkable desktop or desktop-adjacent agentic workspace surface is the best next substrate for Superhuman's desktop-first project cockpit?
 - Trigger: operator requested a desktop-first fork evaluation after checkpointing the cross-surface IA and state model
 - Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013
-- Scope: first-wave rubric, source/readme/license/health review, light local smoke where feasible
-- Out of scope: final screen IA, mobile fork search, messenger fork search, committing to a fork candidate
+- Scope: desktop GUI / operator cockpit; source/readme/license/health review; light local smoke; API seam and client-shell fit
+- Out of scope: choosing the coding harness; final screen IA; mobile fork search; messenger fork search; accepting a fork candidate
 
-## Amendment 2026-04-09: Separate GUI From Coding Harness
+## Current Recommendation
 
-Status: this memo remains the desktop GUI / operator-surface evaluation. It is no longer responsible for deciding the agentic coding harness.
+Do not accept a desktop fork candidate yet.
 
-Operator correction:
+Do not run a winner-take-all OpenHands fork spike yet.
 
-- Layer 0 and 1 belong in `RSH-20260409-009`: OpenClaw, Claude Code, Hermes Agent, hardened Superhuman, Letta as a stateful system, Terminal-Bench/Harbor harnesses, and benchmark-performance options.
-- Layer 2 belongs here: desktop GUI, project cockpit, agent-operation surface, review/merge/monitor UX, local app shell, and code/file/diff evidence views.
+Run the smallest **desktop-server boundary spike** first:
 
-Consequence:
+1. Draft the minimum Superhuman desktop <-> server contract: portfolio, project, generic chat, project chat, agent/session tree, run, approval, tool stream, file tree, file read, diff, terminal/process, notification, and off-Git transcript events.
+2. Check whether current Superhuman gateway/server RPC already exposes that contract, exposes an adjacent contract, or needs a new desktop/mobile sync API.
+3. Mock that contract before modifying a candidate.
+4. Run a replacement-seam read of `OpenHands/OpenHands`, `different-ai/openwork`, `coollabsio/jean`, `pingdotgg/t3code`, and `anomalyco/opencode`.
+5. Then pick one read-only UI spike: one Superhuman project -> chat/session -> run -> stream -> approval -> file -> diff path through a candidate shell.
 
-- The OpenHands recommendation below predates the Conductor, T3 Code, and Letta GUI/app addition.
-- Do not treat the current ranked shortlist as final until `pingdotgg/t3code`, Conductor, Letta's GUI/app, and any other project-cockpit references are compared against the same desktop rubric.
-- If a candidate's main value is memory, benchmark score, terminal-loop quality, or execution backend, put the deep evaluation in `RSH-20260409-009` and reference it here only for GUI implications.
+Current bias:
 
-## Recommendation
+- Treat `OpenHands/OpenHands` as the known API-seam benchmark from the first pass.
+- Treat `different-ai/openwork` as the strongest SPEC-aligned lead from the supplementary pass, pending verification.
+- Treat `coollabsio/jean` as the strongest remote/mobile desktop-shell lead from the supplementary pass, pending verification.
+- Treat `pingdotgg/t3code` as the minimal external-agent GUI lead from the supplementary pass.
+- Treat `anomalyco/opencode` as a fresh active OpenCode lead; do not confuse it with archived `opencode-ai/opencode`.
 
-Do not fork a full IDE yet.
+## Product Boundary
 
-Run the smallest viable next spike against **OpenHands Local GUI as an agent-run workspace reference/fork candidate**, with a parallel **Dyad desktop-shell feasibility read** if packaged desktop matters more than agent-run architecture.
+Superhuman's desktop is a client of Superhuman-owned project/runtime state.
 
-The recommended next spike is:
+The desktop candidate can donate a shell, view hierarchy, app packaging, stream renderer, diff/file/terminal panel, approval UX, local relay trick, or editor/browser/terminal composition. It should not silently become the canonical runtime, chat database, memory store, approval ledger, repo manager, or coding harness.
 
-1. Fork or clone `OpenHands/OpenHands` into a throwaway branch and run `frontend` in `dev:mock`.
-2. Map one Superhuman project -> chat -> run -> approval -> file/diff/terminal path onto the OpenHands frontend/API shape.
-3. Stop after a written replacement map: what UI/state/API would be preserved, what must be deleted, and whether Superhuman would package it as a desktop shell or only borrow the architecture.
+Layer split:
 
-Why: Superhuman's desktop is supposed to be an agent-operation cockpit with contextual code/file surfaces. Among the reviewed candidates, OpenHands is the closest active, permissively licensed, local agent GUI + API product. It is not a perfect fit: the backend/runtime may be too heavy and the product model is agent-task-centric rather than Superhuman's portfolio-wide chat workspace. But it tests the highest-risk question first: can an existing open agent workspace become Superhuman's chat-first cockpit without inheriting a full IDE frame?
+- RSH-008: desktop/operator GUI, project cockpit, app shell, contextual file/code/diff/terminal/browser evidence, review/merge/status surfaces.
+- RSH-009: coding harness/backbone performance, OpenClaw, current Superhuman runtime, Claude Code, Hermes Agent, Letta system, OpenCode harness, ForgeCode, Harbor/Terminal-Bench, Terminus-KIRA, and benchmark mechanics.
 
-If that spike fails, the fallback should not be "panic-fork VS Code." The fallback should be a small Superhuman-native desktop shell that preserves the `RSH-20260409-007` IA contract and borrows narrow patterns from Cline/Roo, Crush, OpenHands, and Dyad.
+## Evaluation Model
 
-## Ranked Shortlist
+Score key: `5` strong fit, `3` usable with surgery, `1` poor fit, `R` reference only, `?` not verified.
 
-- Best fork candidate to spike first: `OpenHands/OpenHands` Local GUI frontend/API shape.
-- Best packaged desktop-shell donor to inspect next: `dyad-sh/dyad`, excluding `src/pro`, with the expectation that its app-builder domain must be replaced.
-- Best open approval/diff/terminal reference: `cline/cline` and `RooCodeInc/Roo-Code`; excellent agent-task loops, but VS Code extensions rather than Superhuman desktop.
-- Best session/permission/API reference: `charmbracelet/crush`; very interesting workspace/session/agent HTTP API, but current license is not an immediate open-source fork fit.
-- Best closed/reference UX: Codex desktop for chat-first portfolio sidebar and home prompt; Cursor only as an IDE-side contrast/reference.
-- Added late for desktop re-rank: Conductor as closed Mac/worktree/merge/operator reference; `pingdotgg/t3code` as open minimal web/desktop GUI around Codex and Claude; Letta GUI/app as state/memory inspector surface for Letta agents.
-- Best fallback if desktop fork fails: Superhuman-native desktop shell around Superhuman's own project/workspace/agent runtime; embed contextual file/code/diff/terminal views instead of forking an IDE.
+Local State Thickness is inverted: `1` is thin/easier to replace, `5` is thick/harder to cut away.
 
-## Evidence Level
+| Candidate                  | Current Lane              | API Seam | Cockpit Fit | Evidence Views | Approval UX | Mobile / Remote | Local State Thickness | License | Verification       |
+| -------------------------- | ------------------------- | -------: | ----------: | -------------: | ----------: | --------------: | --------------------: | ------: | ------------------ |
+| `OpenHands/OpenHands`      | API-seam benchmark        |        5 |           3 |              4 |           4 |               3 |                     3 |       4 | first-pass source  |
+| `different-ai/openwork`    | server-aligned lead       |        5 |           4 |              3 |           3 |               5 |                     2 |       ? | handoff only       |
+| `coollabsio/jean`          | remote/mobile shell lead  |        4 |           4 |              4 |           4 |               5 |                     3 |       5 | handoff only       |
+| `pingdotgg/t3code`         | minimal web/desktop GUI   |        4 |           3 |              3 |           3 |               2 |                     3 |       5 | first-pass source  |
+| `anomalyco/opencode`       | active client/server lead |        4 |           2 |              4 |           3 |               3 |                     3 |       5 | handoff only       |
+| `stablyai/orca`            | worktree-native IDE lead  |        3 |           4 |              5 |           4 |               2 |                     4 |       ? | handoff only       |
+| `generalaction/emdash`     | broad operator shell lead |        3 |           4 |              4 |           3 |               3 |                     3 |       ? | handoff only       |
+| `alltuner/factoryfloor`    | thin native shell ref     |        3 |           3 |              5 |           3 |               1 |                     1 |       5 | handoff only       |
+| Paseo                      | remote-access ref         |        4 |           3 |              2 |           3 |               5 |                     1 |       ? | handoff only       |
+| `johannesjo/parallel-code` | mobile-monitor ref        |        3 |           3 |              4 |           4 |               4 |                     2 |       5 | handoff only       |
+| `Glass-HQ/Glass`           | unified canvas ref        |        2 |           3 |              5 |           3 |               4 |                     5 |       ? | handoff only       |
+| `autohandai/commander`     | simpler desktop candidate |        3 |           3 |              3 |           3 |               1 |                     3 |       ? | handoff only       |
+| `ogulcancelik/herdr`       | terminal/socket ref       |        4 |           3 |              4 |           3 |               2 |                     2 |       ? | handoff only       |
+| `aofp/yume`                | Claude subprocess ref     |        2 |           3 |              4 |           3 |               1 |                     4 |       ? | handoff only       |
+| `dyad-sh/dyad`             | desktop shell reference   |        3 |           3 |              4 |           3 |               1 |                     4 |       3 | first-pass source  |
+| `cline/cline`              | task-loop reference       |        3 |           2 |              5 |           5 |               1 |                     4 |       5 | first-pass source  |
+| `RooCodeInc/Roo-Code`      | task-loop reference       |        3 |           2 |              5 |           5 |               1 |                     4 |       5 | first-pass source  |
+| `charmbracelet/crush`      | API/control reference     |        4 |           3 |              4 |           4 |               3 |                     3 |       1 | CLI smoke + source |
+| `opencode-ai/opencode`     | archived reject           |        R |           R |              R |           R |               R |                     R |       5 | archived reject    |
 
-- Current GitHub metadata checked on 2026-04-09 KST.
-- README, license, package/source excerpts checked for finalists and references.
-- Local CLI smoke run for Crush and Continue.
-- Source/persistence/API seams inspected for OpenHands frontend, Dyad database, Crush server API, Cline task core, and Void pause notice.
-- GUI apps were not dependency-installed or launched in this pass.
+## Shortlist To Verify Next
 
-## Score Matrix
+### OpenHands Local GUI
 
-Legend: `5` strong fit, `3` usable with surgery, `1` poor fit or high risk, `R` reference only.
+- Source: https://github.com/OpenHands/OpenHands
+- Status: source/readme/package inspected in first pass.
+- Why it matters: React SPA plus REST/socket-oriented local GUI; the clearest API replacement seam in the original candidate set.
+- Keep: conversation/run view, file/diff/terminal panels, stream rendering, frontend/API separation.
+- Replace: OpenHands task/runtime/sandbox as product center, unless RSH-009 later accepts it as a harness.
+- Next check: run frontend mock/dev mode, document exact REST/socket state shape, and map it to Superhuman project/chat/run/approval events.
 
-| Candidate                  | Posture                         | Agent Chat | Portfolio / Session | File / Diff / Terminal | Approvals / Control | State Fit | Repo-Template Fit | Extension Seams | Desktop Burden | Mobile / Sync Path | License | Health | Surgery Risk |
-| -------------------------- | ------------------------------- | ---------: | ------------------: | ---------------------: | ------------------: | --------: | ----------------: | --------------: | -------------: | -----------------: | ------: | -----: | -----------: |
-| `pingdotgg/t3code`         | Added late; needs re-rank       |          4 |                   3 |                      3 |                   3 |         3 |                 2 |               3 |              4 |                  2 |       5 |      4 |            3 |
-| `OpenHands/OpenHands`      | Spike first                     |          4 |                   3 |                      4 |                   4 |         3 |                 3 |               3 |              2 |                  3 |       4 |      5 |            3 |
-| `dyad-sh/dyad`             | Runner-up desktop shell         |          3 |                   3 |                      4 |                   3 |         4 |                 2 |               3 |              4 |                  1 |       3 |      4 |            3 |
-| Conductor                  | Closed reference UX             |          4 |                   4 |                      4 |                   4 |         3 |                 2 |               2 |              R |                  1 |       R |      4 |            R |
-| Letta GUI / app            | State inspector reference       |          3 |                   2 |                      2 |                   3 |         5 |                 2 |               4 |              2 |                  4 |       4 |      4 |            2 |
-| `cline/cline`              | Reference / possible extraction |          5 |                   2 |                      5 |                   5 |         3 |                 3 |               5 |              2 |                  1 |       5 |      5 |            2 |
-| `RooCodeInc/Roo-Code`      | Reference / possible extraction |          4 |                   2 |                      5 |                   5 |         3 |                 3 |               5 |              2 |                  1 |       5 |      5 |            2 |
-| `charmbracelet/crush`      | Reference; do not fork yet      |          4 |                   3 |                      4 |                   4 |         4 |                 3 |               4 |              2 |                  3 |       1 |      5 |            3 |
-| `voideditor/void`          | Defer / avoid start             |          4 |                   2 |                      5 |                   3 |         2 |                 2 |               4 |              1 |                  1 |       4 |      1 |            1 |
-| `continuedev/continue`     | CLI / extension reference       |          3 |                   2 |                      3 |                   3 |         3 |                 3 |               4 |              1 |                  2 |       5 |      5 |            2 |
-| `stackblitz-labs/bolt.diy` | App-builder reference           |          3 |                   2 |                      4 |                   3 |         2 |                 1 |               2 |              3 |                  1 |       5 |      3 |            2 |
-| `Aider-AI/aider`           | Agent engine reference          |          4 |                   1 |                      3 |                   2 |         2 |                 3 |               2 |              1 |                  1 |       5 |      5 |            2 |
-| `zed-industries/zed`       | Editor reference only           |          2 |                   2 |                      5 |                   2 |         2 |                 1 |               4 |              1 |                  1 |       2 |      5 |            1 |
-| `microsoft/vscode`         | Editor foundation only          |          1 |                   2 |                      5 |                   1 |         1 |                 1 |               5 |              1 |                  1 |       5 |      5 |            1 |
-| `opencode-ai/opencode`     | Reject archived project         |          R |                   R |                      R |                   R |         R |                 R |               R |              R |                  R |       5 |      1 |            R |
+### OpenWork
 
-## Candidate Cards
+- Source: https://github.com/different-ai/openwork
+- Status: operator handoff only; verify source/license/README.
+- Why it matters: reportedly a desktop app + messaging connectors + server mode, with a "client consumes server surfaces" architecture that directly matches Superhuman's SPEC.
+- Keep if true: server-client philosophy, desktop/messenger composition, connector/server separation.
+- Risk: may be too OpenCode-shaped under the hood.
+- Next check: verify license, repo layout, server API, desktop API client, connector model, and whether desktop can be pointed at a non-OpenWork server.
+
+### Jean
+
+- Source: https://github.com/coollabsio/jean
+- Status: operator handoff only; verify source/license/README.
+- Why it matters: reportedly Tauri/React/Rust desktop with built-in HTTP/WebSocket server, token auth, browser/mobile remote access, worktree sessions, Plan/Build/Yolo modes, diff viewer, and per-prompt backend overrides.
+- Keep if true: local HTTP/WebSocket remote path, remote/mobile web access, notification/approval patterns, diff viewer, mode switcher.
+- Risk: worktree-session manager may be local-first in a way that fights Superhuman's synced state.
+- Next check: run/read server route definitions, state store, auth model, WebSocket events, remote browser UI, and license.
 
 ### T3 Code
 
 - Source: https://github.com/pingdotgg/t3code
 - Product: https://t3.codes
-- Checked health: ~8.6k stars, ~1.5k forks, pushed 2026-04-09.
-- License note: GitHub metadata reports MIT.
-- Relevant shape: minimal web GUI for coding agents; currently supports Codex and Claude; can be run with `npx t3`; packaged desktop app is distributed; monorepo has web/server/desktop paths, local NDJSON span trace file, provider event files, OTLP export path, desktop smoke script, and desktop artifact build scripts.
-- Superhuman fit: highly relevant because it is intentionally a GUI around external coding harnesses rather than a full IDE or all-in-one runtime.
-- Main risk: early project; README says to expect bugs and that contributions are not accepted yet. It may be too narrow if Superhuman needs portfolio/project/orchestrator/repo-template memory rather than a prettier external-CLI terminal.
-- Fork posture: re-rank against OpenHands before the next GUI spike; treat as a serious desktop/web GUI candidate and as an observability reference.
+- Status: source/readme/package/observability docs inspected in first pass; GitHub metadata reported MIT.
+- Why it matters: minimal web GUI around external Codex/Claude agents; packaged desktop path; local NDJSON span trace, provider-event files, optional OTLP.
+- Keep: thin external-agent shell, trace/event model, stream renderer, desktop packaging clues.
+- Risk: early project; may be too narrow for portfolio/project/orchestrator UX.
+- Next check: run locally and compare its server/client event model against the Superhuman desktop-server mock.
 
-### Conductor
+### Active OpenCode
 
-- Product: https://www.conductor.build/
-- Docs: https://docs.conductor.build/
-- Source: no forkable source found in this pass.
-- License note: closed/reference only unless source or explicit licensing appears later.
-- Relevant shape: Mac app for running teams of Codex and Claude Code agents in isolated workspaces; homepage describes repo add, cloned local workspace, parallel agents, at-a-glance work state, diff viewer, scripts, testing, todos, MCP, slash commands, checkpoints, review and merge; FAQ says each Conductor workspace is a git worktree.
-- Superhuman fit: very relevant reference for operator-level "conducting" of multiple coding agents and worktree-backed review/merge.
-- Main risk: Mac-first and closed. Product seems anchored in worktrees and coding-agent teams, not all-project workspace, mobile/messenger capture, repo-template truth, or single unified off-Git state.
-- Fork posture: reference UX and workflow model; not a fork candidate in this pass.
+- Source: https://github.com/anomalyco/opencode
+- Status: operator handoff only; verify source/license/current README/API/desktop app/Harbor adapter.
+- Why it matters: reportedly active SST rewrite with client/server architecture, TUI over local server, desktop app, LSP, MCP, many providers, Copilot auth, Harbor adapter.
+- Keep if true: client/server protocol ideas, LSP/diagnostic surfaces, desktop/TUI separation, Harbor compatibility.
+- Risk: huge ecosystem gravity; cross-listed with RSH-009 harness evaluation.
+- Next check: verify it fresh. Do not inherit the archived `opencode-ai/opencode` rejection.
 
-### Letta GUI / State Inspector
+## Secondary Fork Candidates / References
 
-- Product: https://docs.letta.com/
-- Code system: https://github.com/letta-ai/letta and https://github.com/letta-ai/letta-code
-- Checked health: `letta-ai/letta` ~22k stars; `letta-ai/letta-code` ~2.1k stars; both active in this pass.
-- License note: GitHub metadata and package metadata report Apache 2.0 for Letta Code; verify the GUI/web/app subcomponents before forking any UI.
-- Relevant shape: stateful-agent platform with API, SDKs, agent memory, persisted agent state, Letta Code CLI, remote/headless modes, and likely web/cloud state inspection through Letta's app/API. The GUI value to Superhuman is not "code editor"; it is state/memory/agent inspection.
-- Superhuman fit: strong conceptual reference for long-lived agent state and inspecting durable agent identity; could inform Superhuman's off-Git raw memory and agent/run state browser.
-- Main risk: the Letta memory/server object model can fight Superhuman's repo-template boundary if imported wholesale. In RSH-008, evaluate only GUI/state-inspection implications; evaluate the full Letta system in `RSH-20260409-009`.
-- Fork posture: added as late GUI/state reference; needs locator for the exact open/forkable GUI component before being considered a desktop fork target.
+- `stablyai/orca`: verify. Handoff says cross-platform worktree-native IDE for Claude Code/Codex/OpenCode, with file editor, diff review, PR/CI, notifications, split terminals, and `orca-cli` skill that agents can use to control the IDE.
+- `generalaction/emdash`: verify. Handoff says cross-platform desktop operator shell for 23 CLI agents including Hermes Agent, SSH/SFTP remote dev, ticket intake, local SQLite, no code sent to Emdash servers.
+- `alltuner/factoryfloor`: verify. Handoff says MIT macOS Swift app using Ghostty's GPU terminal engine, lifecycle scripts, tmux-persisted Claude sessions, embedded browser auto-port detection, PR/CI per worktree.
+- `Glass-HQ/Glass`: verify license carefully. Handoff says open browser/editor/terminal unified on GPUI/Metal canvas, with ACP agents as background daemons and a forked `Glass-HQ/gpui`.
+- Paseo / `@getpaseo/cli`: locate source/license. Handoff says self-hosted daemon for Claude Code/Codex/OpenCode, CLI/web/mobile access, optional E2E relay, local-network or own tunnel, voice local-first, zero server-side state.
+- `johannesjo/parallel-code`: verify. Handoff says MIT desktop app for Claude/Codex/Gemini in worktrees, diff viewer, merge button, QR-code mobile monitoring over Wi-Fi/Tailscale.
+- `autohandai/commander`: verify. Handoff says Tauri v2 Rust + React/Vite app, Claude/Codex/Gemini CLI support, `.commander/` worktrees, persistent project chats, slash commands.
+- `ogulcancelik/herdr`: verify. Handoff says Rust terminal-native agent multiplexer with socket API that agents can use to spawn panes/agents and read output.
+- `aofp/yume`: verify license. Handoff says Tauri/React Claude Code GUI that spawns real Claude CLI, with built-in agent roles, background worktree agents, and task routing.
+- `penso/arbor`: unverified queue. Handoff says native desktop app for git worktrees and agentic coding.
+- `celia/finite`: unverified queue. Handoff says spatial terminal multiplexer for macOS.
+- `jakemor/kanna`: unverified queue. Handoff says web UI for Claude Code and Codex.
 
-### OpenHands Local GUI
+## First-Pass References
 
-- Source: https://github.com/OpenHands/OpenHands
-- Product: https://openhands.dev
-- Checked health: ~70k stars, ~8.9k forks, pushed 2026-04-09.
-- License note: README states MIT for work outside `enterprise/`; `enterprise/` is separately source-available.
-- Relevant shape: Local GUI for running agents on a laptop; REST API and single-page React application; frontend package has React 19, React Router, socket.io client, Monaco, xterm, mock-dev script.
-- Superhuman fit: closest active open candidate for an agent-run GUI with a real API behind it.
-- Main risk: the core OpenHands runtime, sandbox, and task model could become the product center of gravity. Superhuman needs a portfolio-wide chat workspace with repo-native memory, not a Devin/Jules clone.
-- Fork posture: spike the frontend/API shape first; do not import the runtime wholesale unless it wins a separate runtime evaluation.
+- Conductor: https://www.conductor.build/ ; https://docs.conductor.build/ ; closed Mac reference for teams of Codex/Claude agents, isolated workspaces/worktrees, diff/scripts/tests/todos/MCP/slash/checkpoint/review/merge flows.
+- Letta GUI / state inspector: https://docs.letta.com/ ; https://github.com/letta-ai/letta ; https://github.com/letta-ai/letta-code ; reference for stateful agent/memory inspection. Full Letta system belongs in RSH-009.
+- Dyad: https://github.com/dyad-sh/dyad ; Electron/React desktop app-builder shell; useful packaging/state/code-surface donor; keep away from `src/pro` unless the operator accepts that license island.
+- Cline: https://github.com/cline/cline ; VS Code extension reference for approval/diff/terminal/browser/MCP/checkpoint/task-loop UX.
+- Roo Code: https://github.com/RooCodeInc/Roo-Code ; VS Code extension reference for modes, auto-approval, checkpoints, codebase indexing, task hierarchy.
+- Crush: https://github.com/charmbracelet/crush ; CLI/TUI/API reference; smoke returned `crush version v0.56.0`; FSL posture makes it reference-only for now.
+- Continue: https://github.com/continuedev/continue ; CLI/extension reference; smoke returned `1.5.45`; useful for readonly/auto, allow/ask, resume/fork, checks/review vocabulary.
+- Bolt.diy: https://github.com/stackblitz-labs/bolt.diy ; app-builder reference, not a first desktop candidate.
+- Aider: https://github.com/Aider-AI/aider ; repo-map / patch / commit loop reference, not a GUI surface.
 
-### Dyad
+## Closed / Non-Fork References
 
-- Source: https://github.com/dyad-sh/dyad
-- Product: https://dyad.sh
-- Checked health: ~20k stars, ~2.3k forks, pushed 2026-04-09.
-- License note: README says code outside `src/pro` is Apache 2.0; `src/pro` is Functional Source License 1.1 Apache 2.0. Keep the pro folder out of any fork plan unless legal/product explicitly accepts it.
-- Relevant shape: Electron/Vite/React desktop app; Monaco, node-pty, ripgrep, git libraries, MCP SDK, provider adapters, better-sqlite3/Drizzle persistence.
-- Inspected persistence seam: SQLite tables include apps, chats, messages, approval state, commit hash, request id, and JSON-preserved AI messages/tool results.
-- Superhuman fit: good desktop packaging/state/code-surface donor; wrong domain center.
-- Main risk: app-builder assumptions are everywhere. Superhuman wants existing repo/project operation, agent hierarchy, off-Git raw memory, repo-template truth, orchestrator proposals, and portfolio navigation.
-- Fork posture: runner-up packaged desktop-shell candidate; run after OpenHands if desktop packaging becomes the dominant risk.
+Use these as mechanic/product references only.
 
-### Cline
+- Cursor: closed IDE-side reference; also a performance/harness reference for RSH-009.
+- Codex desktop: closed chat-first portfolio-sidebar / home-prompt reference.
+- Conductor: closed reference, not fork target unless source/license appears.
+- Graft: https://graftapp.io ; closed Mac reference for parallel worktree agents, multi-model choice, and PR-comment review UI.
+- Polyscope: https://getpolyscope.com ; closed Mac reference for copy-on-write clone isolation, E2E mobile relay, and autopilot.
+- Capy: closed "IDE for the parallel age" per handoff; reference only.
+- Admiral: https://admiralai.dev ; closed native Swift/AppKit Mac reference.
+- GlassCode: closed native Mac multi-agent Claude Code app; separate from `Glass-HQ/Glass`.
+- Aizen: closed early-access Mac reference; handoff flags libghostty GPU terminal and ACP / Aizen Communication Protocol registry.
+- CommanderAI: https://commanderai.app ; closed SwiftUI Mac reference; separate from `autohandai/commander`.
+- Solo: https://soloterm.com ; closed/freemium reference for MCP-exposed process state/logs and committed `solo.yml` shared stack.
+- Lody: https://lody.ai ; closed PWA/mobile reference for in-context response diffs, sharing, PR/CI sync.
+- roro: https://tryroro.com ; closed/free Mac reference for agent calendar, night-scheduled Claude Code work, hooks, personas, and return-to-results timeline.
+- Zodex: https://zodex.dev ; closed Tauri/Rust reference for checkpoint/rollback of whole workspace per turn, loop detection, structured outputs.
+- Superset: https://github.com/superset-sh/superset ; source-available under Elastic License 2.0 per handoff; not Apache / not true OSS.
 
-- Source: https://github.com/cline/cline
-- Product: https://cline.bot / marketplace extension
-- Checked health: ~60k stars, ~6.1k forks, pushed 2026-04-09.
-- License note: GitHub metadata reports Apache 2.0.
-- Relevant shape: VS Code extension with rich task loop; file edits, diff provider, terminal manager, browser session, MCP hub, checkpoint manager, command permission controller, state manager, webview UI.
-- Superhuman fit: excellent reference for per-task approval, terminal cooldown, checkpoints, diff review, and webview-to-agent plumbing.
-- Main risk: extension-first and IDE-first. Extracting the useful loop into a portfolio desktop is probably harder than copying lessons.
-- Fork posture: reference or narrow extraction; not the primary desktop fork.
+## Do Not Start Here
 
-### Roo Code
+- `opencode-ai/opencode`: archived/moved; this rejection applies only to the archived repo.
+- `voideditor/void`: paused IDE work and VS Code-fork weight.
+- `microsoft/vscode`: too low-level / editor-first unless the whole product direction changes.
+- `zed-industries/zed`: too much editor substrate and mixed/copyleft-license risk for a chat-first cockpit.
+- `charmbracelet/crush`: useful reference, but do not fork in this wave because of FSL license posture.
 
-- Source: https://github.com/RooCodeInc/Roo-Code
-- Product: https://roocode.com
-- Checked health: ~23k stars, ~3k forks, pushed 2026-04-08.
-- License note: GitHub metadata reports Apache 2.0.
-- Relevant shape: VS Code extension; modes, MCP, checkpoints, codebase indexing, task/parent/root-task concepts, auto-approval/terminal/checkpoint machinery.
-- Superhuman fit: strong reference for multi-mode agent task UX and approval wiring.
-- Main risk: same as Cline; it is an editor extension, not Superhuman's top-level synchronized workspace.
-- Fork posture: reference; compare with Cline only if deciding to extract a VS Code-extension agent core.
+## Watch
 
-### Crush
+- Helmor: announced 2026-04-08 by @caspian_1016 / GitHub `dohooo` per handoff. Claimed upcoming open-source agent orchestration IDE and one-click migration from Conductor. No source released as of the 2026-04-10 supplementary handoff.
 
-- Source: https://github.com/charmbracelet/crush
-- Product: CLI/TUI coding agent
-- Checked health: ~23k stars, ~1.5k forks, pushed 2026-04-09.
-- License note: repo license is FSL-1.1-MIT. Treat as reference-only for now.
-- Runtime smoke: `npx --yes @charmland/crush --version` -> `v0.56.0`; `npx --yes @charmland/crush --help` worked in a prior smoke; `dirs` points at user config/data dirs.
-- Inspected API seam: server routes expose `/v1/workspaces`, session history/messages, filetracker, LSP diagnostics/start/stop, permissions grant/skip, agent init/update, session cancel, queued prompts, summarize, MCP refresh/read/prompt/resource routes.
-- Superhuman fit: very interesting under-the-hood model for a synced workspace/agent control API.
-- Main risk: product is terminal-first; license is not an immediate fork fit.
-- Fork posture: reference API/control model; do not fork in this first wave.
+## Verified In This Research Lane
 
-### Void
+- Read first-pass source/readme/package/license/health context for OpenHands, Dyad, Cline, Roo, Crush, Continue, Bolt.diy, Aider, Zed, VS Code, archived `opencode-ai/opencode`, Conductor, T3 Code, Letta.
+- Smoked Crush CLI through `npx --yes @charmland/crush --version`.
+- Smoked Continue CLI through `npx --yes @continuedev/cli --version`.
+- Inspected OpenHands frontend/package and confirmed mock-dev / React / REST+SPA positioning.
+- Inspected Dyad package/database shape and confirmed Electron plus local SQLite-backed app/chat/message schema.
+- Inspected Crush route/API shape at a high level: workspaces, sessions, messages, filetracker, diagnostics, permissions, agents, queued prompts, summarize, MCP.
+- Inspected Cline task-core imports at a high level: permission, terminal, browser, MCP, checkpoints, diff, session, state manager.
 
-- Source: https://github.com/voideditor/void
-- Product: https://voideditor.com
-- Checked health: ~29k stars, ~2.4k forks, repo updated 2026-04-09, but README says work on the Void IDE is paused.
-- License note: Void additions are Apache 2.0; inherited VS Code portions remain under VS Code's license; verify file-by-file if forking.
-- Relevant shape: open-source Cursor alternative; VS Code-derived desktop IDE with dedicated `workbench/contrib/void` layer.
-- Superhuman fit: closest "open Cursor-ish IDE" shape.
-- Main risk: paused maintenance, enormous VS Code fork, IDE/root-frame bias, hard mobile/sync story, and too much editor gravity for a chat-first operator cockpit.
-- Fork posture: avoid as starting fork unless the accepted product direction flips toward IDE-first.
+## Preserve Vs Replace
 
-### Continue
+Preserve from a candidate only if it earns the privilege:
 
-- Source: https://github.com/continuedev/continue
-- Docs: https://docs.continue.dev
-- Checked health: ~32k stars, ~4.4k forks, pushed 2026-04-09.
-- License note: GitHub metadata reports Apache 2.0.
-- Runtime smoke: `npx --yes @continuedev/cli --version` -> `1.5.45`; CLI help showed readonly/auto/allow/ask, resume, fork, checks/review commands.
-- Relevant shape: CLI, checks/review, IDE-extension lineage and tooling around agents.
-- Superhuman fit: possible reference for CLI policy, checks, review, resume/fork vocabulary.
-- Main risk: not a desktop app and current product direction is not the same as Superhuman's operator cockpit.
-- Fork posture: reference only in this wave.
-
-### Bolt.diy
-
-- Source: https://github.com/stackblitz-labs/bolt.diy
-- Product/docs: https://stackblitz-labs.github.io/bolt.diy/
-- Checked health: ~19k stars, ~10k forks, pushed 2026-02.
-- License note: GitHub metadata reports MIT.
-- Relevant shape: open browser-based app builder with terminal, file editing, provider selection, Electron option, deploy/import/app-generation flows.
-- Superhuman fit: reference for generated-app workspace and browser terminal/file composition.
-- Main risk: app-builder/browser-sandbox center; weak fit for arbitrary existing repos, repo-template truth, portfolio agent operations.
-- Fork posture: reference; not a first desktop candidate.
-
-### Aider
-
-- Source: https://github.com/Aider-AI/aider
-- Product: https://aider.chat/
-- Checked health: ~43k stars, ~4.2k forks, pushed 2026-04-09.
-- License note: GitHub metadata reports Apache 2.0.
-- Relevant shape: terminal pair-programming agent, repo map, git-integrated flow.
-- Superhuman fit: useful reference for repo map and patch/commit loop.
-- Main risk: not a GUI surface; opinionated terminal pair-programmer rather than project cockpit.
-- Fork posture: runtime/behavior reference only.
-
-### Zed
-
-- Source: https://github.com/zed-industries/zed
-- Product: https://zed.dev
-- Checked health: ~79k stars, ~7.8k forks, pushed 2026-04-09.
-- License note: mixed license files observed: AGPL, GPL, Apache. Requires careful license review before any reuse.
-- Relevant shape: high-performance native collaborative editor.
-- Superhuman fit: excellent editor craft reference; poor root-frame fit.
-- Main risk: massive Rust editor, license complexity, editor-first posture, not an agent cockpit.
-- Fork posture: editor/reference only.
-
-### VS Code
-
-- Source: https://github.com/microsoft/vscode
-- Checked health: ~184k stars, pushed 2026-04-09.
-- License note: MIT for Code-OSS source; product distribution and marketplace branding have separate constraints.
-- Relevant shape: deepest editor/extension foundation.
-- Superhuman fit: too low-level and editor-first for the accepted IA.
-- Fork posture: do not fork raw VS Code for this purpose; only consider if deliberately building an IDE.
-
-### Archived Opencode
-
-- Source: https://github.com/opencode-ai/opencode
-- Checked note: README says project moved to Charmbracelet Crush.
-- Fork posture: reject; evaluate Crush instead.
-
-## Smoke-Test Notes
-
-### Late Source Notes: Conductor, T3 Code, Letta
-
-- Conductor source: read public homepage/docs text. Confirmed closed/reference posture, Codex + Claude Code positioning, local Mac app, isolated workspaces, worktree FAQ, diff/scripts/testing/todos/MCP/slash/checkpoint docs nav.
-- T3 Code source: inspected GitHub metadata, README, package manifest, and observability docs. Confirmed open MIT project, minimal web GUI for Codex/Claude, `npx t3` and desktop distribution path, desktop build/test scripts, server trace NDJSON and OTLP observability model.
-- Letta source: inspected `letta-ai/letta`, `letta-ai/letta-code`, Letta Code README/docs. Confirmed Letta Code is memory-first/stateful CLI, while the GUI relevance needs a more precise locator.
-- Outcome: the desktop GUI ranking needs a re-rank before the previously proposed OpenHands GUI spike.
-
-### Crush CLI
-
-- Ran: `npx --yes @charmland/crush --help`
-- Ran: `npx --yes @charmland/crush --version`
-- Result: CLI installed through `npx`; version smoke returned `crush version v0.56.0`.
-- Useful observed commands: `login`, `logs`, `models`, `projects`, `run`, `server`, `session`, `stats`, `update-providers`.
-- Useful flags observed earlier: `--continue`, `--cwd`, `--data-dir`, `--host`, `--session`, `--yolo`.
-- Blocker: license posture makes this a reference API/control inspection, not an immediate fork.
-
-### Continue CLI
-
-- Ran: `npx --yes @continuedev/cli --help`
-- Ran: `npx --yes @continuedev/cli --version`
-- Result: CLI installed through `npx`; version smoke returned `1.5.45`.
-- Useful observed controls: readonly/auto modes, allow/ask permissions, resume, fork, review/checks commands.
-- Blocker: CLI/extension/reference, not a desktop cockpit candidate.
-
-### OpenHands Source / Package Smoke
-
-- Inspected: README, root Python project, `frontend/package.json`.
-- Result: confirmed explicit Local GUI story, REST API + React SPA statement, frontend mock-dev path, socket.io client, Monaco, xterm, React Router.
-- Not run: GUI/backend. Dependency install and sandbox/backend setup should be a separate spike.
-- Blocker: unknown cost of replacing OpenHands' task/backend assumptions with Superhuman's project workspace.
-
-### Dyad Source / Package Smoke
-
-- Inspected: README, root `package.json`, database schema.
-- Result: confirmed Electron Forge desktop app; main process packaging; local SQLite-backed chats/messages/apps/versions; message-level approval state, commit hash, request id, AI-message JSON storage.
-- Not run: Electron app. Dependency install and providers/app scaffolding should be a separate spike.
-- Blocker: app-builder orientation plus `src/pro` license island.
-
-### Cline Source Smoke
-
-- Inspected: package manifest and `src/core/task/index.ts`.
-- Result: confirmed VS Code extension root, webview build, task core importing permission, terminal, browser, MCP, checkpoints, diff, session, state manager; source has explicit standalone/background terminal seams.
-- Not run: extension host.
-- Blocker: highly useful task loop, but not a top-level desktop app.
-
-### Void Source / README Smoke
-
-- Inspected: README notice and package root.
-- Result: confirmed project presents as an open Cursor alternative, but README states IDE work is paused and issue/PR review is not active.
-- Not run: VS Code fork.
-- Blocker: maintenance pause plus VS Code-fork weight.
-
-## Integration-Risk Notes
-
-- The right fork target is probably not the candidate with the most editor capability. Superhuman's desktop root is project/chat/agent/session, with file/code appearing contextually.
-- VS Code-extension candidates have excellent permission/diff/terminal lessons, but their navigation, persistence, and authority models assume the operator already lives inside an IDE workspace.
-- App-builder candidates have inviting desktop/web shells but tend to assume the goal is generating one app. Superhuman needs durable operation of many arbitrary repos and projects.
-- Terminal/CLI candidates have strong agent loops but poor portfolio GUI, mobile sync, approval evidence, and contextual code browsing unless wrapped by a new surface.
-- License islands matter. Mixed fair-source/pro/enterprise folders can be compatible with research and reference, but a Superhuman fork plan must explicitly mark excluded paths.
-- Repo-template compatibility is mostly absent across the field. Any candidate needs a Superhuman orchestrator/memory layer rather than direct writes to `SPEC.md`, `STATUS.md`, `PLANS.md`, decisions, research, worklogs, or upstream-intake.
-- Off-Git raw memory, `agent-id`, `run-id`, approvals, capture packets, mobile live sync, and messenger channel-native history are Superhuman primitives. Do not let the fork candidate's session table silently become the canonical state model.
-
-## What Superhuman Would Need To Replace Vs Preserve
-
-Preserve from the chosen candidate only if it earns the privilege:
-
-- agent conversation rendering and streaming run activity
+- desktop app shell, updater, menu/tray/deep-link behavior
+- chat/run stream rendering
 - terminal/tool stream visualization
-- file, folder, code, diff, terminal, diagnostics, browser, or artifact panels
-- provider/model configuration seams
-- permission/approval interaction patterns
-- durable local app shell, updater, tray/menu/deep-link mechanics
-- backend API boundary if it cleanly supports desktop/mobile live sync
+- contextual file, folder, code, diff, terminal, browser, preview, diagnostic, PR, CI, or artifact panels
+- permission / approval / checkpoint / rollback interaction patterns
+- browser/mobile/relay access tricks
+- agent-to-shell control API patterns
+- thin frontend/server boundary
 
 Replace with Superhuman-native primitives:
 
 - project portfolio model
 - generic chat vs project chat triage
 - project -> agent/chat session -> subagent tree
-- `agent-id` and `run-id` provenance
-- off-Git raw execution memory and approval runtime
-- capture packet creation/routing/reflection
+- `agent-id` / `run-id` provenance
+- off-Git raw transcript, execution trace, approval runtime, and notification state
+- capture packet routing and reflection
 - repo-template-aware orchestrator briefs and proposals
 - policy that ordinary agents do not directly mutate `SPEC.md`, `STATUS.md`, or `PLANS.md`
-- mobile cockpit sync and approval return paths
-- messenger capture/status/read-operation integration
-- repo-template adoption, upstream-intake, worklog, decision, research, and status/spec/plan reflection flows
+- mobile cockpit sync and approval return path
+- messenger capture/status/read integration
+- repo-template adoption, research, decisions, worklogs, upstream-intake, truth/status/plans reflection
 
-## Do-Not-Fork Rejects For Now
+## Next Work
 
-- `opencode-ai/opencode`: archived/moved; evaluate Crush instead.
-- `voideditor/void`: do not start here while README says the IDE is paused; reconsider only if Superhuman explicitly chooses VS Code IDE-root.
-- `microsoft/vscode`: do not start from raw editor foundation unless the product direction becomes IDE-first.
-- `zed-industries/zed`: do not start from a massive native editor with mixed/copyleft licensing for a chat-first agent cockpit.
-- `charmbracelet/crush`: do not fork in this wave because of FSL license posture; keep as API/session/permission reference.
+1. Define or discover Superhuman's desktop/mobile server API.
+2. Verify source/license/API/readme for OpenWork, Jean, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, active OpenCode, Arbor, Finite, and Kanna.
+3. Re-score only after verification; keep handoff-only rows marked as handoff-only until then.
+4. Run the desktop-server mock spike against one or two candidates.
+5. Create a `DEC-*` only after accepting a desktop substrate, reference mechanic, or explicit "build native" strategy.
 
 ## Open Questions
 
-- Can OpenHands frontend run in mock mode quickly enough to support a one-day UI/state spike?
-- Does OpenHands expose approval/tool/terminal/file state in a way that can be mapped to Superhuman `run-id` events without taking the whole runtime?
-- Can Dyad's Electron/SQLite shell be cleanly reduced to "project cockpit" or is the app-builder assumption too deep?
-- Should Superhuman's desktop be packaged web shell, Electron, Tauri, native, or inherited from a candidate?
-- Which candidate has the least painful path to live-syncing the same conversation/run/approval state with mobile?
+- Does Superhuman's server already expose a clean HTTP/WebSocket API that a forked desktop shell can wire to?
+- Is the first desktop artifact a packaged web shell, Electron app, Tauri app, native Mac app, or candidate-derived client?
+- Does mobile sync happen through Superhuman cloud/gateway, a self-hosted relay, local-network pairing, or several modes?
+- Which candidate has the cleanest replaceable client after source verification: OpenHands, OpenWork, Jean, T3 Code, active OpenCode, or a smaller shell?
+- Which candidate has the best mechanic to steal, even if it is not the fork substrate?
