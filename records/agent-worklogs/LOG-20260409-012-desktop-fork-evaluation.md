@@ -120,3 +120,12 @@ Produce a desktop-first fork evaluation without freezing the final desktop IA an
 - Checks run: `rg` over RSH-008 for amendment/stub/old-matrix headings; `git diff --check`; `git status --short`; `git diff --stat`
 - Output: RSH-008 has no amendment sections, no candidate-card heading, no score-matrix heading, no "stub only" phrasing, and no old State Fit / Backend Burden / Desktop Burden labels; whitespace check passed; diff is limited to RSH-008 and LOG-012
 - Next: operator review of the cleaned RSH-008
+
+## Entry 2026-04-10 00-40-20 KST
+
+- Action: accepted operator addendum for Factory Desktop as a closed desktop/cockpit reference
+- Files touched: research/RSH-20260409-008-desktop-agentic-surface-fork-evaluation.md; research/RSH-20260409-009-coding-harness-and-backbone-evaluation.md; records/agent-worklogs/LOG-20260409-012-desktop-fork-evaluation.md; records/agent-worklogs/LOG-20260409-013-coding-harness-backbone-evaluation.md
+- Checks run: targeted `rg` for Factory/Droid references; targeted reads of RSH-008 closed references and RSH-009 Droid section; `date`; `git status --short`
+- Output: added Factory Desktop to the closed/non-fork reference section and cross-listed its harness implications in RSH-009
+- Blockers: Factory Desktop / Droid details are operator-handoff evidence in this pass; product docs, benchmark row, CLI docs, and run artifact still need verification
+- Next: run final sanity after harness worklog append

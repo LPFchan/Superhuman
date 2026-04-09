@@ -56,6 +56,15 @@ This document contains accepted future direction only.
 - Earliest likely start: before selecting a desktop or mobile fork whose internal model might fight this state contract.
 - Related ids: `DEC-20260409-007`, `RSH-20260409-007`, `LOG-20260409-011`
 
+### Workspace Server API With Local And Remote Deployments
+
+- Outcome: Superhuman surfaces connect to one workspace-server API. Desktop auto-launches a local workspace server for local repos and can connect to operator-approved remote workspace servers without changing product mode.
+- Why this is accepted: the desktop should be a client of Superhuman-owned runtime state, but should not become useless when a remote server or relay is unavailable.
+- Expected value: local-first coding ergonomics, remote/VPS/devbox reach, mobile and messenger continuity, cleaner fork-evaluation criteria, and one state/approval/transcript contract across deployment locations.
+- Preconditions: design or discover the desktop/mobile workspace-server API before modifying a desktop candidate around incompatible assumptions.
+- Earliest likely start: before accepting a desktop fork candidate
+- Related ids: `DEC-20260410-001`, `RSH-20260409-008`, `RSH-20260409-007`, `LOG-20260410-001`
+
 ### Upstream Intake As A First-Class Operating Surface
 
 - Outcome: weekly upstream review remains a first-class subsystem of the workspace, not a side script.
@@ -93,6 +102,10 @@ This document contains accepted future direction only.
 
 ### Mid Term
 
+- Initiative: workspace-server API boundary
+  - Why later: desktop, mobile, messenger, local repos, remote repos, approvals, tool streams, and off-Git transcript state need one API contract before the UI shell choice becomes meaningful
+  - Dependencies: `DEC-20260410-001`, `RSH-20260409-008`, `RSH-20260409-007`
+  - Related ids: `DEC-20260410-001`, `LOG-20260410-001`
 - Initiative: Work surface and Today-style operator cockpit
   - Why later: current runtime and queue/approval primitives should be recomposed into a work-first front door
   - Dependencies: `RSH-20260409-001`, `RSH-20260409-002`

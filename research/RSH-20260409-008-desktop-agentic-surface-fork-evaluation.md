@@ -20,7 +20,7 @@ Do not run a winner-take-all OpenHands fork spike yet.
 
 Run the smallest **desktop-server boundary spike** first:
 
-1. Draft the minimum Superhuman desktop <-> server contract: portfolio, project, generic chat, project chat, agent/session tree, run, approval, tool stream, file tree, file read, diff, terminal/process, notification, and off-Git transcript events.
+1. Draft the minimum Superhuman desktop <-> workspace-server contract: portfolio, project, generic chat, project chat, agent/session tree, run, approval, tool stream, file tree, file read, diff, terminal/process, notification, and off-Git transcript events.
 2. Check whether current Superhuman gateway/server RPC already exposes that contract, exposes an adjacent contract, or needs a new desktop/mobile sync API.
 3. Mock that contract before modifying a candidate.
 4. Run a replacement-seam read of `OpenHands/OpenHands`, `different-ai/openwork`, `coollabsio/jean`, `pingdotgg/t3code`, and `anomalyco/opencode`.
@@ -37,6 +37,8 @@ Current bias:
 ## Product Boundary
 
 Superhuman's desktop is a client of Superhuman-owned project/runtime state.
+
+Desktop is not remote-server-only. It should auto-launch a local workspace server for local repo work and connect to remote workspace servers for remote work. Local and remote are deployments of the same workspace-server contract, not separate UI modes.
 
 The desktop candidate can donate a shell, view hierarchy, app packaging, stream renderer, diff/file/terminal panel, approval UX, local relay trick, or editor/browser/terminal composition. It should not silently become the canonical runtime, chat database, memory store, approval ledger, repo manager, or coding harness.
 
@@ -132,6 +134,7 @@ Local State Thickness is inverted: `1` is thin/easier to replace, `5` is thick/h
 - `autohandai/commander`: verify. Handoff says Tauri v2 Rust + React/Vite app, Claude/Codex/Gemini CLI support, `.commander/` worktrees, persistent project chats, slash commands.
 - `ogulcancelik/herdr`: verify. Handoff says Rust terminal-native agent multiplexer with socket API that agents can use to spawn panes/agents and read output.
 - `aofp/yume`: verify license. Handoff says Tauri/React Claude Code GUI that spawns real Claude CLI, with built-in agent roles, background worktree agents, and task routing.
+- `aaif-goose/goose`: cross-listed from RSH-009. Verify desktop/API shape only if Goose's adversary-mode / ACP / harness semantics survive the RSH-009 evaluation.
 - `penso/arbor`: unverified queue. Handoff says native desktop app for git worktrees and agentic coding.
 - `celia/finite`: unverified queue. Handoff says spatial terminal multiplexer for macOS.
 - `jakemor/kanna`: unverified queue. Handoff says web UI for Claude Code and Codex.
@@ -155,6 +158,7 @@ Use these as mechanic/product references only.
 - Cursor: closed IDE-side reference; also a performance/harness reference for RSH-009.
 - Codex desktop: closed chat-first portfolio-sidebar / home-prompt reference.
 - Conductor: closed reference, not fork target unless source/license appears.
+- Factory Desktop: https://www.factory.ai/news/factory-desktop ; closed macOS/Windows desktop surface for Factory's Droid harness; released 2026-04-08 per handoff. High-signal reference because desktop cockpit and coding harness are designed together: persistent Droid Computers resume installed packages, cloned repos, credentials, and running services; `droid computer register` reportedly attaches operator-owned machines and GPU rigs; Droids can control desktop apps directly, including VS Code, browsers, and documents; phone/tablet reportedly have session/settings/skills parity for starting sessions, monitoring progress, reviewing diffs, and continuing work away from laptop. Not forkable. Cross-list Droid harness in RSH-009.
 - Graft: https://graftapp.io ; closed Mac reference for parallel worktree agents, multi-model choice, and PR-comment review UI.
 - Polyscope: https://getpolyscope.com ; closed Mac reference for copy-on-write clone isolation, E2E mobile relay, and autopilot.
 - Capy: closed "IDE for the parallel age" per handoff; reference only.
@@ -219,7 +223,7 @@ Replace with Superhuman-native primitives:
 
 ## Next Work
 
-1. Define or discover Superhuman's desktop/mobile server API.
+1. Define or discover Superhuman's desktop/mobile workspace-server API.
 2. Verify source/license/API/readme for OpenWork, Jean, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, active OpenCode, Arbor, Finite, and Kanna.
 3. Re-score only after verification; keep handoff-only rows marked as handoff-only until then.
 4. Run the desktop-server mock spike against one or two candidates.
@@ -227,8 +231,8 @@ Replace with Superhuman-native primitives:
 
 ## Open Questions
 
-- Does Superhuman's server already expose a clean HTTP/WebSocket API that a forked desktop shell can wire to?
+- Does Superhuman's local or remote workspace server already expose a clean HTTP/WebSocket API that a forked desktop shell can wire to?
 - Is the first desktop artifact a packaged web shell, Electron app, Tauri app, native Mac app, or candidate-derived client?
-- Does mobile sync happen through Superhuman cloud/gateway, a self-hosted relay, local-network pairing, or several modes?
+- Does mobile sync happen through direct workspace-server connection, Superhuman cloud/gateway, a self-hosted relay, local-network pairing, or several modes?
 - Which candidate has the cleanest replaceable client after source verification: OpenHands, OpenWork, Jean, T3 Code, active OpenCode, or a smaller shell?
 - Which candidate has the best mechanic to steal, even if it is not the fork substrate?

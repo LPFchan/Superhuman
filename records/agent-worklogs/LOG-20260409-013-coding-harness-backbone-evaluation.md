@@ -55,3 +55,36 @@ Update the ongoing research so desktop GUI selection and coding harness selectio
 - Checks run: `rg` for stale Letta/capture wording; `git diff --check`; `git status --short`; `git diff --stat`
 - Output: kept Letta GUI/app as an RSH-008 surface concern and Letta system/code/memory runtime as an RSH-009 backbone concern
 - Next: decide whether to commit this seed split now or continue into a measured harness bakeoff
+
+## Entry 2026-04-10 00-40-20 KST
+
+- Action: updated the Droid harness queue from unresolved locator to Factory/Droid closed-reference lane
+- Files touched: research/RSH-20260409-009-coding-harness-and-backbone-evaluation.md; records/agent-worklogs/LOG-20260409-013-coding-harness-backbone-evaluation.md
+- Checks run: targeted `rg` for Droid/Factory references; targeted read of the existing RSH-009 Droid section
+- Output: noted operator-handoff claims for Factory Desktop, Factory Droid, Droid Computers persistence, BYO computer registration, desktop app control, mobile/tablet parity, and the reported Terminal-Bench 2.0 / GPT-5.3-Codex result
+- Blockers: claims need primary-source verification before RSH-009 treats the benchmark score or mechanics as established fact
+- Next: verify Factory/Droid docs and official benchmark artifacts during the harness-evaluation pass
+
+## Entry 2026-04-10 00-48-53 KST
+
+- Action: incorporated the operator supplementary harness handoff into RSH-009
+- Files touched: research/RSH-20260409-009-coding-harness-and-backbone-evaluation.md; records/agent-worklogs/LOG-20260409-013-coding-harness-backbone-evaluation.md
+- Checks run: full read of current RSH-009; full read of current LOG-013; `date`; `git status --short`; `git diff --stat`
+- Output:
+  - added supplementary Terminal-Bench 2.0 leaderboard snapshot as unverified-for-this-session evidence
+  - upgraded ForgeCode to the top harness candidate queue with source, reported 81.8% rows, blog-post reading requirement, and reported improvement mechanics
+  - resolved Capy out of the harness lane and toward RSH-008 closed desktop references
+  - added score/status detail for Factory Droid and TongAgents
+  - added Goose, mini-swe-agent, Plandex, active OpenCode, and pi-mono
+  - marked Crux, Mux, SageAgent, and CodeBrain-1 as unresolved-after-supplementary-search display names unless artifacts appear
+  - added mini-swe-agent as the bakeoff isolation control
+- Blockers: supplementary rows, scores, blogs, licenses, and product claims still need primary-source verification before a DEC or harness adoption
+- Next: run targeted sanity checks across RSH-009 and keep the next harness pass focused on verification + bakeoff setup
+
+## Entry 2026-04-10 00-52-36 KST
+
+- Action: ran final targeted sanity checks for the supplementary RSH-009 incorporation
+- Files touched: records/agent-worklogs/LOG-20260409-013-coding-harness-backbone-evaluation.md
+- Checks run: `git diff --check`; `git status --short`; `git diff --stat`; full targeted reads of RSH-009; targeted RSH-008/RSH-009 cross-reference `rg`; root truth-doc `rg` for new harness candidate names
+- Output: confirmed the handoff is recorded as research rather than accepted SPEC/PLANS/STATUS truth; confirmed Capy has a desktop-reference home; confirmed active OpenCode and Goose are cross-listed without becoming accepted substrates
+- Next: verify the supplementary claims from primary sources, then prepare the mini-swe-agent isolation control and Harbor/Terminal-Bench bakeoff lane

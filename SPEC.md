@@ -4,14 +4,14 @@ This document is the canonical statement of what Superhuman is supposed to be.
 
 ## Identity
 
-| Field             | Value                                                                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Project           | `Superhuman`                                                                                                                               |
-| Canonical repo    | `https://github.com/LPFchan/Superhuman`                                                                                                    |
-| Project id        | `superhuman`                                                                                                                               |
-| Operator          | single-operator-first                                                                                                                      |
-| Last updated      | `2026-04-09`                                                                                                                               |
-| Related decisions | `DEC-20260409-001`, `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-004`, `DEC-20260409-005`, `DEC-20260409-006`, `DEC-20260409-007` |
+| Field             | Value                                                                                                                                                          |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project           | `Superhuman`                                                                                                                                                   |
+| Canonical repo    | `https://github.com/LPFchan/Superhuman`                                                                                                                        |
+| Project id        | `superhuman`                                                                                                                                                   |
+| Operator          | single-operator-first                                                                                                                                          |
+| Last updated      | `2026-04-10`                                                                                                                                                   |
+| Related decisions | `DEC-20260409-001`, `DEC-20260409-002`, `DEC-20260409-003`, `DEC-20260409-004`, `DEC-20260409-005`, `DEC-20260409-006`, `DEC-20260409-007`, `DEC-20260410-001` |
 
 ## Product Thesis
 
@@ -34,6 +34,18 @@ The inherited OpenClaw promise still matters: this is an AI that actually does t
 Superhuman currently stands on a gateway, CLI, web/control UI, messaging channels, paired-device flows, model providers, a plugin runtime, queued/background work, approvals, and repo-local maintainer tooling. Those are product primitives, not throwaway migration scaffolding.
 
 The current shipping experience is still terminal/setup-oriented and assistant-first. That is acceptable while security, auth, permissions, and gateway behavior are maturing. The product should get easier to enter over time, but onboarding must not hide critical security or trust decisions from the operator.
+
+## Workspace Server Deployment Model
+
+Superhuman surfaces connect to a workspace server API.
+
+The desktop app should be a client shell, but it must not require a remote server before it can work on local repos. Desktop must be able to launch and use a local workspace server automatically. The same desktop surface may connect to operator-approved remote workspace servers.
+
+Local and remote are deployment locations for the same workspace-server contract, not separate product modes.
+
+The workspace server owns live runtime behavior for the workspace it serves: chats, runs, approvals, tool/process streams, file/diff evidence, terminal/process interaction, notification state, and the off-Git operational memory attached to that workspace. Repo-native truth remains in the managed repo; relay or sync infrastructure is connectivity, not canonical project truth.
+
+Mobile and messenger should consume the same product state model. Future mobile clients may gain a local workspace-server deployment where platform constraints allow it, especially Android, but mobile-local execution is optional evolution rather than the first mobile requirement.
 
 ## Primary User And Context
 
@@ -91,6 +103,7 @@ Settled state boundaries:
 - Off-Git raw execution memory must support per-project export, redaction, compaction, hard delete, and periodic secret or API-token redaction.
 - Tool calls may need internal runtime identifiers, but tool-call IDs are not stable operator-facing provenance IDs by default.
 - Desktop and mobile share live-synced state for chats, runs, approvals, agent status, and relevant project context.
+- Desktop and mobile connect to local or remote workspace-server deployments through one product state/API model; local and remote must not become separate identity, approval, or transcript models.
 - Messenger conversations remain channel-native; orchestrator-visible messenger input is recorded off-Git and can produce capture packets or routed project artifacts.
 
 Product-level agent controls are:
