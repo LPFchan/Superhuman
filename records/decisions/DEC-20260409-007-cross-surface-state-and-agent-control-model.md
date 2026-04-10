@@ -77,7 +77,7 @@ The control vocabulary also matches the operator's mental model better than low-
 
 - Desktop and mobile generic chats must get `agent-id`s.
 - Runtime implementation should introduce or preserve `run-id` as separate from `agent-id`.
-- UI should show compact timeline events for important approvals, commits, decisions, routed capture packets, subagent results, host grades, and worklog links inside relevant conversations.
+- UI should show compact timeline events for important approvals, commits, decisions, routed capture packets, subagent results, host grades, and commit-history links inside relevant conversations.
 - Subagent commit authority must be explicit if ever granted.
 - Commit creation normally belongs to an authorized host, worker, orchestrator, or operator flow after reviewing subagent output.
 - Approval records should be runtime objects first; durable repo artifacts should summarize approval consequences only when they affect execution history, decisions, plans, status, spec, or upstream outcomes.

@@ -14,7 +14,7 @@ Superhuman adopts the repo-template framework for itself at the repository root.
 
 ## Context
 
-- Superhuman’s product direction depends on repo-native truth, plans, research, decisions, worklogs, and upstream review.
+- Superhuman’s product direction depends on repo-native truth, plans, research, decisions, commit-backed execution history, and upstream review.
 - Keeping that operating model as an architecture-side draft would leave the product’s own repo outside the discipline it is supposed to provide.
 - Root-managed surfaces make the project’s own memory model real and immediately usable by future orchestrator and worker agents.
 
@@ -55,4 +55,3 @@ Superhuman should model the operating system it intends to become. Root-canonica
   - `SPEC.md`
   - `STATUS.md`
   - `PLANS.md`
-  - `records/agent-worklogs/LOG-20260409-003-root-repo-template-adaptation-bootstrap.md`

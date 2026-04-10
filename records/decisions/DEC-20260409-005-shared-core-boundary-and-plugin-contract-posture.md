@@ -57,4 +57,3 @@ Explicit boundary discipline scales better than repo-wide churn. Keeping shared 
   - `SPEC.md`
   - `STATUS.md`
   - `research/RSH-20260409-004-plugin-compatibility-and-contract-analysis.md`
-  - `records/agent-worklogs/LOG-20260409-002-phase-5-boundary-and-plugin-validation.md`

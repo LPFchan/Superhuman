@@ -57,4 +57,3 @@ Upstream intake is part of the active operating backbone, not just architecture 
   - `REPO.md`
   - `upstream-intake/reports/internal-records/UPS-20260407-001-v2026.4.5.md`
   - `upstream-intake/reports/operator-briefs/UPS-20260407-001-v2026.4.5-operator-brief.md`
-  - `records/agent-worklogs/LOG-20260409-003-root-repo-template-adaptation-bootstrap.md`
