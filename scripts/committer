@@ -68,7 +68,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ "$#" -lt 2 ]; then
+if [ "$#" -lt 1 ]; then
   usage
 fi
 
@@ -85,7 +85,7 @@ if [ -e "$commit_subject" ]; then
   exit 1
 fi
 
-if [ "$#" -eq 0 ]; then
+if [ "$#" -eq 0 ] && [ "$allow_empty" = false ]; then
   usage
 fi
 
@@ -321,22 +321,26 @@ for raw_arg in "$@"; do
 done
 
 # Disallow "." because it stages the entire repository and defeats the helper's safety guardrails.
-for file in "${files[@]}"; do
-  if [ "$file" = "." ]; then
-    printf 'Error: "." is not allowed; list specific paths instead\n' >&2
-    exit 1
-  fi
-done
+if [ "${#files[@]}" -gt 0 ]; then
+  for file in "${files[@]}"; do
+    if [ "$file" = "." ]; then
+      printf 'Error: "." is not allowed; list specific paths instead\n' >&2
+      exit 1
+    fi
+  done
+fi
 
 # Prevent staging node_modules even if a path is forced.
-for file in "${files[@]}"; do
-  case "$file" in
-    *node_modules* | */node_modules | */node_modules/* | node_modules)
-      printf 'Error: node_modules paths are not allowed: %s\n' "$file" >&2
-      exit 1
-      ;;
-  esac
-done
+if [ "${#files[@]}" -gt 0 ]; then
+  for file in "${files[@]}"; do
+    case "$file" in
+      *node_modules* | */node_modules | */node_modules/* | node_modules)
+        printf 'Error: node_modules paths are not allowed: %s\n' "$file" >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
 
 last_commit_error=''
 
@@ -413,15 +417,19 @@ run_git_with_lock_retry() {
   return 1
 }
 
-for file in "${files[@]}"; do
-  if ! path_exists_or_tracked "$file"; then
-    printf 'Error: file not found: %s\n' "$file" >&2
-    exit 1
-  fi
-done
+if [ "${#files[@]}" -gt 0 ]; then
+  for file in "${files[@]}"; do
+    if ! path_exists_or_tracked "$file"; then
+      printf 'Error: file not found: %s\n' "$file" >&2
+      exit 1
+    fi
+  done
+fi
 
 run_git_with_lock_retry "unstaging files" git restore --staged :/
-run_git_with_lock_retry "staging files" git add --force -- "${files[@]}"
+if [ "${#files[@]}" -gt 0 ]; then
+  run_git_with_lock_retry "staging files" git add --force -- "${files[@]}"
+fi
 
 if git diff --staged --quiet && [ "$allow_empty" = false ]; then
   printf 'Warning: no staged changes detected for: %s\n' "${files[*]}" >&2
@@ -430,7 +438,11 @@ fi
 
 timestamp=$(format_kst_timestamp)
 commit_id=$(claim_log_id)
-default_file_list=$(printf '%s' "${files[*]}")
+if [ "${#files[@]}" -gt 0 ]; then
+  default_file_list=$(printf '%s' "${files[*]}")
+else
+  default_file_list=""
+fi
 
 changes_block=$(build_section_items "$changes_override" "Commit the requested files: $default_file_list.")
 rationale_block=$(build_section_items "$rationale_override" "Keep the change scoped to the requested paths and record it as a commit-backed LOG.")
