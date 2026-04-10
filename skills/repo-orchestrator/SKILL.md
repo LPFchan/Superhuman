@@ -50,6 +50,7 @@ Use this skill with:
 4. Write the artifact with provenance.
    - Include `Opened: YYYY-MM-DD HH-mm-ss KST`
    - Include `Recorded by agent: <agent-id>`
+   - For public external sources, record canonical source URLs in the artifact instead of local download or cache paths.
    - Before drafting, read the destination directory's `README.md` and any explicit template.
    - Match the local guide when it is prescriptive, and stay lightweight when the guide is intentionally minimal.
 

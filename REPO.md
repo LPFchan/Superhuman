@@ -272,6 +272,12 @@ Every stable-ID-bearing artifact should open with:
 - `Opened: YYYY-MM-DD HH-mm-ss KST`
 - `Recorded by agent: <agent-id>`
 
+When provenance includes external source material:
+
+- prefer canonical source URLs for public web content, posts, issues, docs, or releases
+- do not use local download/export/cache paths as the primary provenance link when the original source URL is known
+- local files may be mentioned as supporting evidence only when needed for reproducibility or when no stable public URL exists
+
 ## Commit Provenance
 
 Commit provenance is documented here as the canonical policy and is enforced locally plus in CI.

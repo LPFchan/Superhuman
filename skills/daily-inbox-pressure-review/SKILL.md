@@ -29,6 +29,7 @@ It should not produce a giant digest of every captured idea.
    - Read `INBOX.md`.
    - Include relevant external capture packets when available.
    - Treat raw external source events as immutable Off-Git events, not as repo artifacts.
+   - When the source is public, preserve the canonical source URL; do not treat a local export path as the primary provenance pointer.
 
 2. Build meaningful capture packets.
    - Group related raw source events and `IBX-*` entries.
