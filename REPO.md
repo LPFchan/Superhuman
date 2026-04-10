@@ -47,20 +47,20 @@ Practical defaults:
 
 The root docs have different jobs on purpose:
 
-| Surface                   | Role                                                  |
-| ------------------------- | ----------------------------------------------------- |
-| `README.md`               | Public product front door                             |
-| `PROVENANCE.md`           | Legal and historical lineage                          |
-| `REPO.md`                 | Canonical repo contract                               |
-| `SPEC.md`                 | Durable truth about what Superhuman is supposed to be |
-| `STATUS.md`               | Current operational reality                           |
-| `PLANS.md`                | Accepted future direction                             |
-| `INBOX.md`                | Ephemeral intake waiting for routing                  |
-| `research/`               | Curated research worth future retrieval               |
-| `records/decisions/`      | Durable decisions with rationale                      |
-| `records/agent-worklogs/` | Execution history                                     |
-| `skills/`                 | Required procedures for repeatable repo workflows     |
-| `upstream-intake/`        | Canonical upstream review and maintenance surface     |
+| Surface              | Role                                                  |
+| -------------------- | ----------------------------------------------------- |
+| `README.md`          | Public product front door                             |
+| `PROVENANCE.md`      | Legal and historical lineage                          |
+| `REPO.md`            | Canonical repo contract                               |
+| `SPEC.md`            | Durable truth about what Superhuman is supposed to be |
+| `STATUS.md`          | Current operational reality                           |
+| `PLANS.md`           | Accepted future direction                             |
+| `INBOX.md`           | Ephemeral intake waiting for routing                  |
+| `research/`          | Curated research worth future retrieval               |
+| `records/decisions/` | Durable decisions with rationale                      |
+| `git commit history` | Commit-backed execution history through `LOG-*` ids   |
+| `skills/`            | Required procedures for repeatable repo workflows     |
+| `upstream-intake/`   | Canonical upstream review and maintenance surface     |
 
 `README.md` stays public and product-facing.
 `PROVENANCE.md` stays separate because lineage is a permanent concern, not a subsection to hide inside another file.
@@ -69,17 +69,17 @@ The root docs have different jobs on purpose:
 
 Superhuman uses these root surfaces as its canonical project backbone:
 
-| Surface                   | Role                                                     | Mutability              |
-| ------------------------- | -------------------------------------------------------- | ----------------------- |
-| `SPEC.md`                 | Durable statement of what Superhuman is supposed to be   | rewritten               |
-| `STATUS.md`               | What is true right now operationally                     | rewritten               |
-| `PLANS.md`                | Accepted future direction that is not current truth yet  | rewritten               |
-| `INBOX.md`                | Ephemeral intake and unresolved routing items            | append then purge       |
-| `research/`               | Curated research memos                                   | append by new file      |
-| `records/decisions/`      | Durable decision records                                 | append-only by new file |
-| `records/agent-worklogs/` | Execution history for agents and runs                    | append-only             |
-| `skills/`                 | Required procedure skills for repeatable repo workflows  | edit by skill           |
-| `upstream-intake/`        | Canonical upstream intake, review, and escalation system | append by cadence       |
+| Surface              | Role                                                              | Mutability                |
+| -------------------- | ----------------------------------------------------------------- | ------------------------- |
+| `SPEC.md`            | Durable statement of what Superhuman is supposed to be            | rewritten                 |
+| `STATUS.md`          | What is true right now operationally                              | rewritten                 |
+| `PLANS.md`           | Accepted future direction that is not current truth yet           | rewritten                 |
+| `INBOX.md`           | Ephemeral intake and unresolved routing items                     | append then purge         |
+| `research/`          | Curated research memos                                            | append by new file        |
+| `records/decisions/` | Durable decision records                                          | append-only by new file   |
+| `git commit history` | Canonical execution history through commit-backed `LOG-*` records | append-only by new commit |
+| `skills/`            | Required procedure skills for repeatable repo workflows           | edit by skill             |
+| `upstream-intake/`   | Canonical upstream intake, review, and escalation system          | append by cadence         |
 
 ## Procedure Skills
 
@@ -91,7 +91,7 @@ Before running a repeatable repo workflow, read the relevant `skills/<name>/SKIL
 
 Required repo-template procedure skills:
 
-- `skills/repo-orchestrator/SKILL.md` for routing work into truth, status, plans, inbox, research, decisions, worklogs, upstream review, and commit provenance
+- `skills/repo-orchestrator/SKILL.md` for routing work into truth, status, plans, inbox, research, decisions, commit-backed execution history, upstream review, and commit provenance
 - `skills/daily-inbox-pressure-review/SKILL.md` for focus-protecting `INBOX.md`, `IBX-*`, and capture-packet triage
 
 Conditional procedure skills active in this repo:
@@ -109,7 +109,7 @@ These boundaries are mandatory:
 - `PLANS.md` is not a brainstorm dump.
 - `INBOX.md` is not durable truth.
 - `research/` is not raw execution history.
-- `records/decisions/` is not the same as `records/agent-worklogs/`.
+- `records/decisions/` is not the same as commit-backed execution history.
 - `README.md` is not the internal source of truth.
 - Off-Git memory is not a substitute for repo-local canonical docs.
 
@@ -120,7 +120,7 @@ This separation exists so future operators and future agents can answer differen
 - What future work is accepted? -> `PLANS.md`
 - What did we learn from exploration? -> `research/`
 - What did we decide and why? -> `records/decisions/`
-- What actually happened during execution? -> `records/agent-worklogs/`
+- What actually happened during execution? -> git commit history via `commit: LOG-*`
 
 ## Roles
 
@@ -140,7 +140,7 @@ It may:
 - update `SPEC.md`, `STATUS.md`, and `PLANS.md`
 - create research memos
 - create decision records
-- append to worklogs and create a new log only when clarity requires it
+- create compliant commit-backed execution records
 - translate messenger intake into repo artifacts
 - escalate non-obvious product, architecture, workflow, or policy calls
 
@@ -150,7 +150,7 @@ Worker agents execute bounded tasks.
 
 They may:
 
-- append to worklogs
+- create compliant commit-backed execution records when granted commit authority
 - propose truth changes through the orchestrator
 - create evidence, summaries, and implementation outputs
 
@@ -188,7 +188,7 @@ When new work arrives, the orchestrator should classify it in this order:
 7. Is this a meaningful decision with rationale?
    - Route to `records/decisions/`.
 8. Is this execution history?
-   - Route to `records/agent-worklogs/`.
+   - Route to a compliant commit-backed `LOG-*` record.
 
 One task may legitimately touch multiple layers.
 
@@ -221,23 +221,25 @@ Promotion should be sparse. A research memo may stay as research forever. A deci
 - `INBOX.md` is an aggressive scratch disk. Purge entries once they are reflected elsewhere.
 - `research/` keeps curated findings only.
 - `records/decisions/` is append-only by new decision file.
-- `records/agent-worklogs/` is append-only and should prefer appended entries on the current relevant `LOG-*`.
+- Routine execution history lives in git commit history through commit-backed `LOG-*` records.
+- Do not invent a parallel execution-history file layer.
+- If work produces no durable repo change, route only the durable outcome that belongs elsewhere or keep the raw trace Off-Git.
 - `upstream-intake/` keeps paired internal-record and operator-brief artifacts under a shared `UPS-*` review id.
 - Truth docs reflect the latest accepted state, not every intermediate thought.
 
-### Worklog Reuse Policy
+## Execution Record Reuse Policy
 
-Do not create a new `LOG-*` just to satisfy provenance.
+Do not create a new `LOG-*` just because a new commit exists.
 
-Append to the latest relevant `LOG-*` when:
+Prefer reusing the current primary `LOG-*` when:
 
-- the same workstream, goal, or blocker is still in scope
-- the same execution thread is continuing
-- a new timestamped entry preserves clarity
+- the same workstream is continuing
+- the same execution thread is still in scope
+- `--amend` or `rebase` preserves clearer provenance
 
-Create a new `LOG-*` only when:
+Create a new primary `LOG-*` only when:
 
-- the work is materially distinct from the current log's scope
+- the work is materially distinct from the current record's scope
 - a separate agent or subagent owns a clearly separate execution thread
 - reuse would make provenance harder to follow
 - a separate execution record would improve future retrieval
@@ -262,15 +264,27 @@ Recommended prefixes:
 - `IBX-YYYYMMDD-NNN`
 - `RSH-YYYYMMDD-NNN`
 - `DEC-YYYYMMDD-NNN`
-- `LOG-YYYYMMDD-NNN`
 - `UPS-YYYYMMDD-NNN`
+- `LOG-YYYYMMDD-HHMMSS-<agent-suffix>`
 
-Numbering is per day and per artifact type. Any agent may claim the next ID by checking the least available `NNN`.
+File-backed artifact numbering is per day and per artifact type. Any agent may claim the next file-backed `NNN` by checking the least available value.
 
-Every stable-ID-bearing artifact should open with:
+File-backed stable-ID-bearing artifacts should open with:
 
 - `Opened: YYYY-MM-DD HH-mm-ss KST`
 - `Recorded by agent: <agent-id>`
+
+Commit-backed `LOG-*` ids use this format:
+
+- `LOG-YYYYMMDD-HHMMSS-<agent-suffix>`
+- `<agent-suffix>` is the last up to 6 lowercase alphanumeric characters of the normalized `agent:` value
+- normalize `agent:` by lowercasing it and removing non-alphanumeric characters
+
+When claiming a new `LOG-*` id:
+
+- start from the current KST timestamp plus the derived agent suffix
+- scan the current branch and the default branch for existing `commit:` values
+- if the candidate id already exists, bump the timestamp forward by one second until it is unique
 
 When provenance includes external source material:
 
@@ -278,25 +292,81 @@ When provenance includes external source material:
 - do not use local download/export/cache paths as the primary provenance link when the original source URL is known
 - local files may be mentioned as supporting evidence only when needed for reproducibility or when no stable public URL exists
 
-## Commit Provenance
+## Commit-Backed Execution Records
 
-Commit provenance is documented here as the canonical policy and is enforced locally plus in CI.
-
-After a commit is made under this operating model, it should include these lowercase trailers:
+After a repo adopts this system, every commit should include these trailers:
 
 - `project: <project-id>`
 - `agent: <agent-id>`
 - `role: orchestrator|worker|subagent|operator`
+- `commit: LOG-...[, LOG-...]`
+
+Optional trailer:
+
 - `artifacts: <artifact-id>[, <artifact-id>...]`
 
 Rules:
 
+- `commit:` must include one or more `LOG-*` ids, comma-separated.
+- The first `LOG-*` in `commit:` is the commit's primary execution id.
+- Additional `LOG-*` ids mean the landed commit canonically absorbs earlier execution records whose separate commits will not remain separate landed history.
+- Every merge commit must mint its own primary `LOG-*`.
+- When child commits remain visible as landed history, mention child `LOG-*` ids in `notes:` instead of reusing them in `commit:`.
+- `--amend` and `rebase` should preserve existing `LOG-*` ids.
+- If cherry-pick relocates work and the original commit will not also land, keep the same primary `LOG-*`.
+- If both original and cherry-picked commits could land, the later commit must mint a new primary `LOG-*`; source `LOG-*` ids may be mentioned only in `notes:`.
+- If a collision is discovered before landing, the later branch renumbers before merge.
+- `artifacts:` is optional.
 - `artifacts:` may list more than one stable ID, comma-separated.
-- A normal commit should always reference at least one relevant artifact, whether newly created or updated.
-- Artifact-less commits should be treated as bootstrap or migration exceptions only.
-- Normal commits do not require a brand-new `LOG-*`.
-- Prefer appending to an existing relevant `LOG-*` when the same workstream is continuing.
-- Commits may reference `LOG-*`, `DEC-*`, `RSH-*`, `UPS-*`, or another relevant artifact type as appropriate.
+- `artifacts:` must not include any `LOG-*`.
+- The commit side and the repo-artifact side should reinforce the same provenance graph.
+
+Commit bodies must use this lowercase structure:
+
+```text
+<subject line>
+
+timestamp: YYYY-MM-DD HH-mm-ss KST
+changes:
+- ...
+rationale:
+- ...
+checks:
+- ...
+notes:
+- ...
+
+project: <project-id>
+agent: <agent-id>
+role: orchestrator|worker|subagent|operator
+commit: LOG-...
+artifacts: DEC-..., RSH-...
+```
+
+Body rules:
+
+- the subject line must be non-empty
+- `timestamp:` is required and must be one line in KST
+- `changes:`, `rationale:`, and `checks:` are required
+- each required section must contain at least one `- ...` item
+- `checks:` may be `- none`
+- `notes:` is optional
+
+## Commit-Time Enforcement
+
+If the repo enables commit hooks, every attempted commit should be checked against these provenance rules.
+
+Recommended minimum enforcement:
+
+- reject commits that do not include `project:`, `agent:`, `role:`, and `commit:`
+- reject roles outside `orchestrator|worker|subagent|operator`
+- reject malformed `commit:` values
+- reject malformed or empty `artifacts:` values when present
+- reject any `artifacts:` value that includes `LOG-*`
+- reject commits that do not include the required body keys and list items
+- reject duplicate `LOG-*` ids on the current branch or default branch
+
+The goal is not perfect policy automation. The goal is to stop obviously non-compliant commits before they land.
 
 ## Superhuman-Specific Notes
 

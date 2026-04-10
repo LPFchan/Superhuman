@@ -1,24 +1,37 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-# Disable glob expansion to handle brackets in file paths
+# Disable glob expansion to handle brackets in file paths.
 set -f
+
+script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
+repo_root=$(git rev-parse --show-toplevel)
+
 usage() {
-  printf 'Usage: %s [--force] [--project id] [--agent id] [--role role] [--artifacts ids] [--exception bootstrap|migration] "commit message" "file" ["file" ...]\n' "$(basename "$0")" >&2
+  printf 'Usage: %s [--force] [--allow-empty] [--project id] [--agent id] [--role role] [--artifacts ids] "commit subject" "file" ["file" ...]\n' "$(basename "$0")" >&2
   exit 2
 }
 
 force_delete_lock=false
+allow_empty=false
 project=${COMMIT_PROJECT:-superhuman}
 agent=${COMMIT_AGENT:-${CODEX_THREAD_ID:-}}
 role=${COMMIT_ROLE:-orchestrator}
 artifacts=${COMMIT_ARTIFACTS:-}
-exception=${COMMIT_EXCEPTION:-}
+timestamp_override=${COMMIT_TIMESTAMP:-}
+changes_override=${COMMIT_CHANGES:-}
+rationale_override=${COMMIT_RATIONALE:-}
+checks_override=${COMMIT_CHECKS:-}
+notes_override=${COMMIT_NOTES:-}
 
 while [ "$#" -gt 0 ]; do
   case "${1:-}" in
     --force)
       force_delete_lock=true
+      shift
+      ;;
+    --allow-empty)
+      allow_empty=true
       shift
       ;;
     --project)
@@ -41,11 +54,6 @@ while [ "$#" -gt 0 ]; do
       artifacts=$2
       shift 2
       ;;
-    --exception)
-      [ "$#" -ge 2 ] || usage
-      exception=$2
-      shift 2
-      ;;
     --)
       shift
       break
@@ -64,31 +72,22 @@ if [ "$#" -lt 2 ]; then
   usage
 fi
 
-commit_message=$1
+commit_subject=$1
 shift
 
-if [[ "$commit_message" != *[![:space:]]* ]]; then
-  printf 'Error: commit message must not be empty\n' >&2
+if [[ "$commit_subject" != *[![:space:]]* ]]; then
+  printf 'Error: commit subject must not be empty\n' >&2
   exit 1
 fi
 
-if [ -e "$commit_message" ]; then
-  printf 'Error: first argument looks like a file path ("%s"); provide the commit message first\n' "$commit_message" >&2
+if [ -e "$commit_subject" ]; then
+  printf 'Error: first argument looks like a file path ("%s"); provide the commit subject first\n' "$commit_subject" >&2
   exit 1
 fi
 
 if [ "$#" -eq 0 ]; then
   usage
 fi
-
-message_has_trailer() {
-  local key=$1
-  printf '%s\n' "$commit_message" | grep -Eq "^$key: .+"
-}
-
-message_has_exception() {
-  printf '%s\n' "$commit_message" | grep -Eqi '^exception: (bootstrap|migration)$'
-}
 
 path_exists_or_tracked() {
   local candidate=$1
@@ -125,6 +124,195 @@ append_normalized_file_arg() {
   fi
 
   files+=("$raw")
+}
+
+normalize_agent() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]'
+}
+
+agent_suffix() {
+  normalized=$(normalize_agent "$1")
+  [ -n "$normalized" ] || return 1
+  printf '%s\n' "$normalized" | awk '
+    {
+      len = length($0)
+      if (len <= 6) {
+        print $0
+      } else {
+        print substr($0, len - 5)
+      }
+    }
+  '
+}
+
+default_branch_ref() {
+  if ref=$(git -C "$repo_root" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null); then
+    printf '%s\n' "$ref"
+    return 0
+  fi
+
+  if git -C "$repo_root" show-ref --verify --quiet refs/remotes/origin/main; then
+    printf '%s\n' "origin/main"
+    return 0
+  fi
+
+  if git -C "$repo_root" show-ref --verify --quiet refs/remotes/origin/master; then
+    printf '%s\n' "origin/master"
+    return 0
+  fi
+
+  if ref=$(git -C "$repo_root" symbolic-ref -q --short HEAD 2>/dev/null); then
+    printf '%s\n' "$ref"
+    return 0
+  fi
+
+  return 1
+}
+
+extract_commit_ids_from_value() {
+  printf '%s\n' "$1" | tr ',' '\n' | sed 's/^ *//; s/ *$//'
+}
+
+format_kst_timestamp() {
+  if [ -n "$timestamp_override" ]; then
+    printf '%s\n' "$timestamp_override"
+    return 0
+  fi
+
+  TZ=Asia/Seoul date '+%Y-%m-%d %H-%M-%S KST'
+}
+
+bullets_from_text() {
+  printf '%s\n' "$1" | awk '
+    /^[[:space:]]*$/ {
+      next
+    }
+
+    /^- / {
+      print
+      next
+    }
+
+    {
+      print "- " $0
+    }
+  '
+}
+
+build_section_items() {
+  text=$1
+  default_text=$2
+
+  if [ -n "$text" ]; then
+    bullets_from_text "$text"
+    return 0
+  fi
+
+  bullets_from_text "$default_text"
+}
+
+log_id_exists() {
+  candidate=$1
+  refs=""
+
+  current_ref=$(git -C "$repo_root" symbolic-ref -q --short HEAD 2>/dev/null || true)
+  default_ref=$(default_branch_ref || true)
+
+  if [ -n "$current_ref" ]; then
+    refs=$current_ref
+  fi
+
+  if [ -n "$default_ref" ] && [ "$default_ref" != "$current_ref" ]; then
+    refs="$refs $default_ref"
+  fi
+
+  [ -n "$refs" ] || return 1
+
+  git -C "$repo_root" log --format=%B $refs 2>/dev/null |
+    awk -v candidate="$candidate" '
+      /^commit: / {
+        sub(/^commit: /, "")
+        count = split($0, ids, ",")
+        for (i = 1; i <= count; i++) {
+          gsub(/^ +| +$/, "", ids[i])
+          if (ids[i] == candidate) {
+            exit 0
+          }
+        }
+      }
+      END {
+        exit 1
+      }
+    '
+}
+
+claim_log_id() {
+  suffix=$(agent_suffix "$agent")
+  [ -n "$suffix" ] || {
+    printf 'Error: agent id must include at least one alphanumeric character\n' >&2
+    exit 1
+  }
+
+  while true; do
+    timestamp=$(TZ=Asia/Seoul date '+%Y%m%d-%H%M%S')
+    candidate="LOG-${timestamp}-${suffix}"
+    if ! log_id_exists "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    sleep 1
+  done
+}
+
+build_commit_message() {
+  commit_id=$1
+  timestamp=$2
+  changes_block=$3
+  rationale_block=$4
+  checks_block=$5
+  notes_block=$6
+
+  if [ -n "$notes_block" ]; then
+    cat <<EOF
+$commit_subject
+
+timestamp: $timestamp
+changes:
+$changes_block
+rationale:
+$rationale_block
+checks:
+$checks_block
+notes:
+$notes_block
+
+project: $project
+agent: $agent
+role: $role
+commit: $commit_id
+EOF
+  else
+    cat <<EOF
+$commit_subject
+
+timestamp: $timestamp
+changes:
+$changes_block
+rationale:
+$rationale_block
+checks:
+$checks_block
+
+project: $project
+agent: $agent
+role: $role
+commit: $commit_id
+EOF
+  fi
+
+  if [ -n "$artifacts" ]; then
+    printf 'artifacts: %s\n' "$artifacts"
+  fi
 }
 
 files=()
@@ -235,47 +423,46 @@ done
 run_git_with_lock_retry "unstaging files" git restore --staged :/
 run_git_with_lock_retry "staging files" git add --force -- "${files[@]}"
 
-if git diff --staged --quiet; then
+if git diff --staged --quiet && [ "$allow_empty" = false ]; then
   printf 'Warning: no staged changes detected for: %s\n' "${files[*]}" >&2
   exit 1
 fi
 
-commit_text=$commit_message
+timestamp=$(format_kst_timestamp)
+commit_id=$(claim_log_id)
+default_file_list=$(printf '%s' "${files[*]}")
 
-if message_has_exception || message_has_trailer "project" || message_has_trailer "agent" || message_has_trailer "role" || message_has_trailer "artifacts"; then
-  if [ -n "$exception" ] || [ -n "${artifacts:-}" ] || [ -n "${project:-}" ] || [ -n "${agent:-}" ] || [ -n "${role:-}" ]; then
-    :
-  fi
-else
-  if [ -n "$exception" ]; then
-    case "$exception" in
-      bootstrap|migration) ;;
-      *)
-        printf 'Error: --exception must be "bootstrap" or "migration"\n' >&2
-        exit 1
-        ;;
-    esac
-    commit_text=$(printf '%s\n\nexception: %s\n' "$commit_message" "$exception")
-  else
-    if [ -z "$project" ] || [ -z "$agent" ] || [ -z "$role" ] || [ -z "$artifacts" ]; then
-      printf 'Error: commit provenance is required. Provide --artifacts plus agent context (or set CODEX_THREAD_ID / COMMIT_AGENT), or use --exception bootstrap|migration.\n' >&2
-      exit 1
-    fi
-    case "$role" in
-      orchestrator|worker|subagent|operator) ;;
-      *)
-        printf 'Error: invalid --role value: %s\n' "$role" >&2
-        exit 1
-        ;;
-    esac
-    commit_text=$(printf '%s\n\nproject: %s\nagent: %s\nrole: %s\nartifacts: %s\n' "$commit_message" "$project" "$agent" "$role" "$artifacts")
-  fi
+changes_block=$(build_section_items "$changes_override" "Commit the requested files: $default_file_list.")
+rationale_block=$(build_section_items "$rationale_override" "Keep the change scoped to the requested paths and record it as a commit-backed LOG.")
+checks_block=$(build_section_items "$checks_override" "none")
+notes_block=""
+
+if [ -n "$notes_override" ]; then
+  notes_block=$(bullets_from_text "$notes_override")
+fi
+
+commit_text=$(build_commit_message "$commit_id" "$timestamp" "$changes_block" "$rationale_block" "$checks_block" "$notes_block")
+
+commit_message_file=$(mktemp)
+printf '%s\n' "$commit_text" > "$commit_message_file"
+
+if ! "$script_dir/check-commit-standards.sh" "$commit_message_file" >/dev/null 2>&1; then
+  cat "$commit_message_file" >&2
+  rm -f "$commit_message_file"
+  printf '\nError: generated commit message failed validation\n' >&2
+  exit 1
 fi
 
 committed=false
-commit_message_file=$(mktemp)
-printf '%s\n' "$commit_text" > "$commit_message_file"
-if run_git_with_lock_retry "commit" git commit -F "$commit_message_file" -- "${files[@]}"; then
+commit_args=(-F "$commit_message_file")
+if [ "$allow_empty" = true ]; then
+  commit_args+=(--allow-empty)
+fi
+if [ "${#files[@]}" -gt 0 ]; then
+  commit_args+=(-- "${files[@]}")
+fi
+
+if run_git_with_lock_retry "commit" git commit "${commit_args[@]}"; then
   committed=true
 fi
 rm -f "$commit_message_file"
@@ -284,4 +471,4 @@ if [ "$committed" = false ]; then
   exit 1
 fi
 
-printf 'Committed "%s" with %d files\n' "$commit_message" "${#files[@]}"
+printf 'Committed "%s" as %s with %d files\n' "$commit_subject" "$commit_id" "${#files[@]}"

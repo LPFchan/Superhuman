@@ -14,6 +14,17 @@ function run(cwd: string, command: string, args: string[]) {
   }).trim();
 }
 
+function runWithEnv(cwd: string, command: string, args: string[], env: NodeJS.ProcessEnv) {
+  return execFileSync(command, args, {
+    cwd,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env,
+    },
+  }).trim();
+}
+
 function git(cwd: string, ...args: string[]) {
   return run(cwd, "git", args);
 }
@@ -39,12 +50,18 @@ function writeRepoFile(repo: string, relativePath: string, contents: string) {
 }
 
 function commitWithHelper(repo: string, commitMessage: string, ...args: string[]) {
-  return run(repo, "bash", [scriptPath, commitMessage, ...args]);
+  return runWithEnv(repo, "bash", [scriptPath, commitMessage, ...args], {
+    COMMIT_AGENT: "abc123",
+  });
 }
 
 function committedPaths(repo: string) {
   const output = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD");
   return output.split("\n").filter(Boolean).toSorted();
+}
+
+function lastCommitMessage(repo: string) {
+  return git(repo, "log", "-1", "--format=%B", "HEAD");
 }
 
 afterEach(() => {
@@ -114,5 +131,23 @@ describe("scripts/committer", () => {
 
     expect(committedPaths(repo)).toEqual(["CHANGELOG.md"]);
     expect(git(repo, "status", "--short")).toContain("M unrelated.ts");
+  });
+
+  it("writes a commit-backed LOG message with the required structured body", () => {
+    const repo = createRepo();
+    writeRepoFile(repo, "notes.txt", "hello\n");
+
+    commitWithHelper(repo, "feat: structured commit metadata", "notes.txt");
+
+    const message = lastCommitMessage(repo);
+
+    expect(message).toContain("timestamp:");
+    expect(message).toContain("changes:");
+    expect(message).toContain("rationale:");
+    expect(message).toContain("checks:");
+    expect(message).toContain("project: superhuman");
+    expect(message).toContain("agent: abc123");
+    expect(message).toContain("role: orchestrator");
+    expect(message).toMatch(/commit: LOG-\d{8}-\d{6}-abc123/);
   });
 });

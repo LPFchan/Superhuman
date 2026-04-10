@@ -15,7 +15,7 @@ Each reusable workflow should live at `skills/<name>/SKILL.md`.
 ## Required Repo-Template Baseline Skills
 
 - `repo-orchestrator/`
-  - Generic routing workflow for truth, status, plans, research, decisions, worklogs, and inbox capture.
+  - Generic routing workflow for truth, status, plans, research, decisions, commit-backed execution, and inbox capture.
 - `daily-inbox-pressure-review/`
   - Focus-protecting daily triage for `IBX-*` capture and capture packets.
 

@@ -39,11 +39,11 @@ Before running a repeatable repo workflow, read the relevant `skills/<name>/SKIL
 - `INBOX.md`: ephemeral routed intake
 - `research/`: curated research memos
 - `records/decisions/`: durable decision records
-- `records/agent-worklogs/`: execution history
+- `git commit history`: commit-backed execution history through `LOG-*` commits
 - `upstream-intake/`: canonical upstream review and escalation surface
 - `architecture/`: evidence, migration material, and archive context, not the canonical operating layer
 
-Use the correct surface for the job. Do not collapse truth, plans, research, decisions, worklogs, inbox items, and upstream review into one mixed document.
+Use the correct surface for the job. Do not collapse truth, plans, research, decisions, commit-backed execution history, inbox items, and upstream review into one mixed document.
 
 ## Managed Repo Default
 
@@ -56,20 +56,19 @@ Before editing a repo artifact, read the matching local guide first. These are b
 
 - `research/README.md`
 - `records/decisions/README.md`
-- `records/agent-worklogs/README.md`
 - `upstream-intake/reports/README.md`
 - `upstream-intake/reports/internal-records/README.md`
 - `upstream-intake/reports/operator-briefs/README.md`
 
 Read these repo-template procedure skills when relevant:
 
-- `skills/repo-orchestrator/SKILL.md` for artifact routing, truth/status/plans promotion, decisions, research, inbox, worklog, and commit-provenance routing
+- `skills/repo-orchestrator/SKILL.md` for artifact routing, truth/status/plans promotion, decisions, research, inbox, commit-backed execution, and commit-provenance routing
 - `skills/daily-inbox-pressure-review/SKILL.md` for focus-protecting inbox and capture-packet triage
 - `skills/upstream-intake/SKILL.md` for recurring upstream review and its paired internal/operator reports
 
 When a repo artifact has the right substance but the wrong shape, normalize it toward the local guide with the smallest meaningful diff. Preserve repo-specific truth, IDs, dates, decisions, and historical facts.
 
-Prefer appending to the current relevant `LOG-*` instead of creating a new one unless the work is materially distinct, a separate agent or subagent owns it, or a separate execution record would improve clarity.
+Prefer reusing the current relevant `LOG-*` primary id through amend or rebase when the same workstream continues unless the work is materially distinct, a separate agent or subagent owns it, or a separate execution record would improve clarity.
 
 ## Repo Map
 
@@ -118,16 +117,21 @@ High-value subtree guides live at:
 
 ## Commits And Provenance
 
-- Use `scripts/committer` so staging stays scoped.
+- Use `scripts/committer` or `git` directly so staging stays scoped.
 - Normal commits must include the required provenance trailers:
   - `project: <project-id>`
   - `agent: <agent-id>`
   - `role: orchestrator|worker|subagent|operator`
-  - `artifacts: <artifact-id>[, <artifact-id>...]`
-- Prefer `scripts/committer --artifacts <ID[, ID...]> "Subject" <file...>` with `CODEX_THREAD_ID` available so the helper can append compliant trailers automatically.
-- The referenced artifact should usually be the current relevant `LOG-*` or another updated durable artifact, not a freshly created log by default.
+  - `commit: LOG-YYYYMMDD-HHMMSS-<agent-suffix>[, LOG-...]`
+- `artifacts:` is optional and must not contain `LOG-*`.
+- Normal commit bodies must include:
+  - `timestamp:`
+  - `changes:`
+  - `rationale:`
+  - `checks:`
+  - optional `notes:`
+- Prefer the current relevant `LOG-*` primary id when the same workstream continues; use a new primary `LOG-*` only when the execution thread or provenance truly changes.
 - Use `--role` when the default `orchestrator` role is wrong.
-- Use `--exception bootstrap|migration` only for explicit bootstrap or migration commits.
 - Commit provenance is enforced locally through `git-hooks/commit-msg` and remotely through `.github/workflows/commit-standards.yml`.
 - Do not create merge commits on `main`; rebase onto the latest `origin/main` instead.
 

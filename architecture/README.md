@@ -13,7 +13,7 @@ The canonical repo-managed operating surfaces now live at the repository root, n
 5. [`../INBOX.md`](../INBOX.md) for unresolved intake.
 6. [`../research/README.md`](../research/README.md) for curated root research memos.
 7. [`../records/decisions/README.md`](../records/decisions/README.md) for durable decision records.
-8. [`../records/agent-worklogs/README.md`](../records/agent-worklogs/README.md) for execution history.
+8. git commit history via commit-backed `LOG-*` records for execution history.
 9. [`../upstream-intake/README.md`](../upstream-intake/README.md) for the canonical upstream review package.
 
 ## Active Internal Evidence Docs
@@ -50,7 +50,7 @@ These documents are still useful, but they capture audits, checkpoints, or super
 
 ## How To Use This Directory
 
-1. Start with the root canonical docs when you need current truth, status, plans, intake, research, decisions, or worklogs.
+1. Start with the root canonical docs when you need current truth, status, plans, intake, research, decisions, or commit-backed execution history.
 2. Use the active architecture docs here as internal evidence and deeper migration context.
 3. Treat `archive/` as historical input, not as a second current source of truth.
 4. Preserve stable compatibility and boundary contracts introduced during the migration; later work should extend them rather than casually replacing them.

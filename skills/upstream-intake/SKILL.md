@@ -60,7 +60,8 @@ Use it when a downstream fork needs a repeatable review of upstream changes.
    - `project: <project-id>`
    - `agent: <agent-id>`
    - `role: orchestrator|worker|subagent|operator`
-   - `artifacts: UPS-..., LOG-..., DEC-...`
+   - `commit: LOG-...`
+   - `artifacts: UPS-..., DEC-..., RSH-...`
 
 ## Escalation Triggers
 

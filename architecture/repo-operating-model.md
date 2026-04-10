@@ -10,7 +10,7 @@ Superhuman's canonical managed surfaces now live at the repository root:
 - [`../INBOX.md`](../INBOX.md)
 - [`../research/README.md`](../research/README.md)
 - [`../records/decisions/README.md`](../records/decisions/README.md)
-- [`../records/agent-worklogs/README.md`](../records/agent-worklogs/README.md)
+- git commit history via commit-backed `LOG-*` records
 - [`../upstream-intake/README.md`](../upstream-intake/README.md)
 
 This file remains only as a compatibility pointer for older architecture-local references.
