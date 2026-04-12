@@ -1,104 +1,81 @@
-# Superhuman Repo Contract
+# Repo Operating Model
 
-This document is the canonical repo contract for Superhuman.
+This document is the canonical repo contract for repo-template-style repos.
 
 ## Purpose
 
-Superhuman uses the latest [`LPFchan/repo-template`](https://github.com/LPFchan/repo-template) as its canonical repo operating model.
+Use this model when a repo is managed by one operator plus many agents and you want the repo itself to remain legible over time.
 
-That means this repository is no longer using `architecture/` as an architecture-side draft of repo operating surfaces. The canonical repo-native surfaces now live at the repository root.
+The goal is simple:
 
-That same baseline is also the default way Superhuman should create, adopt, and manage other repos unless the operator explicitly approves a different local contract.
+- keep canonical truth in-repo
+- keep noisy activity out of truth docs
+- keep provenance explicit
+- let the orchestrator route work without inventing new storage rules each time
 
-The goal is to let Superhuman run as a long-lived project without losing coherence across:
-
-- public product identity
-- durable project truth
-- accepted future direction
-- exploratory research
-- explicit decisions
-- execution history
-- upstream intake
-
-## Canonical Managed-Repo Baseline
-
-For repos beyond Superhuman itself, the default rule is:
-
-- use the latest `LPFchan/repo-template` scaffold and operating rules as the baseline
-- keep a local `REPO.md` in each managed repo as that repo's canonical contract
-- preserve stronger repo-specific workflow rules, CI, commands, and product truth when merging the model into an existing repo
-- do not vendor template packaging blindly when the target repo already has real project structure
-- do not invent a bespoke repo-memory system when repo-template already fits the need
-
-Practical defaults:
-
-- New repo created by Superhuman:
-  - instantiate the current repo-template scaffold from the start
-  - seed `REPO.md`, `SPEC.md`, `STATUS.md`, `PLANS.md`, `INBOX.md`, `skills/README.md`, and the required repo-template procedure skills
-  - keep `upstream-intake/` active, dormant, or omitted based on the repo's real needs
-  - include `skills/upstream-intake/SKILL.md` when `upstream-intake/` is active
-- Existing repo adopted or managed by Superhuman:
-  - merge repo-template into the real repo with the smallest viable diff
-  - preserve stronger local rules and explicit product constraints
-  - keep repo-template procedure skills at repo-root `skills/`, merging with the repo's existing skill tree when it has one
-  - record intentional divergences in that repo's `REPO.md` or decision history
-
-## Relationship To Other Root Docs
-
-The root docs have different jobs on purpose:
-
-| Surface              | Role                                                  |
-| -------------------- | ----------------------------------------------------- |
-| `README.md`          | Public product front door                             |
-| `PROVENANCE.md`      | Legal and historical lineage                          |
-| `REPO.md`            | Canonical repo contract                               |
-| `SPEC.md`            | Durable truth about what Superhuman is supposed to be |
-| `STATUS.md`          | Current operational reality                           |
-| `PLANS.md`           | Accepted future direction                             |
-| `INBOX.md`           | Ephemeral intake waiting for routing                  |
-| `research/`          | Curated research worth future retrieval               |
-| `records/decisions/` | Durable decisions with rationale                      |
-| `git commit history` | Commit-backed execution history through `LOG-*` ids   |
-| `skills/`            | Required procedures for repeatable repo workflows     |
-| `upstream-intake/`   | Canonical upstream review and maintenance surface     |
-
-`README.md` stays public and product-facing.
-`PROVENANCE.md` stays separate because lineage is a permanent concern, not a subsection to hide inside another file.
+This file is part of the ready-to-copy scaffold for adopted repos.
 
 ## Core Surfaces
 
-Superhuman uses these root surfaces as its canonical project backbone:
+Every repo using this system should separate these surfaces:
 
-| Surface              | Role                                                              | Mutability                |
-| -------------------- | ----------------------------------------------------------------- | ------------------------- |
-| `SPEC.md`            | Durable statement of what Superhuman is supposed to be            | rewritten                 |
-| `STATUS.md`          | What is true right now operationally                              | rewritten                 |
-| `PLANS.md`           | Accepted future direction that is not current truth yet           | rewritten                 |
-| `INBOX.md`           | Ephemeral intake and unresolved routing items                     | append then purge         |
-| `research/`          | Curated research memos                                            | append by new file        |
-| `records/decisions/` | Durable decision records                                          | append-only by new file   |
-| `git commit history` | Canonical execution history through commit-backed `LOG-*` records | append-only by new commit |
-| `skills/`            | Required procedure skills for repeatable repo workflows           | edit by skill             |
-| `upstream-intake/`   | Canonical upstream intake, review, and escalation system          | append by cadence         |
+| Surface              | Role                                                                          | Mutability                |
+| -------------------- | ----------------------------------------------------------------------------- | ------------------------- |
+| `SPEC.md`            | Durable statement of what the project is supposed to be.                      | rewritten                 |
+| `STATUS.md`          | What is true right now operationally.                                         | rewritten                 |
+| `PLANS.md`           | Accepted future direction that is not current truth yet.                      | rewritten                 |
+| `INBOX.md`           | Ephemeral capture waiting for triage.                                         | append then purge         |
+| `research/`          | Curated research memos worth keeping.                                         | append by new file        |
+| `records/decisions/` | Durable decision records with rationale.                                      | append-only by new file   |
+| `git commit history` | Canonical execution history through structured commit-backed `LOG-*` records. | append-only by new commit |
+| `skills/`            | Required procedural workflows for repeatable agent tasks.                     | edit by skill             |
+| `upstream-intake/`   | Optional upstream review subsystem for repos that track an upstream.          | append by cadence         |
 
-## Procedure Skills
+## Agent Compatibility Files
 
-`skills/` is a required repo-native procedure layer.
+Some coding agents look for repo-root instruction files such as `AGENTS.md` or `CLAUDE.md`.
 
-In Superhuman, root `skills/` is also the existing skill catalog for assistant capabilities. Preserve that catalog. Add repo-template procedure skills beside it; do not move the tree under `scaffold/` and do not replace local skill packages with the template baseline.
+When a repo using this model includes them:
 
-Before running a repeatable repo workflow, read the relevant `skills/<name>/SKILL.md`, even if the current agent runtime does not auto-load repo skills.
+- they should act as entrypoints into the canonical rules, not competing policy documents
+- they should stay short enough that they do not drift from `REPO.md`
+- `AGENTS.md` should be the main editable agent-instructions file when both files exist
+- `CLAUDE.md` should be a thin shim that points to `AGENTS.md` when the tool supports it
+- `SKILL.md` stays separate because it defines a bounded reusable procedure, not repo-wide policy
+- `skills/` should ship with adopted repos as repo-native procedural documentation, even when the agent runtime does not auto-load skills
+- optional repo subsystems may have optional companion skills
 
-Required repo-template procedure skills:
+Recommended split:
 
-- `skills/repo-orchestrator/SKILL.md` for routing work into truth, status, plans, inbox, research, decisions, commit-backed execution history, upstream review, and commit provenance
-- `skills/daily-inbox-pressure-review/SKILL.md` for focus-protecting `INBOX.md`, `IBX-*`, and capture-packet triage
+- `REPO.md`
+  - canonical rules
+- `AGENTS.md`
+  - canonical editable agent-instructions file
+- `CLAUDE.md`
+  - Claude Code shim that points to `AGENTS.md`
+- `skills/<name>/SKILL.md`
+  - procedure for one repeatable workflow
 
-Conditional procedure skills active in this repo:
+## Artifact Writing Discipline
 
-- `skills/upstream-intake/SKILL.md` because Superhuman keeps root `upstream-intake/` active
+Macro structure is not enough on its own. Agents should not improvise document shape when the repo already defines one.
 
-`SKILL.md` files define bounded reusable procedures. Repo-wide policy stays in `REPO.md`; durable product truth stays in `SPEC.md`.
+When writing repo files or commit-backed execution records:
+
+- read the nearest canonical surface, directory `README.md`, and any explicit template before drafting
+- if the local `README.md` includes a default shape or canonical example, follow it by default
+- use the established section order only when the surface actually defines one and it helps the repo stay legible
+- write normalized repo records, not external transcripts or stream-of-consciousness notes
+- keep facts, decisions, open questions, and next steps clearly separated
+- summarize evidence and outcomes instead of pasting raw command output unless the literal output is the artifact
+- prefer short declarative bullets or paragraphs over vague filler
+
+When a directory exists to store a durable artifact type, it should ideally include:
+
+- a `README.md` that explains what belongs there
+- a default shape or canonical example inside that same `README.md` when that artifact type benefits from it
+
+That single guide helps future agents copy a house style instead of inventing one.
 
 ## Separation Rules
 
@@ -110,14 +87,13 @@ These boundaries are mandatory:
 - `INBOX.md` is not durable truth.
 - `research/` is not raw execution history.
 - `records/decisions/` is not the same as commit-backed execution history.
-- `README.md` is not the internal source of truth.
 - Off-Git memory is not a substitute for repo-local canonical docs.
 
-This separation exists so future operators and future agents can answer different questions quickly:
+That separation gives future operators and future agents fast answers to different questions:
 
-- What is Superhuman supposed to be? -> `SPEC.md`
+- What is the project? -> `SPEC.md`
 - What is true right now? -> `STATUS.md`
-- What future work is accepted? -> `PLANS.md`
+- What future work is actually accepted? -> `PLANS.md`
 - What did we learn from exploration? -> `research/`
 - What did we decide and why? -> `records/decisions/`
 - What actually happened during execution? -> git commit history via `commit: LOG-*`
@@ -141,7 +117,7 @@ It may:
 - create research memos
 - create decision records
 - create compliant commit-backed execution records
-- translate messenger intake into repo artifacts
+- translate external capture into repo artifacts
 - escalate non-obvious product, architecture, workflow, or policy calls
 
 ### Worker Agents
@@ -150,34 +126,108 @@ Worker agents execute bounded tasks.
 
 They may:
 
+- produce evidence, summaries, and implementation outputs
 - create compliant commit-backed execution records when granted commit authority
 - propose truth changes through the orchestrator
-- create evidence, summaries, and implementation outputs
 
 They should not update `SPEC.md`, `STATUS.md`, or `PLANS.md` directly unless the operator explicitly allows that flow.
 
-### Messenger Surfaces
+### External Capture Surfaces
 
-Messenger surfaces are intake and control channels.
+External capture surfaces are capture and control channels.
 
 They may:
 
-- create or append inbox intake
+- create or append inbox capture
 - request approvals
 - deliver summaries
 - surface blocked states
 
 They must not write truth docs directly.
 
-## Routing Ladder
+### Capture Packets
+
+Raw external source events are immutable Off-Git events.
+Do not treat every raw source event as a separate repo artifact.
+Do not treat a full external-tool history as one giant inbox item.
+
+Use capture packets as mutable working envelopes around one or more relevant raw source events.
+
+A capture packet may be:
+
+- appended as new related source events arrive
+- edited into a clearer operator-intent summary
+- split when it contains multiple independent asks
+- merged when several source events are one meaningful thread
+- summarized into `INBOX.md` as an `IBX-*`
+- routed into durable repo artifacts after triage
+
+Triage should happen per meaningful capture packet.
+Routed repo artifacts should copy a short summary, the stable inbox ID, and any needed external provenance handle instead of relying on raw external source staying visible.
+
+## Inbox Pressure Review
+
+`INBOX.md` is an ephemeral scratch disk for untriaged capture.
+It is not a backlog, roadmap, brainstorm archive, or project digest.
+
+Run a daily inbox pressure review when the project receives substantial capture.
+This review is focus-protecting triage.
+It is not an unconditional digest of every random idea.
+
+During the review:
+
+- group related `IBX-*` entries and capture packets into meaningful clusters
+- identify stale, duplicate, low-confidence, noisy, or "maybe later" capture
+- ask whether each meaningful cluster should route, research, plan, discard, or stay held
+- promote only items that survived triage and have an accepted destination
+- report counts or clusters of held, discarded, stale, or noisy capture instead of summarizing every low-signal item
+- preserve `IBX-*` as a permanent provenance ID even if the inbox line is deleted
+
+Do not update `SPEC.md`, `STATUS.md`, `PLANS.md`, `research/`, or `records/decisions/` directly from raw inbox pressure.
+The orchestrator or operator-approved routing step owns promotion.
+
+## Promotion Discipline
+
+Promotion should be sparse.
+Do not mirror one evolving thought into every repo surface.
+
+Raw shaping may stay in external capture, generic notes, off-Git capture packets, or `INBOX.md` while the thought is still forming.
+Repo artifacts are a refinery: each layer should receive only the part that belongs there, when it is ready.
+
+Use each layer for its distinct job:
+
+- `INBOX.md`
+  - ephemeral routed capture
+- `research/`
+  - reusable exploration, evidence, framing, rejected paths, and open questions
+- `records/decisions/`
+  - meaningful accepted choices and why the winning choice won
+- `PLANS.md`
+  - accepted future work that survived triage
+- `SPEC.md`
+  - concise durable product or system truth after the argument is settled
+- `STATUS.md`
+  - current operational reality
+- `upstream-intake/`
+  - upstream review, upstream conflict, carry-forward, and operator escalation for upstream-related choices
+- git commit history via `commit: LOG-*`
+  - canonical execution history, not truth, decision, plan, or research mirrors
+
+A research memo may remain research forever.
+A decision record should exist only when a real product, architecture, workflow, trust, upstream, or repo-operating choice has been made.
+`SPEC.md`, `STATUS.md`, and `PLANS.md` should receive concise outcomes, not copied debate.
+
+One task may touch multiple layers, but each touched layer must have its own distinct job.
+
+## Orchestrator Routing Ladder
 
 When new work arrives, the orchestrator should classify it in this order:
 
-1. Is this untriaged intake?
+1. Is this untriaged capture?
    - Route to `INBOX.md`.
 2. Is this recurring upstream review?
    - Route to `upstream-intake/`.
-3. Is this durable truth about what Superhuman is?
+3. Is this durable truth about what the project is?
    - Route to `SPEC.md`.
 4. Is this current operational reality?
    - Route to `STATUS.md`.
@@ -187,85 +237,47 @@ When new work arrives, the orchestrator should classify it in this order:
    - Route to `research/`.
 7. Is this a meaningful decision with rationale?
    - Route to `records/decisions/`.
-8. Is this execution history?
+8. Is this implementation or execution that should land in git history?
    - Route to a compliant commit-backed `LOG-*` record.
 
-One task may legitimately touch multiple layers.
+One task may legitimately touch multiple layers. For example:
 
-Examples:
-
-- a research session can create `RSH-*` plus `LOG-*`
+- a research session can create `RSH-*` plus a committed `LOG-*`
 - a product choice can create `DEC-*` and update `PLANS.md`
-- implementation progress can append `LOG-*` and update `STATUS.md`
+- implementation progress can create a committed `LOG-*` and update `STATUS.md`
 
-## Promotion Discipline
-
-Do not mirror the same messy thought into every durable surface.
-
-Prefer this refinery:
-
-1. conversation, messenger, generic chat, or capture packet for raw shaping
-2. `INBOX.md` for ephemeral routed intake waiting for triage
-3. `research/` for reusable exploration, evidence, framing, rejected paths, and open questions
-4. `records/decisions/` for a meaningful accepted choice and why that choice won
-5. `PLANS.md` for accepted future work that survived triage
-6. `SPEC.md` for concise durable system or product truth after the argument is settled
-7. `STATUS.md` for current operational reality
-8. `upstream-intake/` only for recurring upstream review, carry-forward, upstream conflict, and operator escalation
-
-Promotion should be sparse. A research memo may stay as research forever. A decision record should exist only when a real product, architecture, workflow, trust, upstream, or repo-operating choice is made. `SPEC.md`, `STATUS.md`, and `PLANS.md` should receive concise outcomes, not copied debate.
+Touch multiple layers only when each layer receives distinct information.
+Do not copy the same evolving thought into research, decision, plan, spec, status, upstream, and execution surfaces.
 
 ## Write Rules
 
 - `SPEC.md`, `STATUS.md`, and `PLANS.md` should be updated only by the operator or orchestrator.
-- `INBOX.md` is an aggressive scratch disk. Purge entries once they are reflected elsewhere.
+- `INBOX.md` is an aggressive scratch disk. Purge entries once they are reflected elsewhere or explicitly discarded.
+- Daily inbox review should reduce pressure by clustering, routing, holding, or purging capture; it should not generate a larger digest by default.
 - `research/` keeps curated findings only.
 - `records/decisions/` is append-only by new decision file.
 - Routine execution history lives in git commit history through commit-backed `LOG-*` records.
 - Do not invent a parallel execution-history file layer.
 - If work produces no durable repo change, route only the durable outcome that belongs elsewhere or keep the raw trace Off-Git.
-- `upstream-intake/` keeps paired internal-record and operator-brief artifacts under a shared `UPS-*` review id.
-- Truth docs reflect the latest accepted state, not every intermediate thought.
-
-## Execution Record Reuse Policy
-
-Do not create a new `LOG-*` just because a new commit exists.
-
-Prefer reusing the current primary `LOG-*` when:
-
-- the same workstream is continuing
-- the same execution thread is still in scope
-- `--amend` or `rebase` preserves clearer provenance
-
-Create a new primary `LOG-*` only when:
-
-- the work is materially distinct from the current record's scope
-- a separate agent or subagent owns a clearly separate execution thread
-- reuse would make provenance harder to follow
-- a separate execution record would improve future retrieval
+- `upstream-intake/` should preserve its own paired internal-record and operator-brief workflow.
+- Truth docs should reflect the latest accepted state, not every intermediate thought.
 
 ## Stable IDs
 
 This model assumes:
 
 - `project-id` identifies the repo or workspace
-- `agent-id` identifies one user-facing agent conversation
-- `run-id` identifies one bounded execution episode inside an agent conversation
-- one agent conversation may contain multiple runs
+- `agent-id` identifies the conversation or actor lineage that originated the artifact or commit
 - subagents receive their own `agent-id`
-- Off-Git systems resolve parent-child lineage, messages, events, and commit history from `agent-id`
-
-For Superhuman, the project id is:
-
-- `superhuman`
+- Off-Git systems resolve runs, child lineage, messages, events, and commit history from `agent-id`
 
 Recommended prefixes:
 
 - `IBX-YYYYMMDD-NNN`
 - `RSH-YYYYMMDD-NNN`
 - `DEC-YYYYMMDD-NNN`
-- `UPS-YYYYMMDD-NNN`
 - `LOG-YYYYMMDD-HHMMSS-<agent-suffix>`
+- `UPS-YYYYMMDD-NNN`
 
 File-backed artifact numbering is per day and per artifact type. Any agent may claim the next file-backed `NNN` by checking the least available value.
 
@@ -285,12 +297,6 @@ When claiming a new `LOG-*` id:
 - start from the current KST timestamp plus the derived agent suffix
 - scan the current branch and the default branch for existing `commit:` values
 - if the candidate id already exists, bump the timestamp forward by one second until it is unique
-
-When provenance includes external source material:
-
-- prefer canonical source URLs for public web content, posts, issues, docs, or releases
-- do not use local download/export/cache paths as the primary provenance link when the original source URL is known
-- local files may be mentioned as supporting evidence only when needed for reproducibility or when no stable public URL exists
 
 ## Commit-Backed Execution Records
 
@@ -354,9 +360,9 @@ Body rules:
 
 ## Commit-Time Enforcement
 
-If the repo enables commit hooks, every attempted commit should be checked against these provenance rules.
+Repos using this system must enforce these provenance rules both locally and remotely.
 
-Recommended minimum enforcement:
+Required minimum enforcement:
 
 - reject commits that do not include `project:`, `agent:`, `role:`, and `commit:`
 - reject roles outside `orchestrator|worker|subagent|operator`
@@ -365,15 +371,48 @@ Recommended minimum enforcement:
 - reject any `artifacts:` value that includes `LOG-*`
 - reject commits that do not include the required body keys and list items
 - reject duplicate `LOG-*` ids on the current branch or default branch
+- allow explicit bootstrap or migration exceptions
 
 The goal is not perfect policy automation. The goal is to stop obviously non-compliant commits before they land.
 
-## Superhuman-Specific Notes
+Required enforcement layers:
 
-- Superhuman is single-operator-first.
-- Repo-local canonical truth lives in versioned docs.
-- Off-Git operational memory keeps chat history, messenger traffic, and transient context.
-- For repos Superhuman creates, adopts, or manages, the latest `LPFchan/repo-template` baseline is canonical unless the operator explicitly approves a different local contract.
-- The current public product is still a personal AI assistant across channels, devices, and control surfaces.
-- The deeper Superhuman direction is a durable project workspace with repo-native memory, orchestrated agent work, and synchronized access across desktop and mobile.
-- That deeper direction belongs in `SPEC.md` and `PLANS.md`, not only in chat.
+- local git hooks for fast feedback before the commit is created
+- CI for remote re-validation on push or pull request
+
+Every landed commit on the default branch must satisfy the same contract regardless of whether it came from the CLI, a merge queue, a bot, or a web UI.
+If a landing path cannot produce compliant commit messages, the repo should not use that landing path.
+
+## Off-Git Provenance
+
+Repo artifacts stay lightweight on purpose.
+
+In-repo provenance answers:
+
+- what file-backed artifact this is
+- when it was opened
+- which agent recorded it
+- which `LOG-*` execution ids belong to each commit
+
+The Off-Git runtime should answer:
+
+- which conversation or actor lineage the `agent-id` maps to
+- which exact run inside that lineage produced the commit or artifact
+- whether the agent was top-level or a subagent
+- which source events produced the artifact
+- how execution lineage maps across rebases, cherry-picks, merges, and absorbed `LOG-*` ids
+
+## Scaffold Rule
+
+`scaffold/` is a ready-to-copy repo skeleton, not a loose library of files to cherry-pick casually.
+
+Use it when you want a managed repo to share one canonical layout so humans and agents know exactly where work belongs.
+
+In this template, scaffold files live under `scaffold/`.
+After adoption, the scaffold contents belong at the target repo root.
+For example, `scaffold/skills/repo-orchestrator/SKILL.md` becomes `skills/repo-orchestrator/SKILL.md` in the adopted repo.
+
+## Local Divergence
+
+- Superhuman is a repo-template-managed fork that still preserves explicit OpenClaw lineage and compatibility commitments.
+- Superhuman-specific operating details live in `AGENTS.md`; the active repo hook path is `.githooks/`, configured by `scripts/install-hooks.sh` and `package.json`, with remote revalidation in `.github/workflows/commit-standards.yml`.

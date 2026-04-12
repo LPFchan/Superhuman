@@ -1,7 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export const DEFAULT_OPEN_SHELL_MIRROR_EXCLUDE_DIRS = ["hooks", "git-hooks", ".git"] as const;
+export const DEFAULT_OPEN_SHELL_MIRROR_EXCLUDE_DIRS = [
+  "hooks",
+  "git-hooks",
+  ".githooks",
+  ".git",
+] as const;
 const COPY_TREE_FS_CONCURRENCY = 16;
 
 function createExcludeMatcher(excludeDirs?: readonly string[]) {

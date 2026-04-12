@@ -102,6 +102,8 @@ describe("replaceDirectoryContents", () => {
     await fs.writeFile(path.join(source, "hooks", "pre-commit"), "malicious");
     await fs.mkdir(path.join(source, "git-hooks"), { recursive: true });
     await fs.writeFile(path.join(source, "git-hooks", "pre-commit"), "malicious");
+    await fs.mkdir(path.join(source, ".githooks"), { recursive: true });
+    await fs.writeFile(path.join(source, ".githooks", "commit-msg"), "malicious");
     await fs.mkdir(path.join(source, ".git", "hooks"), { recursive: true });
     await fs.writeFile(path.join(source, ".git", "hooks", "post-checkout"), "malicious");
     await fs.writeFile(path.join(source, "safe.txt"), "ok");
@@ -110,6 +112,8 @@ describe("replaceDirectoryContents", () => {
     await fs.writeFile(path.join(target, "hooks", "trusted"), "trusted");
     await fs.mkdir(path.join(target, "git-hooks"), { recursive: true });
     await fs.writeFile(path.join(target, "git-hooks", "trusted"), "trusted");
+    await fs.mkdir(path.join(target, ".githooks"), { recursive: true });
+    await fs.writeFile(path.join(target, ".githooks", "trusted"), "trusted");
     await fs.mkdir(path.join(target, ".git"), { recursive: true });
     await fs.writeFile(path.join(target, ".git", "HEAD"), "ref: refs/heads/main\n");
 
@@ -122,6 +126,7 @@ describe("replaceDirectoryContents", () => {
     expect(await fs.readFile(path.join(target, "safe.txt"), "utf8")).toBe("ok");
     expect(await fs.readFile(path.join(target, "hooks", "trusted"), "utf8")).toBe("trusted");
     expect(await fs.readFile(path.join(target, "git-hooks", "trusted"), "utf8")).toBe("trusted");
+    expect(await fs.readFile(path.join(target, ".githooks", "trusted"), "utf8")).toBe("trusted");
     expect(await fs.readFile(path.join(target, ".git", "HEAD"), "utf8")).toBe(
       "ref: refs/heads/main\n",
     );

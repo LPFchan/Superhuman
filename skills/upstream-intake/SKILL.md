@@ -61,7 +61,7 @@ Use it when a downstream fork needs a repeatable review of upstream changes.
    - `agent: <agent-id>`
    - `role: orchestrator|worker|subagent|operator`
    - `commit: LOG-...`
-   - `artifacts: UPS-..., DEC-..., RSH-...`
+   - optional `artifacts: UPS-..., DEC-...`
 
 ## Escalation Triggers
 
@@ -80,3 +80,7 @@ Escalate instead of guessing when the change:
 - explicit compatibility details
 - clear autonomous-vs-operator split
 - recommendations grounded in current fork policy and architecture
+
+## Local Divergence
+
+- If Git commits happen as part of the intake or merge follow-up, `artifacts:` may include `UPS-*`, `DEC-*`, and `RSH-*`.

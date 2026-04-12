@@ -20,6 +20,11 @@ is_all_zero_oid() {
 
 commit_has_enforcement_marker() {
   commit=$1
+  if git -C "$repo_root" cat-file -e "$commit:.githooks/commit-msg" 2>/dev/null &&
+    git -C "$repo_root" cat-file -e "$commit:scripts/check-commit-standards.sh" 2>/dev/null; then
+    return 0
+  fi
+
   git -C "$repo_root" cat-file -e "$commit:git-hooks/commit-msg" 2>/dev/null &&
     git -C "$repo_root" cat-file -e "$commit:scripts/check-commit-standards.sh" 2>/dev/null
 }
