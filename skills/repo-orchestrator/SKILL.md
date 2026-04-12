@@ -74,6 +74,7 @@ Use this skill with:
    - `artifacts:` is optional and must not contain `LOG-*`
    - Make the commit message pass the required local validator before retrying.
    - Use the structured body keys `timestamp:`, `changes:`, `rationale:`, and `checks:` with `notes:` optional.
+   - If you are migrating legacy markdown `LOG-*` history, prefer amending or rebasing the real unpublished commits so the landed commits carry those ids; do not create standalone empty backfill commits on the main history path.
 
 8. If the task is recurring upstream maintenance and the optional module is enabled, use `upstream-intake/` instead of inventing a parallel workflow.
 

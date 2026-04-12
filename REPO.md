@@ -319,6 +319,9 @@ Rules:
 - Every merge commit must mint its own primary `LOG-*`.
 - When child commits remain visible as landed history, mention child `LOG-*` ids in `notes:` instead of reusing them in `commit:`.
 - `--amend` and `rebase` should preserve existing `LOG-*` ids.
+- When migrating legacy markdown `LOG-*` history and the corresponding commits are still unpublished, rewrite those real commits in place so the landed commits carry the legacy execution ids.
+- Do not add standalone empty "backfill legacy LOG" commits to normal history just to mirror older markdown execution records.
+- If a legacy `LOG-*` record cannot be attached cleanly without rewriting published history, keep it as a legacy or exception record until an operator-approved migration path exists.
 - If cherry-pick relocates work and the original commit will not also land, keep the same primary `LOG-*`.
 - If both original and cherry-picked commits could land, the later commit must mint a new primary `LOG-*`; source `LOG-*` ids may be mentioned only in `notes:`.
 - If a collision is discovered before landing, the later branch renumbers before merge.

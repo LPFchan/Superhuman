@@ -8,12 +8,11 @@ script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
 repo_root=$(git rev-parse --show-toplevel)
 
 usage() {
-  printf 'Usage: %s [--force] [--allow-empty] [--project id] [--agent id] [--role role] [--artifacts ids] "commit subject" "file" ["file" ...]\n' "$(basename "$0")" >&2
+  printf 'Usage: %s [--force] [--project id] [--agent id] [--role role] [--artifacts ids] "commit subject" "file" ["file" ...]\n' "$(basename "$0")" >&2
   exit 2
 }
 
 force_delete_lock=false
-allow_empty=false
 project=${COMMIT_PROJECT:-superhuman}
 agent=${COMMIT_AGENT:-${CODEX_THREAD_ID:-}}
 role=${COMMIT_ROLE:-orchestrator}
@@ -28,10 +27,6 @@ while [ "$#" -gt 0 ]; do
   case "${1:-}" in
     --force)
       force_delete_lock=true
-      shift
-      ;;
-    --allow-empty)
-      allow_empty=true
       shift
       ;;
     --project)
@@ -85,7 +80,8 @@ if [ -e "$commit_subject" ]; then
   exit 1
 fi
 
-if [ "$#" -eq 0 ] && [ "$allow_empty" = false ]; then
+if [ "$#" -eq 0 ]; then
+  printf 'Error: at least one path is required; rewrite or amend the real commit instead of creating an empty backfill commit\n' >&2
   usage
 fi
 
@@ -431,7 +427,7 @@ if [ "${#files[@]}" -gt 0 ]; then
   run_git_with_lock_retry "staging files" git add --force -- "${files[@]}"
 fi
 
-if git diff --staged --quiet && [ "$allow_empty" = false ]; then
+if git diff --staged --quiet; then
   printf 'Warning: no staged changes detected for: %s\n' "${files[*]}" >&2
   exit 1
 fi
@@ -467,9 +463,6 @@ fi
 
 committed=false
 commit_args=(-F "$commit_message_file")
-if [ "$allow_empty" = true ]; then
-  commit_args+=(--allow-empty)
-fi
 if [ "${#files[@]}" -gt 0 ]; then
   commit_args+=(-- "${files[@]}")
 fi

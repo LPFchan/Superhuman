@@ -64,6 +64,10 @@ function lastCommitMessage(repo: string) {
   return git(repo, "log", "-1", "--format=%B", "HEAD");
 }
 
+function lastCommitSha(repo: string) {
+  return git(repo, "rev-parse", "HEAD");
+}
+
 afterEach(() => {
   while (tempRepos.length > 0) {
     const repo = tempRepos.pop();
@@ -149,5 +153,14 @@ describe("scripts/committer", () => {
     expect(message).toContain("agent: abc123");
     expect(message).toContain("role: orchestrator");
     expect(message).toMatch(/commit: LOG-\d{8}-\d{6}-abc123/);
+  });
+
+  it("rejects empty backfill-style commits without file paths", () => {
+    const repo = createRepo();
+    const before = lastCommitSha(repo);
+
+    expect(() => commitWithHelper(repo, "chore: backfill legacy LOG-20260409-001")).toThrow();
+
+    expect(lastCommitSha(repo)).toBe(before);
   });
 });

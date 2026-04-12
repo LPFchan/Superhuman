@@ -33,6 +33,7 @@ When writing into an artifact directory, read that directory's `README.md` first
 - Your pushed commits must satisfy the same provenance rules remotely in CI.
 - Treat each committed change as a canonical execution record through `commit: LOG-*`.
 - Normal commits must use the structured body keys `timestamp:`, `changes:`, `rationale:`, and `checks:` with `notes:` optional.
+- When migrating legacy `LOG-*` history, rewrite the real unpublished commits or preserve the legacy exception record; do not add standalone backfill-only commits to the visible history.
 
 ## Enforcement
 
