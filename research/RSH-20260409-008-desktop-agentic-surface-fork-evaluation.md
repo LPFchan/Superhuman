@@ -8,7 +8,7 @@ Recorded by agent: 019d6f5a-4b00-7390-a9c6-4527c1baa692
 - Status: in progress
 - Question: Which forkable desktop or desktop-adjacent agentic workspace surface is the best next substrate for Superhuman's desktop-first project cockpit?
 - Trigger: operator requested a desktop-first fork evaluation after checkpointing the cross-surface IA and state model
-- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013
+- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013, IBX-20260412-002
 - Scope: desktop GUI / operator cockpit; source/readme/license/health review; light local smoke; API seam and client-shell fit
 - Out of scope: choosing the coding harness; final screen IA; mobile fork search; messenger fork search; accepting a fork candidate
 
@@ -33,6 +33,7 @@ Current bias:
 - Treat `coollabsio/jean` as the strongest remote/mobile desktop-shell lead from the supplementary pass, pending verification.
 - Treat `pingdotgg/t3code` as the minimal external-agent GUI lead from the supplementary pass.
 - Treat `anomalyco/opencode` as a fresh active OpenCode lead; do not confuse it with archived `opencode-ai/opencode`.
+- Treat `microsoft/vscode` as a newly strengthened contender after the reported Insiders `Agent Mode` shift, but only if direct verification shows a workable seam between the IDE substrate and a Superhuman-owned workspace/runtime layer.
 
 ## Product Boundary
 
@@ -176,13 +177,38 @@ Use these as mechanic/product references only.
 
 - `opencode-ai/opencode`: archived/moved; this rejection applies only to the archived repo.
 - `voideditor/void`: paused IDE work and VS Code-fork weight.
-- `microsoft/vscode`: too low-level / editor-first unless the whole product direction changes.
 - `zed-industries/zed`: too much editor substrate and mixed/copyleft-license risk for a chat-first cockpit.
 - `charmbracelet/crush`: useful reference, but do not fork in this wave because of FSL license posture.
 
 ## Watch
 
 - Helmor: announced 2026-04-08 by @caspian_1016 / GitHub `dohooo` per handoff. Claimed upcoming open-source agent orchestration IDE and one-click migration from Conductor. No source released as of the 2026-04-10 supplementary handoff.
+
+## New Signal: VS Code Agent Mode Pressure
+
+- Provenance: `IBX-20260412-002`
+- Source: `https://x.com/laogui/status/2041497562574926216`
+- Status: reference signal only; not direct verification of a fork candidate
+
+What the signal says:
+
+- A referenced 2026-04-07 post claims VS Code Insiders is developing a new `Agent Mode` with a simplified agent-oriented layout rather than staying purely editor-first.
+- The reported shape converges on the same multi-pane agent-manager pattern already appearing elsewhere: task list on the left, execution surface in the middle, and change preview plus file management on the right.
+- The reported runtime mix matters because it combines local interaction, background agent execution, and cloud-connected modes while keeping Git, terminal, and multi-workspace affordances nearby.
+
+Why this matters to Superhuman:
+
+- It strengthens the "build down from a mature IDE substrate" side of the substrate debate. If VS Code itself is moving toward a simplified agent cockpit, the line between IDE and agent manager may keep collapsing.
+- More importantly, it changes the competitive question. The issue is not just whether an IDE substrate can be reduced into an agent cockpit, but how mature VS Code's own agent-mode evolution already is compared with agent-native frontends that started earlier.
+- The key product question is no longer only "IDE fork or not." It is whether VS Code's agent-mode movement is already mature enough to rival or surpass the newer agent-focused frontends on the specific surfaces Superhuman cares about.
+
+Current read:
+
+- Upgrade VS Code's agent-mode evolution from background context to an active contender in the build-up versus build-down question.
+- Treat the Insiders shift as a real change in landscape, not just a curiosity: it materially improves the case for forking or heavily borrowing from VS Code compared with the earlier read.
+- The next evaluation pressure is maturity, not prejudice. Compare VS Code's agent-mode completeness, coherence, and likely velocity against the agent-first frontends that had a head start on this archetype.
+- Seam quality still matters, but mainly as a second-order question after maturity: if VS Code is catching up quickly enough on the agent-manager shape, then the remaining issue is whether Superhuman can adapt that surface without losing ownership of runtime state and product direction.
+- Treat this as pressure on the evaluation model: a candidate no longer wins merely by being thinner than VS Code. It also has to explain why it beats an increasingly agent-native VS Code path on work focus, surface maturity, replaceable state boundaries, and Superhuman-owned runtime seams.
 
 ## Verified In This Research Lane
 
@@ -233,6 +259,8 @@ Replace with Superhuman-native primitives:
 
 - Does Superhuman's local or remote workspace server already expose a clean HTTP/WebSocket API that a forked desktop shell can wire to?
 - Is the first desktop artifact a packaged web shell, Electron app, Tauri app, native Mac app, or candidate-derived client?
+- How mature is VS Code's own agent-mode movement relative to the agent-first frontends that had a head start, and is it already mature enough to justify treating VS Code as a top-tier fork or borrowing candidate?
+- If VS Code is now a strong contender, what is the smallest acceptable fork or adaptation seam: custom workbench surface, extension-host-first product, narrowed distribution, or a deeper product fork?
 - Does mobile sync happen through direct workspace-server connection, Superhuman cloud/gateway, a self-hosted relay, local-network pairing, or several modes?
 - Which candidate has the cleanest replaceable client after source verification: OpenHands, OpenWork, Jean, T3 Code, active OpenCode, or a smaller shell?
 - Which candidate has the best mechanic to steal, even if it is not the fork substrate?
