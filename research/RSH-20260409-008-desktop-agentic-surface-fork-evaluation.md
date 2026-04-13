@@ -8,7 +8,7 @@ Recorded by agent: 019d6f5a-4b00-7390-a9c6-4527c1baa692
 - Status: in progress
 - Question: Which forkable desktop or desktop-adjacent agentic workspace surface is the best next substrate for Superhuman's desktop-first project cockpit?
 - Trigger: operator requested a desktop-first fork evaluation after checkpointing the cross-surface IA and state model
-- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013, IBX-20260410-001, IBX-20260412-002, IBX-20260413-001, IBX-20260413-002
+- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013, IBX-20260410-001, IBX-20260412-002, IBX-20260413-001, IBX-20260413-002, IBX-20260413-003
 - Scope: desktop GUI / operator cockpit; source/readme/license/health review; light local smoke; API seam and client-shell fit
 - Out of scope: choosing the coding harness; final screen IA; mobile fork search; messenger fork search; accepting a fork candidate
 
@@ -126,6 +126,8 @@ Local State Thickness is inverted: `1` is thin/easier to replace, `5` is thick/h
 
 ## Secondary Fork Candidates / References
 
+- `milisp/codexia`: verify carefully. Public TypeScript desktop workstation for Codex CLI and Claude Code, positioning around task scheduling, git worktrees, remote control, skills management, and MCP-client posture. Strong operator-workstation candidate, but AGPL-3.0 posture makes fork viability sensitive.
+- `jasonkneen/codesurf`: verify carefully. Public Electron/React spatial desktop shell positioned as an `infinite canvas workspace for AI agents and developers`, combining terminals, chats, editors, browsers, notes, boards, extensions, local MCP support, and project-scoped workspace state. Strong spatial-orchestration reference and possible candidate, but AGPL-3.0 posture makes fork viability sensitive.
 - `flazouh/acepe`: verify carefully. Public Tauri/Svelte/ACP desktop client positioning itself as `The Agentic Developer Environment`, with parallel sessions and a unified shell for Claude Code, Codex, Cursor Agent, OpenCode, and other ACP-compatible agents. Strong external-agent desktop-shell candidate, but current GitHub metadata reports `NOASSERTION` license despite open-source positioning.
 - `collaborator-ai/collab-public`: verify carefully. Active public repo with strong adoption signal and topics around agents, Claude Code, Codex CLI, IDE, and terminal. The public description is broad (`a place to create with agents`), so the real desktop-surface fit and license posture still need validation before it moves up the list.
 - `wygoralves/panes`: verify. Public MIT Tauri v2 desktop app explicitly framed as a local-first cockpit for AI-assisted coding, with external-agent chat, approvals, diffs, multi-repo awareness, trust levels, git/worktree operations, terminal pane groups, harness detection, and optional one-worktree-per-session multi-launch. Strong operator-cockpit-shaped candidate.
@@ -283,7 +285,7 @@ Working conclusion:
 ## Next Work
 
 1. Define or discover Superhuman's desktop/mobile workspace-server API.
-2. Verify source/license/API/readme for OpenWork, Jean, Panes, Acepe, collab-public, Athas, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, active OpenCode, Arbor, Finite, and Kanna.
+2. Verify source/license/API/readme for OpenWork, Jean, Panes, Codexia, CodeSurf, Acepe, collab-public, Athas, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, active OpenCode, Arbor, Finite, and Kanna.
 3. Re-score only after verification; keep handoff-only rows marked as handoff-only until then.
 4. Run the desktop-server mock spike against one or two candidates.
 5. Create a `DEC-*` only after accepting a desktop substrate, reference mechanic, or explicit "build native" strategy.
