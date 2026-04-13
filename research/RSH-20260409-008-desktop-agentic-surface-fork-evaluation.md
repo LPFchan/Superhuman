@@ -8,7 +8,7 @@ Recorded by agent: 019d6f5a-4b00-7390-a9c6-4527c1baa692
 - Status: in progress
 - Question: Which forkable desktop or desktop-adjacent agentic workspace surface is the best next substrate for Superhuman's desktop-first project cockpit?
 - Trigger: operator requested a desktop-first fork evaluation after checkpointing the cross-surface IA and state model
-- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013, IBX-20260412-002
+- Related ids: RSH-20260409-006, RSH-20260409-007, RSH-20260409-009, DEC-20260409-007, LOG-20260409-012, LOG-20260409-013, IBX-20260410-001, IBX-20260412-002, IBX-20260413-001, IBX-20260413-002
 - Scope: desktop GUI / operator cockpit; source/readme/license/health review; light local smoke; API seam and client-shell fit
 - Out of scope: choosing the coding harness; final screen IA; mobile fork search; messenger fork search; accepting a fork candidate
 
@@ -126,6 +126,10 @@ Local State Thickness is inverted: `1` is thin/easier to replace, `5` is thick/h
 
 ## Secondary Fork Candidates / References
 
+- `flazouh/acepe`: verify carefully. Public Tauri/Svelte/ACP desktop client positioning itself as `The Agentic Developer Environment`, with parallel sessions and a unified shell for Claude Code, Codex, Cursor Agent, OpenCode, and other ACP-compatible agents. Strong external-agent desktop-shell candidate, but current GitHub metadata reports `NOASSERTION` license despite open-source positioning.
+- `collaborator-ai/collab-public`: verify carefully. Active public repo with strong adoption signal and topics around agents, Claude Code, Codex CLI, IDE, and terminal. The public description is broad (`a place to create with agents`), so the real desktop-surface fit and license posture still need validation before it moves up the list.
+- `wygoralves/panes`: verify. Public MIT Tauri v2 desktop app explicitly framed as a local-first cockpit for AI-assisted coding, with external-agent chat, approvals, diffs, multi-repo awareness, trust levels, git/worktree operations, terminal pane groups, harness detection, and optional one-worktree-per-session multi-launch. Strong operator-cockpit-shaped candidate.
+- `athasdev/athas`: verify carefully. Public Tauri/Rust/React editor with Git, AI agents, vim bindings, LSP, integrated terminal, SQLite viewer, and enterprise policy controls. Looks more like a lighter IDE substrate than a pure agent cockpit. README advertises AGPL-3.0 while GitHub metadata reports `Other` or `NOASSERTION`, so verify actual license posture before treating it as a serious fork candidate.
 - `stablyai/orca`: verify. Handoff says cross-platform worktree-native IDE for Claude Code/Codex/OpenCode, with file editor, diff review, PR/CI, notifications, split terminals, and `orca-cli` skill that agents can use to control the IDE.
 - `generalaction/emdash`: verify. Handoff says cross-platform desktop operator shell for 23 CLI agents including Hermes Agent, SSH/SFTP remote dev, ticket intake, local SQLite, no code sent to Emdash servers.
 - `alltuner/factoryfloor`: verify. Handoff says MIT macOS Swift app using Ghostty's GPU terminal engine, lifecycle scripts, tmux-persisted Claude sessions, embedded browser auto-port detection, PR/CI per worktree.
@@ -142,6 +146,9 @@ Local State Thickness is inverted: `1` is thin/easier to replace, `5` is thick/h
 
 ## First-Pass References
 
+- Agent Sessions: https://jazzyalex.github.io/agent-sessions/ ; minimal macOS `Agent Cockpit` reference, positioned around improving workflows across multiple CLI agents rather than replacing them with a full ADE.
+- Cline Kanban: https://cline.bot/kanban ; kanban-first orchestration reference for coding agents, emphasizing board-driven planning, agent assignment, and review flow rather than a traditional IDE shell.
+- Vibe Kanban: https://vibekanban.com/ ; adjacent kanban-first orchestration reference with similar emphasis on planning, review, and multi-agent task flow.
 - Conductor: https://www.conductor.build/ ; https://docs.conductor.build/ ; closed Mac reference for teams of Codex/Claude agents, isolated workspaces/worktrees, diff/scripts/tests/todos/MCP/slash/checkpoint/review/merge flows.
 - Letta GUI / state inspector: https://docs.letta.com/ ; https://github.com/letta-ai/letta ; https://github.com/letta-ai/letta-code ; reference for stateful agent/memory inspection. Full Letta system belongs in RSH-009.
 - Dyad: https://github.com/dyad-sh/dyad ; Electron/React desktop app-builder shell; useful packaging/state/code-surface donor; keep away from `src/pro` unless the operator accepts that license island.
@@ -156,6 +163,11 @@ Local State Thickness is inverted: `1` is thin/easier to replace, `5` is thick/h
 
 Use these as mechanic/product references only.
 
+- Superconductor: https://super.engineering/ ; closed native agent-engineering reference, notable for explicit `No Electron. No Tauri. 100% Rust.` positioning and as a signal that native-performance differentiation is becoming more contested as more rivals move toward native agent shells.
+- Maestri: https://www.themaestri.app/ ; closed native macOS spatial terminal-canvas reference for coordinating multiple coding agents, notable for agent-to-agent links, sketching, notes, reusable roles, and a strong local-native posture.
+- Axel: https://www.axel.build/ ; closed Apple-platform queue-first reference for dispatching parallel coding-agent work, approvals, portable skills, worktrees, and persistent tmux or terminal sessions.
+- Nora: https://www.withnora.run/ ; closed or at least source-unconfirmed reference for a CLI-first agentic development workspace centered on local agents, isolated worktrees, specs, tasks, remote repos, and human-reviewed flows.
+- Air: https://air.dev/ ; closed JetBrains reference for an `Agentic Development Environment` where Codex, Claude Agent, Gemini CLI, and Junie run independent task loops without interfering with each other. Important because it marks a serious IDE-vendor entry into the same emerging category.
 - Cursor: closed IDE-side reference; also a performance/harness reference for RSH-009.
 - Codex desktop: closed chat-first portfolio-sidebar / home-prompt reference.
 - Conductor: closed reference, not fork target unless source/license appears.
@@ -247,10 +259,31 @@ Replace with Superhuman-native primitives:
 - messenger capture/status/read integration
 - repo-template adoption, research, decisions, worklogs, upstream-intake, truth/status/plans reflection
 
+## What Actually Warrants A Fork
+
+The strongest reason for a separate fork or original desktop work is not "Superhuman needs its own editor."
+
+The stronger question is whether a candidate can host Superhuman's actual product contract without fighting it.
+
+The current high-signal fork triggers are:
+
+- a Superhuman-owned desktop <-> workspace-server contract where local and remote are the same product mode rather than separate local-first and cloud modes
+- the cross-surface state model: `agent-id`, `run-id`, subagent lineage, approval state, off-Git transcript memory, and shared desktop/mobile state
+- the work-item and operator-cockpit model where the top-level object is the project workspace and the main attention object is a visible unit of intent rather than just a chat thread or terminal
+- repo-native memory and routing as core product behavior rather than sidecar notes: inbox capture, research, decisions, status, plans, upstream intake, and orchestrator proposals
+- Superhuman's operator-control verbs and semantics: `steer`, `interrupt`, `stop`, `resume`, `revert`, `fork`, and `handoff`
+- a desktop IA where manual editing exists but is second-class, and file or editor surfaces appear contextually rather than as the front door
+
+Working conclusion:
+
+- Superhuman probably does not need a separate fork merely to get agents, diffs, terminals, worktrees, or a multi-pane UI.
+- Superhuman may need a separate fork or original layer if the candidate cannot preserve the workspace-server contract, provenance/state model, repo-memory routing model, and work-item/operator-cockpit semantics without turning those into awkward bolt-ons.
+- The most likely thing Superhuman needs to build itself is the protocol and product-state layer on top of a borrowed shell, not a brand-new editor engine by default.
+
 ## Next Work
 
 1. Define or discover Superhuman's desktop/mobile workspace-server API.
-2. Verify source/license/API/readme for OpenWork, Jean, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, active OpenCode, Arbor, Finite, and Kanna.
+2. Verify source/license/API/readme for OpenWork, Jean, Panes, Acepe, collab-public, Athas, Orca, Emdash, FactoryFloor, Glass, Paseo, Parallel Code, Commander, Herdr, Yume, active OpenCode, Arbor, Finite, and Kanna.
 3. Re-score only after verification; keep handoff-only rows marked as handoff-only until then.
 4. Run the desktop-server mock spike against one or two candidates.
 5. Create a `DEC-*` only after accepting a desktop substrate, reference mechanic, or explicit "build native" strategy.
@@ -261,6 +294,7 @@ Replace with Superhuman-native primitives:
 - Is the first desktop artifact a packaged web shell, Electron app, Tauri app, native Mac app, or candidate-derived client?
 - How mature is VS Code's own agent-mode movement relative to the agent-first frontends that had a head start, and is it already mature enough to justify treating VS Code as a top-tier fork or borrowing candidate?
 - If VS Code is now a strong contender, what is the smallest acceptable fork or adaptation seam: custom workbench surface, extension-host-first product, narrowed distribution, or a deeper product fork?
+- Which current candidate can host Superhuman's workspace-server contract and provenance model cleanly enough that Superhuman only needs to build its own protocol and product-state layer instead of forking deeper?
 - Does mobile sync happen through direct workspace-server connection, Superhuman cloud/gateway, a self-hosted relay, local-network pairing, or several modes?
 - Which candidate has the cleanest replaceable client after source verification: OpenHands, OpenWork, Jean, T3 Code, active OpenCode, or a smaller shell?
 - Which candidate has the best mechanic to steal, even if it is not the fork substrate?
