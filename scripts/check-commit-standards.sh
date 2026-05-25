@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/sh
 
 set -eu
 
@@ -8,7 +8,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 msg_file=$1
-repo_root=$(git rev-parse --show-toplevel)
+repo_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 
 if [ ! -f "$msg_file" ]; then
   echo "commit standards check failed: commit message file not found: $msg_file" >&2
@@ -23,6 +23,11 @@ has_trailer() {
 trailer_value() {
   key=$1
   sed -n "s/^$key: //p" "$msg_file" | tail -n 1
+}
+
+is_exception_commit() {
+  grep -Eqi '^(bootstrap|migration)(\b| exception\b)' "$msg_file" ||
+    grep -Eqi '^exception: (bootstrap|migration)$' "$msg_file"
 }
 
 fail() {
@@ -43,6 +48,8 @@ fail() {
   echo "  rationale:" >&2
   echo "  checks:" >&2
   echo "  notes: (optional)" >&2
+  echo >&2
+  echo "Bootstrap or migration exceptions must be explicit in the commit message." >&2
   exit 1
 }
 
@@ -217,6 +224,7 @@ validate_body() {
 check_primary_id_uniqueness() {
   primary_id=$1
   refs=""
+  head_sha=$(git -C "$repo_root" rev-parse -q --verify HEAD 2>/dev/null || true)
 
   current_ref=$(git -C "$repo_root" symbolic-ref -q --short HEAD 2>/dev/null || true)
   default_ref=$(default_branch_ref || true)
@@ -231,30 +239,29 @@ check_primary_id_uniqueness() {
 
   [ -n "$refs" ] || return 0
 
-  if git -C "$repo_root" log --format=%B $refs 2>/dev/null |
-    awk -v primary_id="$primary_id" '
-      /^commit: / {
-        sub(/^commit: /, "")
-        count = split($0, ids, ",")
-        for (i = 1; i <= count; i++) {
-          gsub(/^ +| +$/, "", ids[i])
-          if (ids[i] == primary_id) {
-            exit 0
-          }
-        }
-      }
-      END {
-        exit 1
-      }
-    '; then
-    fail "primary \`commit:\` id already exists in history: $primary_id"
-  fi
+  for sha in $(git -C "$repo_root" rev-list $refs 2>/dev/null); do
+    existing_value=$(git -C "$repo_root" log -1 --format=%B "$sha" | sed -n 's/^commit: //p' | tail -n 1)
+    [ -n "$existing_value" ] || continue
+
+    for existing_id in $(extract_commit_ids_from_value "$existing_value"); do
+      if [ "$existing_id" = "$primary_id" ]; then
+        if [ -n "$head_sha" ] && [ "$sha" = "$head_sha" ]; then
+          continue
+        fi
+        fail "primary \`commit:\` id already exists in history: $primary_id (generate a fresh skeleton with sh scripts/new-commit-message.sh --subject \"...\")"
+      fi
+    done
+  done
 
   return 0
 }
 
 subject=$(sed -n '1p' "$msg_file")
 [ -n "$subject" ] || fail "subject line is empty"
+
+if is_exception_commit; then
+  exit 0
+fi
 
 has_trailer "project" || fail "missing trailer: project"
 has_trailer "agent" || fail "missing trailer: agent"
