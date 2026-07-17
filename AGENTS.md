@@ -17,15 +17,15 @@ Before writing into an artifact directory, read its `README.md` and follow its p
 
 Load the skill before the trigger condition fires. Each skill defines the procedure; follow it.
 
-| Trigger                                                     | Skill                                         |
-| ----------------------------------------------------------- | --------------------------------------------- |
-| Before creating a normal commit                             | `skills/commit-generator/SKILL.md`            |
-| Before any destructive file edit (replace, delete, rewrite) | `skills/clean-correction-gate/SKILL.md`       |
-| When routing work or creating repo artifacts                | `skills/repo-orchestrator/SKILL.md`           |
-| When reviewing inbox pressure                               | `skills/daily-inbox-pressure-review/SKILL.md` |
-| When reviewing upstream changes                             | `skills/upstream-intake/SKILL.md`             |
-| When sharpening or iteratively refining an artifact         | `skills/sharpen-the-tip/SKILL.md`             |
-| When prototyping, greenfield building, or working pre-MVP   | `skills/prototype-mode/SKILL.md`              |
+| Trigger                                                              | Skill                                         |
+| -------------------------------------------------------------------- | --------------------------------------------- |
+| Before creating a normal commit                                      | `skills/commit-generator/SKILL.md`            |
+| Before replacing, deleting, or rewriting content that already exists | `skills/clean-correction/SKILL.md`            |
+| When routing work or creating repo artifacts                         | `skills/repo-orchestrator/SKILL.md`           |
+| When reviewing inbox pressure                                        | `skills/daily-inbox-pressure-review/SKILL.md` |
+| When reviewing upstream changes                                      | `skills/upstream-intake/SKILL.md`             |
+
+Repo-agnostic skills (`sharpen-the-tip`, `prototype-mode`, `housekeeping`, `proactive-docs`) are **global**, not vendored per repo — they live in `~/.agents/skills/` via the `agents` module of LPFchan/setup, and your runtime surfaces them automatically.
 
 ## Rules
 
